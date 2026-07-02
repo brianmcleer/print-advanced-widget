@@ -68,33 +68,86 @@ function configToXml(config: any): string {
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + withVer + '\n'
 }
 
-function elementToValue(el: Element): any {
-    const t = el.getAttribute('t')
-    if (t === 'null') return null
-    if (t === 'a') {
-        return Array.from(el.children).map(c => elementToValue(c as Element))
+interface CfgNode { tag: string, attrs: { [k: string]: string }, children: CfgNode[], text: string }
+
+/** Unescape the XML entities our serializer emits, plus numeric refs. */
+function unescapeXml(s: string): string {
+    return s
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .replace(/&#x([0-9a-fA-F]+);/g, (_m, h) => String.fromCodePoint(parseInt(h, 16)))
+        .replace(/&#(\d+);/g, (_m, d) => String.fromCodePoint(Number(d)))
+        .replace(/&amp;/g, '&') // must run last so escaped ampersands restore correctly
+}
+
+/**
+ * Parse our own structurally-typed config XML WITHOUT DOMParser, so the imported
+ * string is never handed to a markup/HTML parser. The format is exactly what
+ * valueToXml (above) produces: elements carrying t = s|n|b|o|a|null, arrays of
+ * <item>, objects keyed by tag name. Patterns are delimiter-bounded (no nested
+ * quantifiers) to avoid catastrophic backtracking.
+ */
+function parseConfigXml(xml: string): CfgNode {
+    const s = xml
+        .replace(/<\?[\s\S]*?\?>/g, '')   // <?xml ...?> prolog / processing instructions
+        .replace(/<!--[\s\S]*?-->/g, '')  // comments
+        .replace(/<!DOCTYPE[^>]*>/gi, '') // doctype
+    const tagRe = /<(\/?)([A-Za-z_$][\w.$-]*)([^>]*?)(\/?)>/g
+    const attrRe = /([\w.$-]+)\s*=\s*"([^"]*)"/g
+    const stack: CfgNode[] = []
+    let root: CfgNode | null = null
+    let last = 0
+    let m: RegExpExecArray | null
+    while ((m = tagRe.exec(s)) !== null) {
+        if (stack.length) {
+            const between = s.slice(last, m.index)
+            if (between) stack[stack.length - 1].text += unescapeXml(between)
+        }
+        last = tagRe.lastIndex
+        const name = m[2]
+        if (m[1] === '/') { // closing tag
+            const node = stack.pop()
+            if (!node || node.tag !== name) throw new Error('The file is not valid XML.')
+            if (!stack.length) root = node
+            continue
+        }
+        const attrs: { [k: string]: string } = {}
+        let a: RegExpExecArray | null
+        attrRe.lastIndex = 0
+        while ((a = attrRe.exec(m[3] || '')) !== null) attrs[a[1]] = unescapeXml(a[2])
+        const node: CfgNode = { tag: name, attrs, children: [], text: '' }
+        if (stack.length) stack[stack.length - 1].children.push(node)
+        if (m[4] === '/') { if (!stack.length) root = node } // self-closing element
+        else stack.push(node)
     }
+    if (stack.length || !root) throw new Error('The file is not valid XML.')
+    return root
+}
+
+/** Restore a config value from a parsed node using its t attribute. */
+function nodeToValue(node: CfgNode): any {
+    const t = node.attrs.t
+    if (t === 'null') return null
+    if (t === 'a') return node.children.map(nodeToValue)
     if (t === 'o') {
         const obj: any = {}
-        Array.from(el.children).forEach(c => { obj[(c as Element).tagName] = elementToValue(c as Element) })
+        node.children.forEach(c => { obj[c.tag] = nodeToValue(c) })
         return obj
     }
-    const text = el.textContent || '' // DOMParser already unescapes entities
+    const text = node.text
     if (t === 'n') return text === '' ? 0 : Number(text)
     if (t === 'b') return text === 'true'
     return text // t === 's' (default)
 }
 
 function xmlToConfig(xmlString: string): any {
-    // Parse as application/xml (a data type, never text/html), so the imported
-    // string is not interpreted as HTML. Values are read only as text/number/boolean.
-    const doc = new DOMParser().parseFromString(xmlString, 'application/xml')
-    if (doc.getElementsByTagName('parsererror').length) throw new Error('The file is not valid XML.')
-    const root = doc.documentElement
-    if (!root || (root.tagName !== XML_ROOT && root.tagName !== 'PrintDesignerConfig')) {
+    const root = parseConfigXml(xmlString)
+    if (root.tag !== XML_ROOT && root.tag !== 'PrintDesignerConfig') {
         throw new Error('This is not a Print Advanced configuration (root <' + XML_ROOT + '> not found).')
     }
-    return elementToValue(root)
+    return nodeToValue(root)
 }
 
 export default class Setting extends React.PureComponent<AllWidgetSettingProps<IMConfig>, State> {
