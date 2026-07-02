@@ -72,14 +72,21 @@ interface CfgNode { tag: string, attrs: { [k: string]: string }, children: CfgNo
 
 /** Unescape the XML entities our serializer emits, plus numeric refs. */
 function unescapeXml(s: string): string {
-    return s
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&apos;/g, "'")
-        .replace(/&#x([0-9a-fA-F]+);/g, (_m, h) => String.fromCodePoint(parseInt(h, 16)))
-        .replace(/&#(\d+);/g, (_m, d) => String.fromCodePoint(Number(d)))
-        .replace(/&amp;/g, '&') // must run last so escaped ampersands restore correctly
+    // Single pass over one alternation, so a decoded value can never be re-scanned
+    // and turned back into an entity. Each match maps to exactly one character.
+    return s.replace(/&(?:lt|gt|quot|apos|amp|#x[0-9a-fA-F]+|#\d+);/g, (ent) => {
+        switch (ent) {
+            case '&lt;': return '<'
+            case '&gt;': return '>'
+            case '&quot;': return '"'
+            case '&apos;': return "'"
+            case '&amp;': return '&'
+            default:
+                return ent.charAt(2) === 'x' || ent.charAt(2) === 'X'
+                    ? String.fromCodePoint(parseInt(ent.slice(3, -1), 16))
+                    : String.fromCodePoint(Number(ent.slice(2, -1)))
+        }
+    })
 }
 
 /**
