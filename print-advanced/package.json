@@ -1,0 +1,25 @@
+{
+  "name": "print-advanced",
+  "version": "1.0.0",
+  "description": "Advanced print widget for ArcGIS Experience Builder that reproduces ArcGIS Pro .pagx layouts in the browser and exports PDF, SVG, PNG, JPG, GIF, TIFF, and EPS with no print service required.",
+  "keywords": [
+    "exb-widget",
+    "experience-builder",
+    "exb",
+    "print",
+    "pagx",
+    "layout",
+    "pdf",
+    "arcgis",
+    "scale-bar",
+    "north-arrow"
+  ],
+  "license": "Apache-2.0",
+  "author": "Brian McLeer",
+  "dependencies": {
+    "jspdf": "^4.2.1",
+    "upng-js": "^2.1.0",
+    "utif": "^3.1.0",
+    "gifenc": "^1.0.3"
+  }
+}

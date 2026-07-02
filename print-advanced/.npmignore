@@ -1,0 +1,8 @@
+node_modules/
+.vs/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+desktop.ini
+dist/
