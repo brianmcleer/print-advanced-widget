@@ -97,23 +97,24 @@ function unescapeXml(s: string): string {
  * quantifiers) to avoid catastrophic backtracking.
  */
 function parseConfigXml(xml: string): CfgNode {
-    const s = xml
-        .replace(/<\?[\s\S]*?\?>/g, '')   // <?xml ...?> prolog / processing instructions
-        .replace(/<!--[\s\S]*?-->/g, '')  // comments
-        .replace(/<!DOCTYPE[^>]*>/gi, '') // doctype
-    const tagRe = /<(\/?)([A-Za-z_$][\w.$-]*)([^>]*?)(\/?)>/g
+    // Single scan. The prolog (<?...?>), comments (<!--...-->) and declarations
+    // (<!...>) are matched as tokens and skipped in place, so there is no separate
+    // string-sanitization pass. Every pattern is delimiter-bounded to avoid
+    // catastrophic backtracking.
+    const tokenRe = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<![^>]*>|<(\/?)([A-Za-z_$][\w.$-]*)([^>]*?)(\/?)>/g
     const attrRe = /([\w.$-]+)\s*=\s*"([^"]*)"/g
     const stack: CfgNode[] = []
     let root: CfgNode | null = null
     let last = 0
     let m: RegExpExecArray | null
-    while ((m = tagRe.exec(s)) !== null) {
+    while ((m = tokenRe.exec(xml)) !== null) {
         if (stack.length) {
-            const between = s.slice(last, m.index)
+            const between = xml.slice(last, m.index)
             if (between) stack[stack.length - 1].text += unescapeXml(between)
         }
-        last = tagRe.lastIndex
+        last = tokenRe.lastIndex
         const name = m[2]
+        if (name === undefined) continue // prolog / comment / declaration: skip
         if (m[1] === '/') { // closing tag
             const node = stack.pop()
             if (!node || node.tag !== name) throw new Error('The file is not valid XML.')
