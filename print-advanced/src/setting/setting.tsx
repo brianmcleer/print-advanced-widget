@@ -10,7 +10,10 @@ import { React, jsx, css, Immutable } from 'jimu-core'
 import { AllWidgetSettingProps } from 'jimu-for-builder'
 import { MapWidgetSelector, SettingSection, SettingRow } from 'jimu-ui/advanced/setting-components'
 import { Button, Select, TextInput, TextArea, NumericInput, Alert, Switch, Checkbox, Tooltip } from 'jimu-ui'
-import { FORMAT_LABELS, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } from '../runtime/lib/pdfRenderer'
+// Import UI constants from printConstants, NOT from runtime/lib/pdfRenderer.
+// pdfRenderer imports esri/* modules; pulling it into the settings bundle makes
+// the settings panel fail to load in the builder (no AMD loader there yet).
+import { FORMAT_LABELS, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } from '../printConstants'
 import { IMConfig, PrintLayout, PictureEl, LegendEl, newLayoutId } from '../config'
 import { parsePagx } from '../pagxParser'
 import defaultMessages from './translations/default'
