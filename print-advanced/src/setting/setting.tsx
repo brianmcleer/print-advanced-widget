@@ -1076,31 +1076,31 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     </SettingRow>
                     {this.meOn('enabled') && (
                         <React.Fragment>
-                            <SettingRow tag='label' label={messages.meShowPreview} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowPreview} truncateLabel indented>
                                 <Switch checked={this.meOn('showPreview', true)}
                                     onChange={(e) => this.setMapExtent('showPreview', e.target.checked ? '' : false)} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowPreserveScale} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowPreserveScale} truncateLabel indented>
                                 <Switch checked={this.meOn('showPreserveScale', true)}
                                     onChange={(e) => this.setMapExtent('showPreserveScale', e.target.checked ? '' : false)} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowPreserveExtent} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowPreserveExtent} truncateLabel indented>
                                 <Switch checked={this.meOn('showPreserveExtent')}
                                     onChange={(e) => this.setMapExtent('showPreserveExtent', e.target.checked ? true : '')} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowForceScale} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowForceScale} truncateLabel indented>
                                 <Switch checked={this.meOn('showForceScale')}
                                     onChange={(e) => this.setMapExtent('showForceScale', e.target.checked ? true : '')} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowScaleSelect} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowScaleSelect} truncateLabel indented>
                                 <Switch checked={this.meOn('showScaleSelect')}
                                     onChange={(e) => this.setMapExtent('showScaleSelect', e.target.checked ? true : '')} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowLock} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowLock} truncateLabel indented>
                                 <Switch checked={this.meOn('showLock')}
                                     onChange={(e) => this.setMapExtent('showLock', e.target.checked ? true : '')} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.mePreviewDefault} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.mePreviewDefault} truncateLabel indented>
                                 <Switch checked={this.meOn('previewOnByDefault')}
                                     onChange={(e) => this.setMapExtent('previewOnByDefault', e.target.checked ? true : '')} />
                             </SettingRow>
