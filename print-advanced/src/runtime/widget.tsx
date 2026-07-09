@@ -628,7 +628,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
     this.setState({ busy: true, error: null, lastResult: null, status: 'Preparing…' })
     try {
-      const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 4096
+      const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0 // 0 = auto (GPU-detected)
       const effLayout = this.state.dpi
         ? { ...layout, dpi: Number(this.state.dpi) }
         : layout
@@ -839,6 +839,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                   <option value='150'>150</option>
                   <option value='200'>200</option>
                   <option value='300'>300</option>
+                  <option value='400'>400</option>
+                  <option value='600'>600</option>
                 </Select>
               </Tooltip>
             </div>
@@ -1081,6 +1083,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                   <option value='150'>150</option>
                   <option value='200'>200</option>
                   <option value='300'>300</option>
+                  <option value='400'>400</option>
+                  <option value='600'>600</option>
                 </Select>
               </Tooltip>
             </div>

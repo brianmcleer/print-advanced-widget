@@ -1085,9 +1085,14 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             onChange={(e: any) => this.setCfg('defaultFilename', e.target.value)} />
                     </SettingRow>
                     <SettingRow flow='wrap' label={messages.maxCapture} truncateLabel>
-                        <NumericInput size='sm' className='w-100' min={1024} max={8192} step={256}
-                            value={Number((this.props.config as any)?.maxImagePx) || 4096}
-                            onChange={(v: number) => this.setCfg('maxImagePx', v === 4096 ? '' : v)} />
+                        <TextInput size='sm' className='w-100'
+                            value={String((this.props.config as any)?.maxImagePx || '')}
+                            placeholder='Auto (graphics card limit)'
+                            onChange={(e: any) => {
+                                const digits = String(e.target.value || '').replace(/[^0-9]/g, '')
+                                const n = Math.min(16384, Number(digits) || 0)
+                                this.setCfg('maxImagePx', n > 0 ? n : '')
+                            }} />
                     </SettingRow>
                     <SettingRow>
                         <div className='pd-hint'>{messages.defaultsHint}</div>

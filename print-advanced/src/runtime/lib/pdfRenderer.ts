@@ -124,7 +124,17 @@ function replaceTokens(tpl: string, tk: TextTokens): string {
         .replace(/\{scale\}/g, fmtNumber(tk.printedScale))
         .replace(/\{scaleRatio:(\w+):(\d+)\}/g, (_m, unit: string, dp: string) => {
             const per = INCHES_PER_UNIT[unit] || 12
-            return fmtNumber(tk.printedScale / per, parseInt(dp, 10) || 0)
+            const v = tk.printedScale / per
+            let decimals = parseInt(dp, 10) || 0
+            // Pro prints "1 inch equals 0 miles" when decimalPlaces rounds a
+            // nonzero value to 0 (common at city scales with mapUnits="mi").
+            // Escalate to two significant digits instead of printing 0.
+            if (v > 0 && parseFloat(v.toFixed(decimals)) === 0) {
+                decimals = Math.min(6, Math.ceil(-Math.log10(v)) + 1)
+                const trimmed = String(parseFloat(v.toFixed(decimals)))
+                decimals = (trimmed.split('.')[1] || '').length
+            }
+            return fmtNumber(v, decimals)
         })
 }
 
@@ -176,6 +186,32 @@ interface CaptureResult {
     rotation: number
 }
 
+/* ------------------------------------------------------------------ */
+/* GPU capability probe                                                 */
+/* ------------------------------------------------------------------ */
+
+let _gpuMaxPx: number | null = null
+
+/** Longest canvas side the GPU can render (min of MAX_TEXTURE_SIZE and
+ *  MAX_RENDERBUFFER_SIZE), probed once. Falls back to 8192. */
+export function gpuMaxCapturePx (): number {
+    if (_gpuMaxPx !== null) return _gpuMaxPx
+    let max = 8192
+    try {
+        const c = document.createElement('canvas')
+        const gl = (c.getContext('webgl2') || c.getContext('webgl')) as WebGLRenderingContext | null
+        if (gl) {
+            const t = Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 8192
+            const r = Number(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)) || 8192
+            max = Math.max(2048, Math.min(t, r))
+            const lose = gl.getExtension('WEBGL_lose_context')
+            if (lose) lose.loseContext()
+        }
+    } catch (e) { /* keep fallback */ }
+    _gpuMaxPx = max
+    return max
+}
+
 export async function captureMapHiRes(
     liveView: MapView,
     frameWIn: number,
@@ -187,11 +223,20 @@ export async function captureMapHiRes(
 ): Promise<CaptureResult> {
     let capW = Math.round(frameWIn * layout.dpi)
     let capH = Math.round(frameHIn * layout.dpi)
+    // Cap the longest side: admin setting if provided, otherwise auto
+    // (GPU limit, but no higher than 8192 to keep memory sane). The GPU
+    // limit always wins - a canvas larger than MAX_TEXTURE_SIZE renders
+    // blank or fails on takeScreenshot.
+    const gpuMax = gpuMaxCapturePx()
+    const capLimit = Math.min(maxImagePx > 0 ? maxImagePx : Math.min(gpuMax, 8192), gpuMax)
     const maxDim = Math.max(capW, capH)
-    if (maxDim > maxImagePx) {
-        const s = maxImagePx / maxDim
+    if (maxDim > capLimit) {
+        const s = capLimit / maxDim
         capW = Math.round(capW * s)
         capH = Math.round(capH * s)
+        onProgress('Map capture capped at ' + capLimit + ' px (' +
+            (maxImagePx > 0 && capLimit === maxImagePx ? 'settings limit' : 'graphics card limit') +
+            '); effective ' + Math.round(capW / frameWIn) + ' DPI.')
     }
     const effectiveDpi = capW / frameWIn
 
