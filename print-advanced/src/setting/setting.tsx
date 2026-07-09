@@ -10,7 +10,10 @@ import { React, jsx, css, Immutable } from 'jimu-core'
 import { AllWidgetSettingProps } from 'jimu-for-builder'
 import { MapWidgetSelector, SettingSection, SettingRow } from 'jimu-ui/advanced/setting-components'
 import { Button, Select, TextInput, TextArea, NumericInput, Alert, Switch, Checkbox, Tooltip } from 'jimu-ui'
-import { FORMAT_LABELS, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } from '../runtime/lib/pdfRenderer'
+// Import UI constants from printConstants, NOT from runtime/lib/pdfRenderer.
+// pdfRenderer imports esri/* modules; pulling it into the settings bundle makes
+// the settings panel fail to load in the builder (no AMD loader there yet).
+import { FORMAT_LABELS, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } from '../printConstants'
 import { IMConfig, PrintLayout, PictureEl, LegendEl, newLayoutId } from '../config'
 import { parsePagx } from '../pagxParser'
 import defaultMessages from './translations/default'
@@ -1073,31 +1076,31 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     </SettingRow>
                     {this.meOn('enabled') && (
                         <React.Fragment>
-                            <SettingRow tag='label' label={messages.meShowPreview} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowPreview} truncateLabel indented>
                                 <Switch checked={this.meOn('showPreview', true)}
                                     onChange={(e) => this.setMapExtent('showPreview', e.target.checked ? '' : false)} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowPreserveScale} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowPreserveScale} truncateLabel indented>
                                 <Switch checked={this.meOn('showPreserveScale', true)}
                                     onChange={(e) => this.setMapExtent('showPreserveScale', e.target.checked ? '' : false)} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowPreserveExtent} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowPreserveExtent} truncateLabel indented>
                                 <Switch checked={this.meOn('showPreserveExtent')}
                                     onChange={(e) => this.setMapExtent('showPreserveExtent', e.target.checked ? true : '')} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowForceScale} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowForceScale} truncateLabel indented>
                                 <Switch checked={this.meOn('showForceScale')}
                                     onChange={(e) => this.setMapExtent('showForceScale', e.target.checked ? true : '')} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowScaleSelect} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowScaleSelect} truncateLabel indented>
                                 <Switch checked={this.meOn('showScaleSelect')}
                                     onChange={(e) => this.setMapExtent('showScaleSelect', e.target.checked ? true : '')} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.meShowLock} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.meShowLock} truncateLabel indented>
                                 <Switch checked={this.meOn('showLock')}
                                     onChange={(e) => this.setMapExtent('showLock', e.target.checked ? true : '')} />
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.mePreviewDefault} truncateLabel indentLevel={1}>
+                            <SettingRow tag='label' label={messages.mePreviewDefault} truncateLabel indented>
                                 <Switch checked={this.meOn('previewOnByDefault')}
                                     onChange={(e) => this.setMapExtent('previewOnByDefault', e.target.checked ? true : '')} />
                             </SettingRow>
