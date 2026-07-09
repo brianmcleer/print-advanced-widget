@@ -16,6 +16,7 @@ Two print sources are available:
 ## Features
 
 - Client side rendering of ArcGIS Pro .pagx layouts, calibrated against real Pro output.
+- Import one or more .pagx layouts at a time in the settings panel; each becomes a selectable layout.
 - Print area preview on the live map, with scale modes (preserve scale, preserve extent, fixed scale, or pick from a list) and a lock toggle.
 - Output coordinate system (WKID) selection in both print sources.
 - 12 north arrow styles and 9 scale bar styles, each shown as a visual thumbnail picker, plus a Layout default option.
@@ -57,6 +58,11 @@ https://community.esri.com/t5/experience-builder-custom-widgets/print-advanced-b
 
 Or open an issue on the GitHub repository:
 https://github.com/brianmcleer/print-advanced-widget
+
+## Contributors
+
+- Brian McLeer, City of Grand Junction, CO (author, maintainer)
+- Nicholas Cramer, Polk County, OR (contributor)
 
 ## License
 

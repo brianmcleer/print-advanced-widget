@@ -54,6 +54,11 @@ Version tags must increase and never repeat. Bug fix: v1.0.1. New feature: v1.1.
 
 For the Esri Community post, zip the `print-advanced-widget\print-advanced\` subfolder (not the live EB widget folder) and upload that as the attachment, so it stays in sync with the GitHub release and stays free of `node_modules` and `.vs`.
 
+## Contributors
+
+- Brian McLeer, City of Grand Junction, CO (author, maintainer)
+- Nicholas Cramer, Polk County, OR (contributor)
+
 ## License
 
 Apache-2.0. See the LICENSE file.

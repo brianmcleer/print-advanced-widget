@@ -507,23 +507,51 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         this.fileInputRef.current?.click()
     }
 
+    // Read one file as text (wrapped so several can be imported together).
+    private readFileText(file: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(String(reader.result))
+            reader.onerror = () => reject(new Error('Could not read ' + file.name + '.'))
+            reader.readAsText(file)
+        })
+    }
+
     onPagxChosen = (e: React.ChangeEvent<HTMLInputElement>): void => {
-        const file = e.target.files && e.target.files[0]
-        e.target.value = ''
-        if (!file) return
-        const reader = new FileReader()
-        reader.onload = () => {
-            try {
-                const doc = JSON.parse(String(reader.result))
-                const { layout, warnings } = parsePagx(doc, file.name)
-                this.commitLayouts([...this.getLayouts(), layout])
-                this.setState({ editingId: layout.id, importWarnings: warnings, importError: null })
-            } catch (err: any) {
-                this.setState({ importError: (err && err.message) || 'Import failed.', importWarnings: [] })
+        const files = e.target.files ? Array.from(e.target.files) : []
+        e.target.value = '' // reset so re-choosing the same file(s) fires change again
+        if (!files.length) return
+
+        const multi = files.length > 1
+
+        // Read/parse every file; Promise.all preserves the selection order, so
+        // layouts are added in the order the user picked them (not resolve order).
+        Promise.all(files.map(file =>
+            this.readFileText(file)
+                .then(text => ({ ok: true as const, file, res: parsePagx(JSON.parse(text), file.name) }))
+                .catch((err: any) => ({ ok: false as const, file, err }))
+        )).then(results => {
+            const added: PrintLayout[] = []
+            const warnings: string[] = []
+            const failed: string[] = []
+            results.forEach((r: any) => {
+                if (r.ok) {
+                    added.push(r.res.layout)
+                    r.res.warnings.forEach((w: string) => warnings.push(multi ? r.file.name + ': ' + w : w))
+                } else {
+                    failed.push(r.file.name + ' (' + ((r.err && r.err.message) || 'import failed') + ')')
+                }
+            })
+            if (added.length) {
+                this.commitLayouts([...this.getLayouts(), ...added])
             }
-        }
-        reader.onerror = () => this.setState({ importError: 'Could not read the file.', importWarnings: [] })
-        reader.readAsText(file)
+            const error = failed.length ? 'Could not import: ' + failed.join('; ') : null
+            this.setState({
+                editingId: added.length ? added[added.length - 1].id : this.state.editingId,
+                importWarnings: warnings,
+                importError: added.length ? error : (error || 'Import failed.')
+            })
+        })
     }
 
     duplicateLayout = (): void => {
@@ -648,7 +676,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         return (
             <div css={this.getStyle()}>
                 {/* hidden file inputs */}
-                <input ref={this.fileInputRef} type='file' accept='.pagx,application/json'
+                <input ref={this.fileInputRef} type='file' accept='.pagx,application/json' multiple
                     tabIndex={-1} aria-label={messages.importPagx}
                     style={{ display: 'none' }} onChange={this.onPagxChosen} />
                 <input ref={this.pictureInputRef} type='file' accept='image/*'
