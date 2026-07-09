@@ -16,14 +16,14 @@
  */
 import MapView from 'esri/views/MapView'
 import SpatialReference from 'esri/geometry/SpatialReference'
-import { metersPerMapUnit, extentFitScale, resolvePrintedScale, PrintScaleMode } from './scaleMath'
+import { metersPerMapUnit, extentFitScale, resolvePrintedScale, printExtent, PrintScaleMode } from './scaleMath'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
+import { loadArcGISJSAPIModules } from 'jimu-arcgis'
 import * as symbolUtils from 'esri/symbols/support/symbolUtils'
 import { jsPDF } from 'jspdf'
 import {
     PrintLayout, ScaleBarUnits, ScaleBarStyle, NorthArrowStyle, FontFamily, LayoutElement,
-    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl
-} from '../../config'
+    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig } from '../../config'
 import { Drawer, PdfDrawer, CanvasDrawer, SvgDrawer, splitText } from './drawing'
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -63,6 +63,18 @@ export interface RenderOptions {
     /** MAP_ONLY explicit output size in pixels (matches TemplateOptions width/height). */
     mapOnlyWidth?: number
     mapOnlyHeight?: number
+    /** Runtime user toggles (default on when the layout configures them). */
+    showOverview?: boolean
+    showGrid?: boolean
+    /** Internal: prebuilt grid geometry (projection-engine graticules). */
+    gridGeomOverride?: GridGeometry
+    /** Internal: overview inset payload assembled by renderLayout. */
+    overview?: {
+        cap: CaptureResult
+        box: { xIn: number, yIn: number, wIn: number, hIn: number }
+        indicator: { xIn: number, yIn: number, wIn: number, hIn: number }
+        cfg: OverviewConfig
+    }
     /** Output coordinate system WKID; map is re-rendered in this SR client-side. */
     outputWkid?: number
 }
@@ -75,6 +87,8 @@ export interface RenderResult {
     printedScale: number
     url?: string
     sizeKb?: number
+    /** Set when the map may not have finished drawing before capture. */
+    warning?: string
 }
 
 interface LegendRow {
@@ -143,7 +157,7 @@ function niceBarDistance(printedScale: number, units: ScaleBarUnits, maxIn: numb
     const maxGround = (maxIn * 0.0254 * printedScale) / mpu
     const pow = Math.pow(10, Math.floor(Math.log10(Math.max(maxGround, 1e-6))))
     let best = pow
-    for (const mult of [1, 2, 2.5, 3, 4, 5, 10]) {
+    for (const mult of [1, 2, 2.5, 4, 5, 10]) {
         if (mult * pow <= maxGround) best = mult * pow
     }
     const barIn = (best * mpu) / (0.0254 * printedScale)
@@ -184,6 +198,16 @@ interface CaptureResult {
     printedScale: number
     effectiveDpi: number
     rotation: number
+    /** Set when the map may not have finished drawing before capture. */
+    warning?: string
+    /** Ground extent of the capture in the view's spatial reference
+     *  (valid when rotation = 0 and the output SR matches the map). */
+    groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number }
+    /** Projection family for grid math. */
+    projection?: 'webMercator' | 'geographic' | 'projected'
+    /** True when an output WKID reprojected the capture away from the
+     *  live map's SR (ground extent no longer applies). */
+    reprojected?: boolean
 }
 
 /* ------------------------------------------------------------------ */
@@ -284,21 +308,73 @@ export async function captureMapHiRes(
         ])
         await new Promise(resolve => setTimeout(resolve, 600))
 
-        onProgress('Capturing map image…')
-        const shot = await tmp.takeScreenshot({
-            width: capW,
-            height: capH,
-            format: layout.imageFormat === 'png' ? 'png' : 'jpg',
-            quality: 95
-        } as any)
+        // If the view is still drawing after the wait (slow services, big
+        // captures), the screenshot would silently miss layers. Capture
+        // anyway, but say so honestly on the result.
+        let warning: string | undefined
+        if (tmp.updating) {
+            warning = 'Some layers may not have finished drawing. Export again, or lower the DPI or max capture size.'
+            onProgress('Map is still drawing after 45 s; capturing anyway. ' + warning)
+        }
 
+        onProgress('Capturing map image…')
+        let shot: any
+        try {
+            shot = await tmp.takeScreenshot({
+                width: capW,
+                height: capH,
+                format: layout.imageFormat === 'png' ? 'png' : 'jpg',
+                quality: 95
+            } as any)
+        } catch (err: any) {
+            throw new Error('Map capture failed at ' + capW + ' x ' + capH + ' px' +
+                (err && err.message ? ' (' + err.message + ')' : '') +
+                '. Lower the DPI, or set a smaller Max map capture in settings.')
+        }
+        if (!shot || !shot.dataUrl) {
+            throw new Error('Map capture returned no image at ' + capW + ' x ' + capH + ' px. ' +
+                'Lower the DPI, or set a smaller Max map capture in settings.')
+        }
+
+        const liveWkid = (liveView.spatialReference && (liveView.spatialReference as any).wkid) || 0
+        const reprojected = !!(opts.outputWkid && opts.outputWkid > 0 && opts.outputWkid !== liveWkid)
+        // Ground extent for grid math: the offscreen view knows its own
+        // extent in the CAPTURE spatial reference, so grids stay correct
+        // even when an output WKID reprojects the map. Fall back to the
+        // live-SR computation only when not reprojected.
+        const capWkid = reprojected ? Number(opts.outputWkid) : liveWkid
+        let ground: { xmin: number, ymin: number, xmax: number, ymax: number } | undefined
+        const tExt: any = (tmp as any).extent
+        if (tExt && isFinite(tExt.xmin) && tExt.xmax > tExt.xmin) {
+            ground = { xmin: tExt.xmin, ymin: tExt.ymin, xmax: tExt.xmax, ymax: tExt.ymax }
+        } else if ((tmp as any).center && (tmp as any).resolution) {
+            // The view's extent property was not ready; rebuild it from the
+            // temp view's own center/scale in the CAPTURE spatial reference.
+            const tc: any = (tmp as any).center
+            const mpuTmp = metersPerMapUnit((tmp as any).scale, (tmp as any).resolution)
+            const gx = printExtent(tc.x, tc.y, mpuTmp, frameWIn, frameHIn, printedScale)
+            ground = { xmin: gx.xmin, ymin: gx.ymin, xmax: gx.xmax, ymax: gx.ymax }
+        } else if (!reprojected) {
+            const gx = printExtent(center.x, center.y, mpuLive, frameWIn, frameHIn, printedScale)
+            ground = { xmin: gx.xmin, ymin: gx.ymin, xmax: gx.xmax, ymax: gx.ymax }
+        }
         return {
             dataUrl: shot.dataUrl,
             widthPx: capW,
             heightPx: capH,
             printedScale,
             effectiveDpi,
-            rotation: liveView.rotation || 0
+            rotation: (() => {
+                const raw = liveView.rotation || 0
+                const norm = ((raw % 360) + 360) % 360
+                return (norm < 0.05 || norm > 359.95) ? 0 : raw
+            })(),
+            warning,
+            groundExtent: ground,
+            projection: (capWkid === 3857 || capWkid === 102100 || capWkid === 102113)
+                ? 'webMercator'
+                : (capWkid === 4326 ? 'geographic' : 'projected'),
+            reprojected
         }
     } finally {
         // CRITICAL: temp view shares the live WebMap - detach before destroy.
@@ -853,6 +929,417 @@ async function drawLegendEl(d: Drawer, el: LegendEl, rows: LegendRow[]): Promise
 /* page composition                                                    */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Grids and graticules (ArcGIS Pro style, settings-defined)            */
+/* ------------------------------------------------------------------ */
+
+const R_MERC = 6378137
+
+export function lonToMercX (lonDeg: number): number { return R_MERC * lonDeg * Math.PI / 180 }
+export function mercXToLon (x: number): number { return (x / R_MERC) * 180 / Math.PI }
+export function latToMercY (latDeg: number): number { return R_MERC * Math.asinh(Math.tan(latDeg * Math.PI / 180)) }
+export function mercYToLat (y: number): number { return Math.atan(Math.sinh(y / R_MERC)) * 180 / Math.PI }
+
+/** Clean 1 / 2 / 2.5 / 5 x 10^k interval targeting ~divisions lines. */
+export function niceGridInterval (span: number, divisions = 4): number {
+    const raw = span / Math.max(1, divisions)
+    const pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-12))))
+    let best = pow
+    for (const mult of [1, 2, 2.5, 5, 10]) {
+        if (mult * pow <= raw) best = mult * pow
+    }
+    return best
+}
+
+/** Pro-style graticule ladder (degrees down to seconds). */
+const DEG_LADDER = [45, 30, 15, 10, 5, 2, 1,
+    30 / 60, 15 / 60, 10 / 60, 5 / 60, 2 / 60, 1 / 60,
+    30 / 3600, 15 / 3600, 10 / 3600, 5 / 3600, 2 / 3600, 1 / 3600]
+
+export function niceGraticuleInterval (spanDeg: number, divisions = 4): number {
+    const raw = spanDeg / Math.max(1, divisions)
+    for (const step of DEG_LADDER) {
+        if (step <= raw) return step
+    }
+    return DEG_LADDER[DEG_LADDER.length - 1]
+}
+
+/** Degrees -> D°MM'SS" trimming units the interval never needs. */
+export function fmtDMS (deg: number, intervalDeg: number): string {
+    const sign = deg < 0 ? '-' : ''
+    const a = Math.abs(deg)
+    let d = Math.floor(a)
+    let mFloat = (a - d) * 60
+    let mm = Math.floor(mFloat)
+    let ss = Math.round((mFloat - mm) * 60)
+    if (ss === 60) { ss = 0; mm += 1 }
+    if (mm === 60) { mm = 0; d += 1 }
+    if (intervalDeg >= 1) return sign + d + '\u00B0'
+    if (intervalDeg >= 1 / 60) {
+        return sign + d + '\u00B0' + String(mm).padStart(2, '0') + "'"
+    }
+    return sign + d + '\u00B0' + String(mm).padStart(2, '0') + "'" + String(ss).padStart(2, '0') + '"'
+}
+
+/** Clip a segment to a rectangle (Liang-Barsky). Returns null when fully outside. */
+export function clipSegToRect (
+    x1: number, y1: number, x2: number, y2: number,
+    rx: number, ry: number, rw: number, rh: number
+): [number, number, number, number] | null {
+    let t0 = 0, t1 = 1
+    const dx = x2 - x1, dy = y2 - y1
+    const p = [-dx, dx, -dy, dy]
+    const q = [x1 - rx, rx + rw - x1, y1 - ry, ry + rh - y1]
+    for (let i = 0; i < 4; i++) {
+        if (p[i] === 0) { if (q[i] < 0) return null; continue }
+        const r = q[i] / p[i]
+        if (p[i] < 0) { if (r > t1) return null; if (r > t0) t0 = r }
+        else { if (r < t0) return null; if (r < t1) t1 = r }
+    }
+    return [x1 + t0 * dx, y1 + t0 * dy, x1 + t1 * dx, y1 + t1 * dy]
+}
+
+/** Graticule from an arbitrary projector pair. Samples the extent border to
+ *  find the lat/lon range (extremes can sit mid-edge in projected systems),
+ *  then draws each meridian/parallel as a sampled polyline clipped to the
+ *  frame, so curved graticules render correctly in any projection. */
+export function buildGraticuleGeometry (
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number },
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number },
+    cfg: GridConfig,
+    toGeo: (x: number, y: number) => [number, number],
+    fromGeo: (lon: number, lat: number) => [number, number],
+    samples = 24
+): GridGeometry {
+    const g: GridGeometry = { lines: [], crosses: [], ticks: [], labels: [] }
+    const pageX = (x: number): number => mf.xIn + (x - ext.xmin) / (ext.xmax - ext.xmin) * mf.wIn
+    const pageY = (y: number): number => mf.yIn + (ext.ymax - y) / (ext.ymax - ext.ymin) * mf.hIn
+    const markScale = gridMarkScale(mf)
+
+    // Border sampling for the geographic range
+    let lonMin = Infinity, lonMax = -Infinity, latMin = Infinity, latMax = -Infinity
+    const N = 8
+    for (let i = 0; i <= N; i++) {
+        const fx = ext.xmin + (i / N) * (ext.xmax - ext.xmin)
+        const fy = ext.ymin + (i / N) * (ext.ymax - ext.ymin)
+        for (const [px, py] of [[fx, ext.ymin], [fx, ext.ymax], [ext.xmin, fy], [ext.xmax, fy]]) {
+            const ll = toGeo(px, py)
+            if (!ll || !isFinite(ll[0]) || !isFinite(ll[1])) continue
+            lonMin = Math.min(lonMin, ll[0]); lonMax = Math.max(lonMax, ll[0])
+            latMin = Math.min(latMin, ll[1]); latMax = Math.max(latMax, ll[1])
+        }
+    }
+    if (!isFinite(lonMin) || lonMax <= lonMin || latMax <= latMin) return g
+
+    const step = cfg.intervalMode === 'fixed' && Number(cfg.fixedInterval) > 0
+        ? Number(cfg.fixedInterval)
+        : niceGraticuleInterval(Math.max(lonMax - lonMin, latMax - latMin))
+    const tickLen = 0.12 * markScale, crossLen = 0.08 * markScale
+    const fx0 = mf.xIn, fy0 = mf.yIn, fw = mf.wIn, fh = mf.hIn
+
+    const addPolyline = (pts: Array<[number, number]>): void => {
+        for (let i = 1; i < pts.length; i++) {
+            const c = clipSegToRect(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], fx0, fy0, fw, fh)
+            if (c) g.lines.push({ x1In: c[0], y1In: c[1], x2In: c[2], y2In: c[3] })
+        }
+    }
+
+    const meridians: number[] = []
+    for (let lon = Math.ceil(lonMin / step) * step; lon <= lonMax + 1e-12; lon += step) meridians.push(lon)
+    const parallels: number[] = []
+    for (let lat = Math.ceil(latMin / step) * step; lat <= latMax + 1e-12; lat += step) parallels.push(lat)
+
+    for (const lon of meridians) {
+        const pts: Array<[number, number]> = []
+        for (let i = 0; i <= samples; i++) {
+            const lat = latMin + (i / samples) * (latMax - latMin)
+            const xy = fromGeo(lon, lat)
+            if (xy && isFinite(xy[0])) pts.push([pageX(xy[0]), pageY(xy[1])])
+        }
+        addPolyline(pts)
+        if (cfg.labels !== false && pts.length) {
+            // label where the meridian meets top and bottom edges
+            for (const edge of ['top', 'bottom'] as const) {
+                const targetY = edge === 'top' ? fy0 : fy0 + fh
+                let best: [number, number] | null = null
+                for (const pt of pts) if (!best || Math.abs(pt[1] - targetY) < Math.abs(best[1] - targetY)) best = pt
+                if (best && best[0] >= fx0 - 0.05 && best[0] <= fx0 + fw + 0.05) {
+                    g.labels.push({ text: fmtGeoLabel(lon, step, 'lon'), xIn: Math.min(Math.max(best[0], fx0), fx0 + fw), yIn: targetY, edge })
+                }
+            }
+        }
+        // ticks at edges
+        const first = pts[0]; const last = pts[pts.length - 1]
+        if (first) g.ticks.push({ x1In: Math.min(Math.max(first[0], fx0), fx0 + fw), y1In: fy0 + fh - tickLen, x2In: Math.min(Math.max(first[0], fx0), fx0 + fw), y2In: fy0 + fh })
+        if (last) g.ticks.push({ x1In: Math.min(Math.max(last[0], fx0), fx0 + fw), y1In: fy0, x2In: Math.min(Math.max(last[0], fx0), fx0 + fw), y2In: fy0 + tickLen })
+    }
+    for (const lat of parallels) {
+        const pts: Array<[number, number]> = []
+        for (let i = 0; i <= samples; i++) {
+            const lon = lonMin + (i / samples) * (lonMax - lonMin)
+            const xy = fromGeo(lon, lat)
+            if (xy && isFinite(xy[0])) pts.push([pageX(xy[0]), pageY(xy[1])])
+        }
+        addPolyline(pts)
+        if (cfg.labels !== false && pts.length) {
+            for (const edge of ['left', 'right'] as const) {
+                const targetX = edge === 'left' ? fx0 : fx0 + fw
+                let best: [number, number] | null = null
+                for (const pt of pts) if (!best || Math.abs(pt[0] - targetX) < Math.abs(best[0] - targetX)) best = pt
+                if (best && best[1] >= fy0 - 0.05 && best[1] <= fy0 + fh + 0.05) {
+                    g.labels.push({ text: fmtGeoLabel(lat, step, 'lat'), xIn: targetX, yIn: Math.min(Math.max(best[1], fy0), fy0 + fh), edge })
+                }
+            }
+        }
+        const first = pts[0]; const last = pts[pts.length - 1]
+        if (first) g.ticks.push({ x1In: fx0, y1In: Math.min(Math.max(first[1], fy0), fy0 + fh), x2In: fx0 + tickLen, y2In: Math.min(Math.max(first[1], fy0), fy0 + fh) })
+        if (last) g.ticks.push({ x1In: fx0 + fw - tickLen, y1In: Math.min(Math.max(last[1], fy0), fy0 + fh), x2In: fx0 + fw, y2In: Math.min(Math.max(last[1], fy0), fy0 + fh) })
+    }
+    // crosses at meridian/parallel intersections
+    for (const lon of meridians) {
+        for (const lat of parallels) {
+            const xy = fromGeo(lon, lat)
+            if (!xy || !isFinite(xy[0])) continue
+            const px = pageX(xy[0]), py = pageY(xy[1])
+            if (px < fx0 || px > fx0 + fw || py < fy0 || py > fy0 + fh) continue
+            g.crosses.push({ x1In: px - crossLen / 2, y1In: py, x2In: px + crossLen / 2, y2In: py })
+            g.crosses.push({ x1In: px, y1In: py - crossLen / 2, x2In: px, y2In: py + crossLen / 2 })
+        }
+    }
+    return g
+}
+
+/** Marks (ticks, crosses) scale with the map frame so they stay visible on
+ *  large formats: 1x at letter size, ~4x on a 36x48 sheet. */
+export function gridMarkScale (mf: { wIn: number, hIn: number }): number {
+    return Math.max(1, Math.min(5, Math.min(mf.wIn, mf.hIn) / 6.5))
+}
+
+/** Cartographic geographic label: 108°30'W rather than -108°30'. */
+export function fmtGeoLabel (deg: number, intervalDeg: number, axis: 'lon' | 'lat'): string {
+    const base = fmtDMS(Math.abs(deg), intervalDeg)
+    if (Math.abs(deg) < 1e-12) return base
+    return base + (axis === 'lon' ? (deg < 0 ? 'W' : 'E') : (deg < 0 ? 'S' : 'N'))
+}
+
+export interface GridLine { x1In: number, y1In: number, x2In: number, y2In: number }
+export interface GridLabel { text: string, xIn: number, yIn: number, edge: 'top' | 'bottom' | 'left' | 'right' }
+export interface GridGeometry { lines: GridLine[], crosses: GridLine[], ticks: GridLine[], labels: GridLabel[] }
+
+/** Pure geometry builder for graticule / measured grids (rotation 0).
+ *  Returns page-inch line work + edge label anchors; the caller styles it. */
+export function buildGridGeometry (
+    cap: { groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number }, projection?: string },
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number },
+    cfg: GridConfig
+): GridGeometry | null {
+    const g: GridGeometry = { lines: [], crosses: [], ticks: [], labels: [] }
+    const ext = cap.groundExtent
+    if (!ext) return null
+    const markScale = gridMarkScale(mf)
+    const tickLen = 0.12 * markScale
+    const crossLen = 0.08 * markScale
+
+    // Value axes: either lon/lat degrees (graticule) or map units (measured).
+    let xs: Array<{ v: number, pageX: number, label: string }> = []
+    let ys: Array<{ v: number, pageY: number, label: string }> = []
+
+    if (cfg.type === 'graticule') {
+        if (cap.projection !== 'webMercator' && cap.projection !== 'geographic') return null
+        const merc = cap.projection === 'webMercator'
+        return buildGraticuleGeometry(ext, mf, cfg,
+            merc ? (x, y) => [mercXToLon(x), mercYToLat(y)] : (x, y) => [x, y],
+            merc ? (lon, lat) => [lonToMercX(lon), latToMercY(lat)] : (lon, lat) => [lon, lat])
+    }
+    { // measured
+        const step = cfg.intervalMode === 'fixed' && Number(cfg.fixedInterval) > 0
+            ? Number(cfg.fixedInterval)
+            : niceGridInterval(Math.max(ext.xmax - ext.xmin, ext.ymax - ext.ymin))
+        const fmt = (v: number): string => {
+            const r = Math.round(v)
+            return String(r).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+        }
+        for (let x = Math.ceil(ext.xmin / step) * step; x <= ext.xmax + 1e-9; x += step) {
+            xs.push({ v: x, pageX: mf.xIn + (x - ext.xmin) / (ext.xmax - ext.xmin) * mf.wIn, label: fmt(x) })
+        }
+        for (let y = Math.ceil(ext.ymin / step) * step; y <= ext.ymax + 1e-9; y += step) {
+            ys.push({ v: y, pageY: mf.yIn + (ext.ymax - y) / (ext.ymax - ext.ymin) * mf.hIn, label: fmt(y) })
+        }
+    }
+
+    for (const x of xs) {
+        g.lines.push({ x1In: x.pageX, y1In: mf.yIn, x2In: x.pageX, y2In: mf.yIn + mf.hIn })
+        g.ticks.push({ x1In: x.pageX, y1In: mf.yIn, x2In: x.pageX, y2In: mf.yIn + tickLen })
+        g.ticks.push({ x1In: x.pageX, y1In: mf.yIn + mf.hIn - tickLen, x2In: x.pageX, y2In: mf.yIn + mf.hIn })
+        if (cfg.labels !== false) {
+            g.labels.push({ text: x.label, xIn: x.pageX, yIn: mf.yIn, edge: 'top' })
+            g.labels.push({ text: x.label, xIn: x.pageX, yIn: mf.yIn + mf.hIn, edge: 'bottom' })
+        }
+    }
+    for (const y of ys) {
+        g.lines.push({ x1In: mf.xIn, y1In: y.pageY, x2In: mf.xIn + mf.wIn, y2In: y.pageY })
+        g.ticks.push({ x1In: mf.xIn, y1In: y.pageY, x2In: mf.xIn + tickLen, y2In: y.pageY })
+        g.ticks.push({ x1In: mf.xIn + mf.wIn - tickLen, y1In: y.pageY, x2In: mf.xIn + mf.wIn, y2In: y.pageY })
+        if (cfg.labels !== false) {
+            g.labels.push({ text: y.label, xIn: mf.xIn, yIn: y.pageY, edge: 'left' })
+            g.labels.push({ text: y.label, xIn: mf.xIn + mf.wIn, yIn: y.pageY, edge: 'right' })
+        }
+    }
+    for (const x of xs) {
+        for (const y of ys) {
+            g.crosses.push({ x1In: x.pageX - crossLen / 2, y1In: y.pageY, x2In: x.pageX + crossLen / 2, y2In: y.pageY })
+            g.crosses.push({ x1In: x.pageX, y1In: y.pageY - crossLen / 2, x2In: x.pageX, y2In: y.pageY + crossLen / 2 })
+        }
+    }
+    return g
+}
+
+/** Reference (alphanumeric index) grid: pure page-space. */
+export function buildReferenceGrid (
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number },
+    cols: number, rows: number, labels: boolean
+): GridGeometry {
+    const g: GridGeometry = { lines: [], crosses: [], ticks: [], labels: [] }
+    const c = Math.max(1, Math.min(26, Math.round(cols) || 4))
+    const r = Math.max(1, Math.min(99, Math.round(rows) || 4))
+    const tickLen = 0.12 * gridMarkScale(mf)
+    for (let i = 1; i < c; i++) {
+        const x = mf.xIn + (i / c) * mf.wIn
+        g.lines.push({ x1In: x, y1In: mf.yIn, x2In: x, y2In: mf.yIn + mf.hIn })
+        g.ticks.push({ x1In: x, y1In: mf.yIn, x2In: x, y2In: mf.yIn + tickLen })
+        g.ticks.push({ x1In: x, y1In: mf.yIn + mf.hIn - tickLen, x2In: x, y2In: mf.yIn + mf.hIn })
+    }
+    for (let j = 1; j < r; j++) {
+        const y = mf.yIn + (j / r) * mf.hIn
+        g.lines.push({ x1In: mf.xIn, y1In: y, x2In: mf.xIn + mf.wIn, y2In: y })
+        g.ticks.push({ x1In: mf.xIn, y1In: y, x2In: mf.xIn + tickLen, y2In: y })
+        g.ticks.push({ x1In: mf.xIn + mf.wIn - tickLen, y1In: y, x2In: mf.xIn + mf.wIn, y2In: y })
+    }
+    if (labels !== false) {
+        for (let i = 0; i < c; i++) {
+            const x = mf.xIn + ((i + 0.5) / c) * mf.wIn
+            const letter = String.fromCharCode(65 + i)
+            g.labels.push({ text: letter, xIn: x, yIn: mf.yIn, edge: 'top' })
+            g.labels.push({ text: letter, xIn: x, yIn: mf.yIn + mf.hIn, edge: 'bottom' })
+        }
+        for (let j = 0; j < r; j++) {
+            const y = mf.yIn + ((j + 0.5) / r) * mf.hIn
+            g.labels.push({ text: String(j + 1), xIn: mf.xIn, yIn: y, edge: 'left' })
+            g.labels.push({ text: String(j + 1), xIn: mf.xIn + mf.wIn, yIn: y, edge: 'right' })
+        }
+    }
+    return g
+}
+
+/** Draw a built grid over the map frame. */
+function drawGrid (d: Drawer, geom: GridGeometry, cfg: GridConfig): void {
+    const lc = cfg.lineColor || [90, 90, 90]
+    d.setStroke(lc[0], lc[1], lc[2])
+    d.setLineWidth(cfg.lineWidthPt > 0 ? cfg.lineWidthPt : 0.5)
+    const seg = cfg.lineStyle === 'ticks' ? geom.ticks
+        : cfg.lineStyle === 'crosses' ? geom.ticks.concat(geom.crosses)
+            : geom.lines
+    for (const L of seg) {
+        d.line(L.x1In * PT_PER_IN, L.y1In * PT_PER_IN, L.x2In * PT_PER_IN, L.y2In * PT_PER_IN)
+    }
+    if (geom.labels.length) {
+        const size = cfg.labelSizePt > 0 ? cfg.labelSizePt : 7
+        const pad = 3 // pt
+        d.setFont('normal', size)
+        const inside = cfg.labelsInside !== false
+        for (const lb of geom.labels) {
+            const x = lb.xIn * PT_PER_IN
+            const y = lb.yIn * PT_PER_IN
+            let tx = x
+            let baseline = y
+            let align: 'left' | 'center' | 'right' = 'center'
+            if (lb.edge === 'top') { baseline = inside ? y + size + pad : y - pad; align = 'center' }
+            // Bottom-inside labels need descender + halo clearance or the
+            // glyphs collide with the frame border below the baseline.
+            else if (lb.edge === 'bottom') { baseline = inside ? y - pad - size * 0.3 : y + size + pad; align = 'center' }
+            else if (lb.edge === 'left') { tx = inside ? x + pad : x - pad; baseline = y + size * 0.35; align = inside ? 'left' : 'right' }
+            else { tx = inside ? x - pad : x + pad; baseline = y + size * 0.35; align = inside ? 'right' : 'left' }
+            // Cartographic halo: white stroke behind the glyphs so labels
+            // read over imagery and grid lines without a boxy backing.
+            d.setTextColor(lc[0], lc[1], lc[2])
+            if (typeof d.haloText === 'function') {
+                d.haloText(lb.text, tx, baseline, align, [255, 255, 255], Math.max(1.2, size * 0.11))
+            } else {
+                const tw = d.textWidth(lb.text)
+                const bx = align === 'center' ? tx - tw / 2 : align === 'right' ? tx - tw : tx
+                d.setFill(255, 255, 255)
+                d.rect(bx - 2, baseline - size, tw + 4, size + 3, 'F')
+                d.text(lb.text, tx, baseline, align)
+            }
+        }
+    }
+}
+
+/** Inset box (page inches, top-left origin) for a settings-defined overview,
+ *  positioned in a corner of the main map frame and clamped inside it. */
+export function overviewBoxIn (
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number },
+    ov: OverviewConfig
+): { xIn: number, yIn: number, wIn: number, hIn: number } {
+    const margin = Math.max(0, Number(ov.marginIn) || 0)
+    const w = Math.min(Math.max(0.5, Number(ov.widthIn) || 2.5), Math.max(0.5, mf.wIn - 2 * margin))
+    const h = Math.min(Math.max(0.5, Number(ov.heightIn) || 2), Math.max(0.5, mf.hIn - 2 * margin))
+    const left = ov.position === 'topLeft' || ov.position === 'bottomLeft'
+    const top = ov.position === 'topLeft' || ov.position === 'topRight'
+    return {
+        xIn: left ? mf.xIn + margin : mf.xIn + mf.wIn - margin - w,
+        yIn: top ? mf.yIn + margin : mf.yIn + mf.hIn - margin - h,
+        wIn: w,
+        hIn: h
+    }
+}
+
+/** Extent indicator (page inches) inside the overview box. Both captures
+ *  share center and rotation, so the printed map's footprint is a centered
+ *  axis-aligned rectangle scaled by printedScale / overviewScale. */
+export function overviewIndicatorIn (
+    box: { xIn: number, yIn: number, wIn: number, hIn: number },
+    mainWIn: number, mainHIn: number,
+    printedScale: number, overviewScale: number
+): { xIn: number, yIn: number, wIn: number, hIn: number } {
+    const r = overviewScale > 0 ? printedScale / overviewScale : 0
+    const w = Math.min(mainWIn * r, box.wIn)
+    const h = Math.min(mainHIn * r, box.hIn)
+    return {
+        xIn: box.xIn + (box.wIn - w) / 2,
+        yIn: box.yIn + (box.hIn - h) / 2,
+        wIn: w,
+        hIn: h
+    }
+}
+
+/** Lazy projector: ArcGIS SDK 5.x (esri/geometry/operators/projectOperator)
+ *  first, 4.x (esri/geometry/projection) as fallback for EB 1.19. Loaded at
+ *  export time via jimu-arcgis so a missing module can never break widget
+ *  class load. Resolves to { project(point, outSR), Point } or null. */
+let _projector: { project: (pt: any, sr: any) => any, Point: any } | null | undefined
+async function getProjector (): Promise<{ project: (pt: any, sr: any) => any, Point: any } | null> {
+    if (_projector !== undefined) return _projector
+    try {
+        const [op, Pt] = await loadArcGISJSAPIModules(['esri/geometry/operators/projectOperator', 'esri/geometry/Point'])
+        if (op && typeof op.execute === 'function') {
+            if (typeof op.load === 'function' && !(typeof op.isLoaded === 'function' && op.isLoaded())) await op.load()
+            _projector = { project: (pt: any, sr: any) => op.execute(pt, sr), Point: Pt }
+            return _projector
+        }
+    } catch (e) { /* fall through to 4.x */ }
+    try {
+        const [proj, Pt] = await loadArcGISJSAPIModules(['esri/geometry/projection', 'esri/geometry/Point'])
+        if (proj && typeof proj.project === 'function') {
+            if (typeof proj.load === 'function') await proj.load()
+            _projector = { project: (pt: any, sr: any) => proj.project(pt, sr), Point: Pt }
+            return _projector
+        }
+    } catch (e) { /* unavailable */ }
+    _projector = null
+    return null
+}
+
 export function getMapFrame(layout: PrintLayout): MapFrameEl {
     const mf = (layout.elements || []).find(e => e.type === 'mapFrame') as MapFrameEl
     if (!mf) throw new Error('Layout has no map frame element. Re-import the .pagx.')
@@ -881,10 +1368,48 @@ export async function composePage(
                 const w = mf.wIn * PT_PER_IN
                 const h = mf.hIn * PT_PER_IN
                 await d.image(cap.dataUrl, layout.imageFormat === 'png' ? 'PNG' : 'JPEG', x, y, w, h)
+                // Settings-defined grid/graticule over the map, under the border.
+                const gridCfg = layout.grid
+                if (gridCfg && gridCfg.enabled && opts.showGrid !== false && cap.rotation === 0 &&
+                    (gridCfg.type === 'reference' || cap.groundExtent)) {
+                    const geom = opts.gridGeomOverride || (gridCfg.type === 'reference'
+                        ? buildReferenceGrid(mf, Number(gridCfg.refCols) || 4, Number(gridCfg.refRows) || 4, gridCfg.labels !== false)
+                        : buildGridGeometry(cap, mf, gridCfg))
+                    try {
+                        console.info('[print-advanced] grid gate OPEN: type=' + gridCfg.type +
+                            ' geom=' + (geom ? (geom.lines.length + ' lines, ' + geom.ticks.length + ' ticks, ' + geom.crosses.length + ' crosses, ' + geom.labels.length + ' labels') : 'null'))
+                    } catch (e) { /* noop */ }
+                    if (geom) drawGrid(d, geom, gridCfg)
+                } else if (gridCfg) {
+                    try {
+                        console.info('[print-advanced] grid gate CLOSED: enabled=' + String(gridCfg.enabled) +
+                            ' showGrid=' + String(opts.showGrid) + ' rotation=' + String(cap.rotation) +
+                            ' groundExtent=' + String(!!cap.groundExtent))
+                    } catch (e) { /* noop */ }
+                }
                 if (mf.borderColor && mf.borderWidthPt > 0) {
                     d.setStroke(mf.borderColor[0], mf.borderColor[1], mf.borderColor[2])
                     d.setLineWidth(mf.borderWidthPt)
                     d.rect(x, y, w, h, 'S')
+                }
+                // Settings-defined overview inset: zoomed-out capture in a
+                // corner of the map frame with an extent indicator.
+                if (opts.overview) {
+                    const ov = opts.overview
+                    const bx = ov.box.xIn * PT_PER_IN
+                    const by = ov.box.yIn * PT_PER_IN
+                    const bw = ov.box.wIn * PT_PER_IN
+                    const bh = ov.box.hIn * PT_PER_IN
+                    await d.image(ov.cap.dataUrl, layout.imageFormat === 'png' ? 'PNG' : 'JPEG', bx, by, bw, bh)
+                    const bc = ov.cfg.borderColor || [0, 0, 0]
+                    d.setStroke(bc[0], bc[1], bc[2])
+                    d.setLineWidth(ov.cfg.borderWidthPt > 0 ? ov.cfg.borderWidthPt : 1)
+                    d.rect(bx, by, bw, bh, 'S')
+                    const ic = ov.cfg.indicatorColor || [221, 0, 0]
+                    d.setStroke(ic[0], ic[1], ic[2])
+                    d.setLineWidth(ov.cfg.indicatorWidthPt > 0 ? ov.cfg.indicatorWidthPt : 1)
+                    d.rect(ov.indicator.xIn * PT_PER_IN, ov.indicator.yIn * PT_PER_IN,
+                        ov.indicator.wIn * PT_PER_IN, ov.indicator.hIn * PT_PER_IN, 'S')
                 }
                 break
             }
@@ -1168,6 +1693,97 @@ export async function renderLayout(
 
     const cap = await captureMapHiRes(liveView, mf.wIn, mf.hIn, useLayout, maxImagePx, options, onProgress)
 
+    // A grid cannot be drawn correctly on a rotated capture or when an
+    // output WKID reprojected the map; say so on the result instead of
+    // drawing wrong lines.
+    const gCfg = useLayout.grid
+    // Forensic: report exactly what reached the renderer (harmless info log).
+    try {
+        console.info('[print-advanced] layout "' + useLayout.name + '" grid=' +
+            JSON.stringify(gCfg || null) + ' overview=' + JSON.stringify(useLayout.overview || null) +
+            ' showGrid=' + String(options.showGrid) + ' showOverview=' + String(options.showOverview) +
+            ' rotation=' + String(cap.rotation) + ' groundExtent=' + String(!!cap.groundExtent) +
+            ' projection=' + String(cap.projection))
+    } catch (e) { /* logging must never break an export */ }
+    if (gCfg && gCfg.enabled && options.showGrid !== false && !options.mapOnly) {
+        if (cap.rotation !== 0) {
+            cap.warning = (cap.warning ? cap.warning + ' ' : '') +
+                'Grid skipped: the map is rotated. Reset rotation to 0 to print the grid.'
+            onProgress('Grid skipped: the map is rotated.')
+        } else if (gCfg.type !== 'reference' && !cap.groundExtent) {
+            cap.warning = (cap.warning ? cap.warning + ' ' : '') +
+                'Grid skipped: the map extent could not be determined for this capture.'
+            onProgress('Grid skipped: no map extent.')
+        } else if (gCfg.type === 'graticule' && cap.projection === 'projected') {
+            // Lat/lon lines on an arbitrary projected output: build the
+            // geometry with the JSAPI client-side projection engine.
+            onProgress('Adding graticule (projecting coordinates)…')
+            try {
+                const projector = await getProjector()
+                if (!projector) throw new Error('projection engine unavailable')
+                const PointCls: any = projector.Point
+                const capSR = new SpatialReference({ wkid: (options.outputWkid && options.outputWkid > 0)
+                    ? options.outputWkid
+                    : ((liveView.spatialReference as any)?.wkid || 4326) })
+                const wgs = new SpatialReference({ wkid: 4326 })
+                const toGeo = (x: number, y: number): [number, number] => {
+                    const out: any = projector.project(new PointCls({ x, y, spatialReference: capSR }), wgs)
+                    return out ? [out.x, out.y] : [NaN, NaN]
+                }
+                const fromGeo = (lon: number, lat: number): [number, number] => {
+                    const out: any = projector.project(new PointCls({ x: lon, y: lat, spatialReference: wgs }), capSR)
+                    return out ? [out.x, out.y] : [NaN, NaN]
+                }
+                const geomBuilt = buildGraticuleGeometry(cap.groundExtent, getMapFrame(useLayout), gCfg, toGeo, fromGeo)
+                if (geomBuilt.lines.length || geomBuilt.ticks.length) {
+                    options = { ...options, gridGeomOverride: geomBuilt }
+                } else {
+                    cap.warning = (cap.warning ? cap.warning + ' ' : '') +
+                        'Graticule produced no lines for this extent; try a smaller fixed interval.'
+                    onProgress('Graticule produced no lines for this extent.')
+                }
+            } catch (err: any) {
+                cap.warning = (cap.warning ? cap.warning + ' ' : '') +
+                    'Graticule unavailable: the projection engine failed to load.'
+                onProgress('Graticule unavailable: projection engine failed to load.')
+            }
+        } else {
+            onProgress(gCfg.type === 'reference' ? 'Adding reference grid…'
+                : (gCfg.type === 'graticule' ? 'Adding graticule…' : 'Adding measured grid…'))
+        }
+    }
+
+    // Settings-defined overview inset (skipped for map-only exports).
+    const ovCfg = useLayout.overview
+    if (ovCfg && ovCfg.enabled && options.showOverview !== false && !options.mapOnly) {
+        const box = overviewBoxIn(mf, ovCfg)
+        const mult = Number(ovCfg.scaleMultiplier) > 0 ? Number(ovCfg.scaleMultiplier) : 10
+        const ovScale = Number(ovCfg.fixedScale) > 0 ? Number(ovCfg.fixedScale) : cap.printedScale * mult
+        onProgress('Rendering overview map at 1:' + Math.round(ovScale).toLocaleString() + '…')
+        const ovCap = await captureMapHiRes(
+            liveView, box.wIn, box.hIn,
+            { ...useLayout, dpi: Math.min(useLayout.dpi || 96, 150) },
+            maxImagePx,
+            {
+                ...options,
+                scaleMode: 'fixed',
+                fixedScale: ovScale,
+                lockedCenter: options.lockedCenter && typeof options.lockedCenter.x === 'number'
+                    ? options.lockedCenter
+                    : { x: liveView.center.x, y: liveView.center.y }
+            },
+            onProgress)
+        options = {
+            ...options,
+            overview: {
+                cap: ovCap,
+                box,
+                indicator: overviewIndicatorIn(box, mf.wIn, mf.hIn, cap.printedScale, ovScale),
+                cfg: ovCfg
+            }
+        }
+    }
+
     const hasLegend = !options.mapOnly && options.includeLegend !== false && (useLayout.elements || []).some(e => e.type === 'legend')
     const legendRows = hasLegend
         ? await buildLegendRows(
@@ -1244,6 +1860,7 @@ export async function renderLayout(
     return {
         fileName: outName,
         effectiveDpi: Math.round(cap.effectiveDpi),
+        warning: cap.warning,
         printedScale: Math.round(cap.printedScale),
         url: lastUrl || undefined,
         sizeKb: lastSize ? Math.round(lastSize / 1024) : undefined

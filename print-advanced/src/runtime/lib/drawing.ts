@@ -43,6 +43,9 @@ export interface Drawer {
   setCustomFont (name: string | null): void
   setTextColor (r: number, g: number, b: number): void
   text (str: string, x: number, y: number, align?: TextAlign): void
+  /** Text with a cartographic halo (stroke behind the glyph fill).
+   *  Optional capability; callers must fall back when absent. */
+  haloText? (str: string, x: number, y: number, align: TextAlign, halo: [number, number, number], haloWidthPt: number): void
   textWidth (str: string): number
   /**
    * fit='stretch' (default) fills the box exactly - used for the map image,
@@ -72,12 +75,34 @@ export function containRect (
   return { x: fx, y: fy, w: fw, h: fh }
 }
 
-/** Greedy word-wrap shared by all backends. */
+/** Break a single overlong token (URL, path) at character level. */
+function breakWord (drawer: Drawer, word: string, maxW: number): string[] {
+  const parts: string[] = []
+  let cur = ''
+  for (const ch of word) {
+    if (cur && drawer.textWidth(cur + ch) > maxW) { parts.push(cur); cur = ch }
+    else cur += ch
+  }
+  if (cur) parts.push(cur)
+  return parts
+}
+
+/** Greedy word-wrap shared by all backends. Words wider than the box
+ *  (long URLs in attribution or copyright) break at character level
+ *  instead of overflowing the frame. */
 export function splitText (drawer: Drawer, str: string, maxW: number): string[] {
   const words = (str || '').split(/\s+/)
   const lines: string[] = []
   let cur = ''
   for (const w of words) {
+    if (drawer.textWidth(w) > maxW) {
+      // flush the current line, then hard-break the long token
+      if (cur) { lines.push(cur); cur = '' }
+      const parts = breakWord(drawer, w, maxW)
+      cur = parts.pop() || ''
+      lines.push(...parts)
+      continue
+    }
     const cand = cur ? cur + ' ' + w : w
     if (drawer.textWidth(cand) <= maxW || !cur) cur = cand
     else { lines.push(cur); cur = w }
@@ -125,6 +150,17 @@ export class PdfDrawer implements Drawer {
   setTextColor (r: number, g: number, b: number): void { this.doc.setTextColor(r, g, b) }
   text (str: string, x: number, y: number, align: TextAlign = 'left'): void {
     this.doc.text(str, x, y, align === 'left' ? undefined : { align })
+  }
+  haloText (str: string, x: number, y: number, align: TextAlign, halo: [number, number, number], haloWidthPt: number): void {
+    const d: any = this.doc
+    try {
+      d.setDrawColor(halo[0], halo[1], halo[2])
+      d.setLineWidth(haloWidthPt)
+      if (typeof d.setLineJoin === 'function') d.setLineJoin('round')
+      if (typeof d.setLineCap === 'function') d.setLineCap('round')
+      d.text(str, x, y, { align: align === 'left' ? undefined : align, renderingMode: 'stroke' })
+    } catch (e) { /* halo is best-effort; fill always draws */ }
+    this.text(str, x, y, align)
   }
   textWidth (str: string): number { return this.doc.getTextWidth(str) }
   async image (dataUrl: string, fmt: 'JPEG' | 'PNG', x: number, y: number, w: number, h: number, fit: 'stretch' | 'contain' = 'stretch', anchorH: AnchorH = 'center', anchorV: AnchorV = 'center'): Promise<void> {
@@ -260,6 +296,19 @@ export class CanvasDrawer implements Drawer {
     this.ctx.textBaseline = 'alphabetic'
     this.ctx.fillText(str, x * this.s, y * this.s)
   }
+  haloText (str: string, x: number, y: number, align: TextAlign, halo: [number, number, number], haloWidthPt: number): void {
+    this.applyFont()
+    this.ctx.save()
+    this.ctx.textAlign = align
+    this.ctx.textBaseline = 'alphabetic'
+    this.ctx.lineJoin = 'round'
+    this.ctx.miterLimit = 2
+    this.ctx.strokeStyle = this.rgb(halo[0], halo[1], halo[2])
+    this.ctx.lineWidth = haloWidthPt * 2 * this.s
+    this.ctx.strokeText(str, x * this.s, y * this.s)
+    this.ctx.restore()
+    this.text(str, x, y, align)
+  }
 
   textWidth (str: string): number {
     this.applyFont()
@@ -346,6 +395,18 @@ export class SvgDrawer implements Drawer {
     this.parts.push(
       `<text x="${x}" y="${y}" font-family='${this.cssFamily()}' font-size="${this.fontSize}"` +
       `${weight}${styleAttr} fill="${this.textColor}" text-anchor="${anchor}">${esc(str)}</text>`
+    )
+  }
+  haloText (str: string, x: number, y: number, align: TextAlign, halo: [number, number, number], haloWidthPt: number): void {
+    const anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'
+    const weight = this.font === 'bold' ? ' font-weight="bold"' : ''
+    const styleAttr = this.font === 'italic' ? ' font-style="italic"' : ''
+    const stroke = `rgb(${halo[0]},${halo[1]},${halo[2]})`
+    this.parts.push(
+      `<text x="${x}" y="${y}" font-family='${this.cssFamily()}' font-size="${this.fontSize}"` +
+      `${weight}${styleAttr} fill="${this.textColor}" text-anchor="${anchor}"` +
+      ` stroke="${stroke}" stroke-width="${haloWidthPt * 2}" stroke-linejoin="round"` +
+      ` style="paint-order:stroke">${esc(str)}</text>`
     )
   }
 

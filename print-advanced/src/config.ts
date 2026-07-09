@@ -95,6 +95,52 @@ export interface LegendEl extends ElBase {
 export type LayoutElement =
   | MapFrameEl | TextEl | LineEl | NorthArrowEl | ScaleBarEl | PictureEl | LegendEl
 
+export type GridType = 'graticule' | 'measured' | 'reference'
+export type GridLineStyle = 'solid' | 'ticks' | 'crosses'
+
+/** Settings-defined grid or graticule drawn over the map frame, in the
+ *  spirit of ArcGIS Pro layout grids (graticule = lat/lon, measured =
+ *  projected map units, reference = alphanumeric index). */
+export interface GridConfig {
+  enabled: boolean
+  type: GridType
+  /** 'auto' picks a clean interval; 'fixed' uses fixedInterval. */
+  intervalMode: 'auto' | 'fixed'
+  /** Degrees for graticule, map units for measured grid. */
+  fixedInterval?: number
+  lineStyle: GridLineStyle
+  lineColor: RGB
+  lineWidthPt: number
+  labels: boolean
+  labelsInside: boolean
+  labelSizePt: number
+  /** Reference grid only: index cell counts. */
+  refCols?: number
+  refRows?: number
+}
+
+export type OverviewPosition = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight'
+
+/** Settings-defined overview (inset) map drawn inside the main map frame.
+ *  Captured at a zoomed-out scale with an extent indicator showing the
+ *  printed map's footprint. */
+export interface OverviewConfig {
+  enabled: boolean
+  position: OverviewPosition
+  widthIn: number
+  heightIn: number
+  /** Gap between the inset and the map frame edge. */
+  marginIn: number
+  /** Overview scale = printed scale x multiplier (used when fixedScale unset). */
+  scaleMultiplier: number
+  /** Absolute overview scale; overrides the multiplier when > 0. */
+  fixedScale?: number
+  indicatorColor: RGB
+  indicatorWidthPt: number
+  borderColor: RGB
+  borderWidthPt: number
+}
+
 export interface PrintLayout {
   id: string
   name: string
@@ -107,6 +153,13 @@ export interface PrintLayout {
   dpi: number
   imageFormat: ImageFormat
   preserve: PreserveMode
+
+  /** Optional settings-defined overview inset. Older configs lack this key
+   *  (ExB does not backfill config), so all reads must guard undefined. */
+  overview?: OverviewConfig
+
+  /** Optional settings-defined grid/graticule. Same backfill caveat. */
+  grid?: GridConfig
 
   elements: LayoutElement[]
 }

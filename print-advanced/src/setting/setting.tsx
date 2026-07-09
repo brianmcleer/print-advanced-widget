@@ -14,7 +14,7 @@ import { Button, Select, TextInput, TextArea, NumericInput, Alert, Switch, Check
 // pdfRenderer imports esri/* modules; pulling it into the settings bundle makes
 // the settings panel fail to load in the builder (no AMD loader there yet).
 import { FORMAT_LABELS, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } from '../printConstants'
-import { IMConfig, PrintLayout, PictureEl, LegendEl, newLayoutId } from '../config'
+import { IMConfig, PrintLayout, PictureEl, LegendEl, newLayoutId, OverviewConfig, GridConfig } from '../config'
 import { parsePagx } from '../pagxParser'
 import defaultMessages from './translations/default'
 
@@ -497,6 +497,54 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         this.commitLayouts(this.getLayouts().map(l => (l.id === editing.id ? { ...l, ...partial } : l)))
     }
 
+    /** Defaults for the settings-defined overview inset. Older configs lack
+     *  the overview key (ExB does not backfill), so merge on every write. */
+    private readonly ovDefaults: OverviewConfig = {
+        enabled: false,
+        position: 'topRight',
+        widthIn: 2.5,
+        heightIn: 2,
+        marginIn: 0.25,
+        scaleMultiplier: 10,
+        indicatorColor: [221, 0, 0],
+        indicatorWidthPt: 1,
+        borderColor: [0, 0, 0],
+        borderWidthPt: 1
+    }
+
+    patchOverview = (partial: Partial<OverviewConfig>): void => {
+        const editing = this.getEditing()
+        if (!editing) return
+        const cur = (editing as any).overview
+            ? JSON.parse(JSON.stringify((editing as any).overview))
+            : {}
+        this.patch({ overview: { ...this.ovDefaults, ...cur, ...partial } } as any)
+    }
+
+    /** Defaults for the settings-defined grid/graticule. */
+    private readonly gridDefaults: GridConfig = {
+        enabled: false,
+        type: 'measured',
+        intervalMode: 'auto',
+        lineStyle: 'solid',
+        lineColor: [90, 90, 90],
+        lineWidthPt: 0.5,
+        labels: true,
+        labelsInside: true,
+        labelSizePt: 7,
+        refCols: 4,
+        refRows: 4
+    }
+
+    patchGrid = (partial: Partial<GridConfig>): void => {
+        const editing = this.getEditing()
+        if (!editing) return
+        const cur = (editing as any).grid
+            ? JSON.parse(JSON.stringify((editing as any).grid))
+            : {}
+        this.patch({ grid: { ...this.gridDefaults, ...cur, ...partial } } as any)
+    }
+
     onMapWidgetSelected = (useMapWidgetIds: string[]): void => {
         this.props.onSettingChange({ id: this.props.id, useMapWidgetIds })
     }
@@ -829,6 +877,194 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                     { value: 'scale', label: messages.preserveScale },
                                     { value: 'extent', label: messages.preserveExtent }
                                 ]))}
+                        </SettingSection>
+
+                        <SettingSection title={messages.overviewSection}>
+                            <SettingRow>
+                                <div className='pd-hint'>{messages.overviewHint}</div>
+                            </SettingRow>
+                            <SettingRow tag='label' label={messages.overviewEnabled} truncateLabel>
+                                <Switch checked={!!(editing as any).overview?.enabled}
+                                    onChange={(e) => this.patchOverview({ enabled: e.target.checked })} />
+                            </SettingRow>
+                            {(editing as any).overview?.enabled && (
+                                <React.Fragment>
+                                    {this.rowWrap(messages.overviewPosition, this.select(
+                                        ((editing as any).overview?.position) || 'topRight',
+                                        v => this.patchOverview({ position: v as any }),
+                                        [
+                                            { value: 'topLeft', label: messages.posTopLeft },
+                                            { value: 'topRight', label: messages.posTopRight },
+                                            { value: 'bottomLeft', label: messages.posBottomLeft },
+                                            { value: 'bottomRight', label: messages.posBottomRight }
+                                        ]))}
+                                    <SettingRow flow='wrap' label={messages.overviewWidth} truncateLabel>
+                                        <NumericInput size='sm' className='w-100' min={0.5} max={24} step={0.25}
+                                            value={Number((editing as any).overview?.widthIn) || 2.5}
+                                            onChange={(v: number) => this.patchOverview({ widthIn: v })} />
+                                    </SettingRow>
+                                    <SettingRow flow='wrap' label={messages.overviewHeight} truncateLabel>
+                                        <NumericInput size='sm' className='w-100' min={0.5} max={24} step={0.25}
+                                            value={Number((editing as any).overview?.heightIn) || 2}
+                                            onChange={(v: number) => this.patchOverview({ heightIn: v })} />
+                                    </SettingRow>
+                                    <SettingRow flow='wrap' label={messages.overviewMargin} truncateLabel>
+                                        <NumericInput size='sm' className='w-100' min={0} max={5} step={0.05}
+                                            value={Number((editing as any).overview?.marginIn) || 0.25}
+                                            onChange={(v: number) => this.patchOverview({ marginIn: v })} />
+                                    </SettingRow>
+                                    {this.rowWrap(messages.overviewScale, this.select(
+                                        Number((editing as any).overview?.fixedScale) > 0
+                                            ? 'fixed'
+                                            : String(Number((editing as any).overview?.scaleMultiplier) || 10),
+                                        v => {
+                                            if (v === 'fixed') this.patchOverview({ fixedScale: 100000 })
+                                            else this.patchOverview({ scaleMultiplier: Number(v), fixedScale: undefined })
+                                        },
+                                        [
+                                            { value: '5', label: '5 x ' + messages.printedScale },
+                                            { value: '10', label: '10 x ' + messages.printedScale },
+                                            { value: '20', label: '20 x ' + messages.printedScale },
+                                            { value: '50', label: '50 x ' + messages.printedScale },
+                                            { value: 'fixed', label: messages.overviewFixed }
+                                        ]))}
+                                    {Number((editing as any).overview?.fixedScale) > 0 && (
+                                        <SettingRow flow='wrap' label={messages.overviewFixedScale} truncateLabel>
+                                            <NumericInput size='sm' className='w-100' min={100} max={50000000} step={1000}
+                                                value={Number((editing as any).overview?.fixedScale) || 100000}
+                                                onChange={(v: number) => this.patchOverview({ fixedScale: v })} />
+                                        </SettingRow>
+                                    )}
+                                    {this.rowWrap(messages.indicatorColor, this.select(
+                                        JSON.stringify(((editing as any).overview?.indicatorColor) || [221, 0, 0]),
+                                        v => this.patchOverview({ indicatorColor: JSON.parse(v) }),
+                                        [
+                                            { value: '[221,0,0]', label: messages.colorRed },
+                                            { value: '[0,0,0]', label: messages.colorBlack },
+                                            { value: '[255,255,255]', label: messages.colorWhite },
+                                            { value: '[0,92,230]', label: messages.colorBlue },
+                                            { value: '[255,170,0]', label: messages.colorOrange }
+                                        ]))}
+                                    {this.rowWrap(messages.indicatorWidth, this.select(
+                                        String(Number((editing as any).overview?.indicatorWidthPt) || 1),
+                                        v => this.patchOverview({ indicatorWidthPt: Number(v) }),
+                                        [
+                                            { value: '0.5', label: '0.5 pt' },
+                                            { value: '1', label: '1 pt' },
+                                            { value: '2', label: '2 pt' },
+                                            { value: '3', label: '3 pt' }
+                                        ]))}
+                                </React.Fragment>
+                            )}
+                        </SettingSection>
+
+                        <SettingSection title={messages.gridSection}>
+                            <SettingRow>
+                                <div className='pd-hint'>{messages.gridHint}</div>
+                            </SettingRow>
+                            <SettingRow tag='label' label={messages.gridEnabled} truncateLabel>
+                                <Switch checked={!!(editing as any).grid?.enabled}
+                                    onChange={(e) => this.patchGrid({ enabled: e.target.checked })} />
+                            </SettingRow>
+                            {(editing as any).grid?.enabled && (
+                                <React.Fragment>
+                                    {this.rowWrap(messages.gridType, this.select(
+                                        ((editing as any).grid?.type) || 'measured',
+                                        v => this.patchGrid({ type: v as any }),
+                                        [
+                                            { value: 'graticule', label: messages.gridGraticule },
+                                            { value: 'measured', label: messages.gridMeasured },
+                                            { value: 'reference', label: messages.gridReference }
+                                        ]))}
+                                    {((editing as any).grid?.type) !== 'reference' && (
+                                        <React.Fragment>
+                                            {this.rowWrap(messages.gridInterval, this.select(
+                                                ((editing as any).grid?.intervalMode) || 'auto',
+                                                v => this.patchGrid({ intervalMode: v as any }),
+                                                [
+                                                    { value: 'auto', label: messages.gridAuto },
+                                                    { value: 'fixed', label: messages.gridFixed }
+                                                ]))}
+                                            {((editing as any).grid?.intervalMode) === 'fixed' && (
+                                                <SettingRow flow='wrap' label={messages.gridFixedValue} truncateLabel>
+                                                    <NumericInput size='sm' className='w-100' min={0.000001} max={10000000}
+                                                        value={Number((editing as any).grid?.fixedInterval) || 1000}
+                                                        onChange={(v: number) => this.patchGrid({ fixedInterval: v })} />
+                                                </SettingRow>
+                                            )}
+                                        </React.Fragment>
+                                    )}
+                                    {((editing as any).grid?.type) === 'reference' && (
+                                        <React.Fragment>
+                                            <SettingRow flow='wrap' label={messages.gridCols} truncateLabel>
+                                                <NumericInput size='sm' className='w-100' min={1} max={26} step={1}
+                                                    value={Number((editing as any).grid?.refCols) || 4}
+                                                    onChange={(v: number) => this.patchGrid({ refCols: v })} />
+                                            </SettingRow>
+                                            <SettingRow flow='wrap' label={messages.gridRows} truncateLabel>
+                                                <NumericInput size='sm' className='w-100' min={1} max={99} step={1}
+                                                    value={Number((editing as any).grid?.refRows) || 4}
+                                                    onChange={(v: number) => this.patchGrid({ refRows: v })} />
+                                            </SettingRow>
+                                        </React.Fragment>
+                                    )}
+                                    {this.rowWrap(messages.gridStyle, this.select(
+                                        ((editing as any).grid?.lineStyle) || 'solid',
+                                        v => this.patchGrid({ lineStyle: v as any }),
+                                        [
+                                            { value: 'solid', label: messages.gridSolid },
+                                            { value: 'ticks', label: messages.gridTicks },
+                                            { value: 'crosses', label: messages.gridCrosses }
+                                        ]))}
+                                    {this.rowWrap(messages.gridColor, this.select(
+                                        JSON.stringify(((editing as any).grid?.lineColor) || [90, 90, 90]),
+                                        v => this.patchGrid({ lineColor: JSON.parse(v) }),
+                                        [
+                                            { value: '[90,90,90]', label: messages.colorGray },
+                                            { value: '[0,0,0]', label: messages.colorBlack },
+                                            { value: '[255,255,255]', label: messages.colorWhite },
+                                            { value: '[0,92,230]', label: messages.colorBlue },
+                                            { value: '[221,0,0]', label: messages.colorRed }
+                                        ]))}
+                                    {this.rowWrap(messages.gridWidth, this.select(
+                                        String(Number((editing as any).grid?.lineWidthPt) || 0.5),
+                                        v => this.patchGrid({ lineWidthPt: Number(v) }),
+                                        [
+                                            { value: '0.25', label: '0.25 pt' },
+                                            { value: '0.5', label: '0.5 pt' },
+                                            { value: '1', label: '1 pt' },
+                                            { value: '2', label: '2 pt' }
+                                        ]))}
+                                    <SettingRow tag='label' label={messages.gridLabels} truncateLabel>
+                                        <Switch checked={((editing as any).grid?.labels) !== false}
+                                            onChange={(e) => this.patchGrid({ labels: e.target.checked })} />
+                                    </SettingRow>
+                                    {((editing as any).grid?.labels) !== false && (
+                                        <React.Fragment>
+                                            {this.rowWrap(messages.gridLabelPos, this.select(
+                                                ((editing as any).grid?.labelsInside) !== false ? 'inside' : 'outside',
+                                                v => this.patchGrid({ labelsInside: v === 'inside' }),
+                                                [
+                                                    { value: 'inside', label: messages.gridInside },
+                                                    { value: 'outside', label: messages.gridOutside }
+                                                ]))}
+                                            {this.rowWrap(messages.gridLabelSize, this.select(
+                                                String(Number((editing as any).grid?.labelSizePt) || 7),
+                                                v => this.patchGrid({ labelSizePt: Number(v) }),
+                                                [
+                                                    { value: '6', label: '6 pt' },
+                                                    { value: '7', label: '7 pt' },
+                                                    { value: '8', label: '8 pt' },
+                                                    { value: '10', label: '10 pt' },
+                                                    { value: '12', label: '12 pt' },
+                                                    { value: '14', label: '14 pt' },
+                                                    { value: '18', label: '18 pt (large formats)' },
+                                                    { value: '24', label: '24 pt (large formats)' }
+                                                ]))}
+                                        </React.Fragment>
+                                    )}
+                                </React.Fragment>
+                            )}
                         </SettingSection>
 
                         {editing.elements.some(el => el.type === 'picture') && (
@@ -1206,7 +1442,9 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                         ['fileName', messages.ctrlFilename],
                         ['author', messages.ctrlAuthor],
                         ['copyright', messages.ctrlCopyright],
-                        ['legend', messages.ctrlLegend]
+                        ['legend', messages.ctrlLegend],
+                        ['overview', messages.ctrlOverview],
+                        ['grid', messages.ctrlGrid]
                     ] as Array<[string, string]>).map(([key, label]) => (
                         <SettingRow key={key} tag='label' label={label} truncateLabel>
                             <Switch

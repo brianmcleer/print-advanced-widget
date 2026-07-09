@@ -48,6 +48,8 @@ interface State {
   author: string
   copyright: string
   includeLegend: boolean
+  showOverview: boolean
+  showGrid: boolean
   mapOnly: boolean
   mapOnlyW: string
   mapOnlyH: string
@@ -90,6 +92,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       author: cfgAny.defaultAuthor || ((this.props as any).user && (this.props as any).user.username) || '',
       copyright: cfgAny.defaultCopyright || '',
       includeLegend: true,
+      showOverview: true,
+      showGrid: true,
       mapOnly: false,
       mapOnlyW: '',
       mapOnlyH: '',
@@ -655,6 +659,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         options.attribution = this.captureAttribution(jimuMapView.view)
       }
       options.includeLegend = this.state.includeLegend
+      options.showOverview = this.state.showOverview
+      options.showGrid = this.state.showGrid
       if (this.outSREnabled() && parseInt(this.state.outWkid, 10) > 0) {
         options.outputWkid = parseInt(this.state.outWkid, 10)
       }
@@ -691,7 +697,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         lastResult: result.fileName + '  ·  ' + result.effectiveDpi + ' DPI  ·  1:' +
           result.printedScale.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','),
         results: result.url
-          ? this.pushResult({ name: result.fileName, url: result.url, meta: result.effectiveDpi + ' DPI · ' + (result.sizeKb || 0) + ' KB' })
+          ? this.pushResult({ name: result.fileName, url: result.url, meta: result.effectiveDpi + ' DPI · ' + (result.sizeKb || 0) + ' KB' + (result.warning ? ' · ' + result.warning : '') })
           : this.state.results
       })
     } catch (err: any) {
@@ -1182,6 +1188,26 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               <Tooltip title={messages.includeLegendTip} placement='top'>
                 <Switch aria-labelledby={this.uid('leg') + '-lbl'} checked={this.state.includeLegend}
                   onChange={(e) => this.setState({ includeLegend: e.target.checked })} />
+              </Tooltip>
+            </div>
+            )}
+
+            {this.ctrl('overview') && layout && (layout as any).overview?.enabled && (
+            <div className='pd-row pd-pa-switch'>
+              <Label className='pd-label' id={this.uid('ovw') + '-lbl'}>{messages.overviewToggleLabel}</Label>
+              <Tooltip title={messages.overviewToggleTip} placement='top'>
+                <Switch aria-labelledby={this.uid('ovw') + '-lbl'} checked={this.state.showOverview}
+                  onChange={(e) => this.setState({ showOverview: e.target.checked })} />
+              </Tooltip>
+            </div>
+            )}
+
+            {this.ctrl('grid') && layout && (layout as any).grid?.enabled && (
+            <div className='pd-row pd-pa-switch'>
+              <Label className='pd-label' id={this.uid('grd') + '-lbl'}>{messages.gridToggleLabel}</Label>
+              <Tooltip title={messages.gridToggleTip} placement='top'>
+                <Switch aria-labelledby={this.uid('grd') + '-lbl'} checked={this.state.showGrid}
+                  onChange={(e) => this.setState({ showGrid: e.target.checked })} />
               </Tooltip>
             </div>
             )}

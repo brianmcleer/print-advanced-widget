@@ -370,6 +370,24 @@ export function parsePagx (doc: any, fileName: string): PagxParseResult {
   }
 
   const baseName = (fileName || 'layout').replace(/\.pagx$/i, '')
+  // A .pagx can carry more than one map frame (a Pro-authored inset). The
+  // widget renders one live-map frame; keep the main one (WEBMAP_MAP_FRAME by
+  // convention, else the largest) and skip the rest so the same capture is
+  // not stretched into every frame. Use the Overview inset in settings for
+  // an inset map.
+  const frames = elements.filter(e => e.type === 'mapFrame') as any[]
+  if (frames.length > 1) {
+    const main = frames.find(f => f.name === 'WEBMAP_MAP_FRAME') ||
+      frames.reduce((a, b) => (a.wIn * a.hIn >= b.wIn * b.hIn ? a : b))
+    for (const f of frames) {
+      if (f === main) continue
+      const idx = elements.indexOf(f)
+      if (idx >= 0) elements.splice(idx, 1)
+      warnings.push('Map frame "' + f.name + '" skipped (one live map frame is supported). ' +
+        'Use the Overview inset in the layout settings for an inset map.')
+    }
+  }
+
   const layout: PrintLayout = {
     id: newLayoutId(),
     name: baseName,
