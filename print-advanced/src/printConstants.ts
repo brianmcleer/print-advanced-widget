@@ -48,12 +48,15 @@ export const NORTH_ARROW_STYLES: Array<{ value: NorthArrowStyle, label: string }
 
 export const SCALE_BAR_STYLES: Array<{ value: ScaleBarStyle, label: string }> = [
     { value: 'alternating', label: 'Alternating' },
+    { value: 'alternating2', label: 'Alternating (ticked)' },
     { value: 'doubleAlternating', label: 'Double alternating' },
     { value: 'hollow', label: 'Hollow' },
     { value: 'hollowDouble', label: 'Double hollow' },
     { value: 'singleDivision', label: 'Single division' },
     { value: 'line', label: 'Line' },
+    { value: 'line2', label: 'Line (labels below)' },
     { value: 'scaleLine', label: 'Scale line' },
+    { value: 'scaleLine2', label: 'Scale line (center)' },
     { value: 'steppedLine', label: 'Stepped line' },
     { value: 'steppedFilled', label: 'Stepped filled' }
 ]

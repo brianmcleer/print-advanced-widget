@@ -23,7 +23,7 @@ import * as symbolUtils from 'esri/symbols/support/symbolUtils'
 import { jsPDF } from 'jspdf'
 import {
     PrintLayout, ScaleBarUnits, ScaleBarStyle, NorthArrowStyle, FontFamily, LayoutElement,
-    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig } from '../../config'
+    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig, LegendConfig } from '../../config'
 import { Drawer, PdfDrawer, CanvasDrawer, SvgDrawer, splitText } from './drawing'
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -66,8 +66,23 @@ export interface RenderOptions {
     /** Runtime user toggles (default on when the layout configures them). */
     showOverview?: boolean
     showGrid?: boolean
+    /** Runtime user overrides from the widget's advanced options. */
+    legendPositionOverride?: string
+    gridTypeOverride?: string
+    /** Bound Legend widget id ('' = automatic: first legend DOM found). */
+    legendWidgetId?: string
+    /** Internal: reports the computed legend panel so the live print-extent
+     *  preview can match the shrunken frame on subsequent updates. */
+    onPanelComputed?: (panel: { position: string, wIn: number, hIn: number }) => void
     /** Internal: prebuilt grid geometry (projection-engine graticules). */
     gridGeomOverride?: GridGeometry
+    /** Internal: legend panel box (page inches) when the legend sits
+     *  adjacent to the map instead of overlaying a corner. */
+    legendBox?: { xIn: number, yIn: number, wIn: number, hIn: number }
+    /** Internal: the ORIGINAL map frame bounds and border, stroked around
+     *  map + legend panel together so the authored composition (corner
+     *  stubs, heavy neatline) stays intact when the map shrinks. */
+    legendPanelOuter?: { xIn: number, yIn: number, wIn: number, hIn: number, color: [number, number, number] | null, widthPt: number }
     /** Internal: overview inset payload assembled by renderLayout. */
     overview?: {
         cap: CaptureResult
@@ -91,10 +106,14 @@ export interface RenderResult {
     warning?: string
 }
 
-interface LegendRow {
-    kind: 'layer' | 'item'
+export interface LegendRow {
+    kind: 'layer' | 'heading' | 'item' | 'note'
     label: string
     dataUrl?: string | null
+    /** Flat color swatch alternative to an image (color ramps). */
+    color?: [number, number, number] | null
+    /** Nesting depth (group layers). */
+    indent?: number
 }
 
 const PT_PER_IN = 72
@@ -304,7 +323,7 @@ export async function captureMapHiRes(
         await tmp.when()
         await Promise.race([
             reactiveUtils.whenOnce(() => !!tmp && !tmp.updating),
-            new Promise(resolve => setTimeout(resolve, 45000))
+            new Promise(resolve => setTimeout(resolve, Number((opts as any).maxWaitMs) > 0 ? Number((opts as any).maxWaitMs) : 45000))
         ])
         await new Promise(resolve => setTimeout(resolve, 600))
 
@@ -393,12 +412,37 @@ export async function captureMapHiRes(
 /* legend extraction (client-side)                                     */
 /* ------------------------------------------------------------------ */
 
+const _symbolSwatchCache = new Map<string, Promise<string | null>>()
+
 async function symbolToDataUrl(symbol: any): Promise<string | null> {
+    // cache by symbol JSON: identical symbols render once
+    try {
+        const key = symbol && typeof symbol.toJSON === 'function' ? JSON.stringify(symbol.toJSON()) : null
+        if (key) {
+            let hit = _symbolSwatchCache.get(key)
+            if (!hit) {
+                hit = symbolToDataUrlUncached(symbol)
+                _symbolSwatchCache.set(key, hit)
+                hit.then(v => { if (v === null) _symbolSwatchCache.delete(key) })
+            }
+            return hit
+        }
+    } catch (e) { /* fall through to uncached */ }
+    return symbolToDataUrlUncached(symbol)
+}
+
+async function symbolToDataUrlUncached(symbol: any): Promise<string | null> {
     try {
         const el: HTMLElement = await (symbolUtils as any).renderPreviewHTML(symbol, { size: 18 })
         if (!el) return null
         const canvas = el instanceof HTMLCanvasElement ? el : el.querySelector('canvas')
         if (canvas) return (canvas as HTMLCanvasElement).toDataURL('image/png')
+        // picture marker previews render as <img>
+        const pimg = el.querySelector && el.querySelector('img')
+        if (pimg && (pimg as HTMLImageElement).src) {
+            const norm = await urlToDataUrl((pimg as HTMLImageElement).src)
+            if (norm) return norm
+        }
         const svg = el instanceof SVGElement ? el : el.querySelector('svg')
         if (svg) {
             const xml = new XMLSerializer().serializeToString(svg)
@@ -426,15 +470,479 @@ async function symbolToDataUrl(symbol: any): Promise<string | null> {
     }
 }
 
-export async function buildLegendRows(view: MapView, maxItems: number, onProgress: RenderProgress): Promise<LegendRow[]> {
+const MAX_LEGEND_ROWS = 400
+
+/** Upgrade harvested legend rows with high-resolution REST swatches.
+ *  Matching uses the row's label within the context of the most recent
+ *  heading/layer names (map service sublayer names). Pure and exported
+ *  for tests: services = [{ layers: [{ layerName, legend: [...] }] }]. */
+export function matchRestSwatches (rows: LegendRow[], services: any[]): number {
+    const norm = (x: any): string => String(x || '').trim().toLowerCase()
+    interface Entry { layerName: string, items: Array<{ label: string, data: string }> }
+    const entries: Entry[] = []
+    for (const svc of services || []) {
+        for (const lyr of (svc && svc.layers) || []) {
+            const items = ((lyr && lyr.legend) || [])
+                .filter((it: any) => it && it.imageData)
+                .map((it: any) => ({
+                    label: norm(it.label),
+                    data: 'data:' + (it.contentType || 'image/png') + ';base64,' + it.imageData
+                }))
+            if (items.length) entries.push({ layerName: norm(lyr.layerName), items })
+        }
+    }
+    if (!entries.length) return 0
+    let upgraded = 0
+    const context: string[] = []
+    for (const r of rows) {
+        if (r.kind === 'layer' || r.kind === 'heading') {
+            context.push(norm(r.label))
+            if (context.length > 4) context.shift()
+            continue
+        }
+        if (r.kind !== 'item') continue
+        const inContext = entries.filter(e => context.includes(e.layerName))
+        const pool = inContext.length ? inContext : entries
+        const lbl = norm(r.label)
+        let hit: string | null = null
+        if (lbl) {
+            for (const e of pool) {
+                const m = e.items.find(it => it.label === lbl)
+                if (m) { hit = m.data; break }
+            }
+        } else {
+            // unlabeled single-symbol sublayer: match by the nearest heading
+            for (let c = context.length - 1; c >= 0 && !hit; c--) {
+                const e = entries.find(en => en.layerName === context[c])
+                if (e && e.items.length === 1) hit = e.items[0].data
+            }
+        }
+        if (hit) { r.dataUrl = hit; upgraded++ }
+    }
+    return upgraded
+}
+
+/** Extract a swatch data URL from a legend symbol cell (canvas, img, or
+ *  inline svg), normalizing anything that is not already a data URL. */
+async function swatchFromCell (cell: Element | null): Promise<string | null> {
+    if (!cell) return null
+    try {
+        const canvas = cell.querySelector('canvas') as HTMLCanvasElement | null
+        if (canvas) {
+            try { return canvas.toDataURL('image/png') } catch (e) { /* tainted */ }
+        }
+        const img = cell.querySelector('img') as HTMLImageElement | null
+        if (img && img.src) {
+            // already-rendered same-origin images can be copied via canvas
+            try {
+                if (img.complete && img.naturalWidth > 0) {
+                    const c = document.createElement('canvas')
+                    c.width = img.naturalWidth
+                    c.height = img.naturalHeight
+                    c.getContext('2d')?.drawImage(img, 0, 0)
+                    return c.toDataURL('image/png')
+                }
+            } catch (e) { /* tainted -> fetch */ }
+            return await urlToDataUrl(img.src)
+        }
+        const svg = cell.querySelector('svg')
+        if (svg) {
+            const xml = new XMLSerializer().serializeToString(svg)
+            const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)))
+            return await new Promise<string | null>((resolve) => {
+                const im = new Image()
+                im.onload = () => {
+                    try {
+                        const SS = 3 // supersample vectors for crisp print swatches
+                        const c = document.createElement('canvas')
+                        c.width = (im.width || 36) * SS
+                        c.height = (im.height || 36) * SS
+                        const ctx = c.getContext('2d')
+                        if (ctx) { ctx.scale(SS, SS); ctx.drawImage(im, 0, 0) }
+                        resolve(c.toDataURL('image/png'))
+                    } catch (e) { resolve(null) }
+                }
+                im.onerror = () => resolve(null)
+                im.src = url
+            })
+        }
+    } catch (e) { /* best-effort */ }
+    return null
+}
+
+/** Harvest legend rows from a LIVE Legend widget's rendered DOM: exactly
+ *  what the user sees, in the same order, swatches included. Returns []
+ *  when the widget is not on screen (closed panel, different page). */
+export async function harvestLegendDom (root: Element, labelsOnly?: boolean): Promise<LegendRow[]> {
+    const rows: LegendRow[] = []
+    const pending: Array<{ row: LegendRow, cell: Element | null }> = []
+    const nodes = root.querySelectorAll(
+        '.esri-legend__service-label, .esri-legend__layer-caption, .esri-legend__layer-row')
+    for (let i = 0; i < nodes.length && rows.length < MAX_LEGEND_ROWS; i++) {
+        const node = nodes[i]
+        let indent = 0
+        let layerDepth = 0
+        let anc: Element | null = node.parentElement
+        while (anc && anc !== root) {
+            if (anc.classList) {
+                if (anc.classList.contains('esri-legend__group-layer-child')) indent++
+                if (anc.classList.contains('esri-legend__layer')) layerDepth++
+            }
+            anc = anc.parentElement
+        }
+        // nested sublayer tables (map services) indent like the widget
+        indent += Math.max(0, layerDepth - 1)
+        if (node.classList.contains('esri-legend__service-label')) {
+            const label = (node.textContent || '').trim()
+            if (label) rows.push({ kind: 'layer', label, indent })
+        } else if (node.classList.contains('esri-legend__layer-caption')) {
+            const label = (node.textContent || '').trim()
+            if (label) rows.push({ kind: 'heading', label, indent })
+        } else {
+            const symCell = node.querySelector('.esri-legend__layer-cell--symbols')
+            const infoCell = node.querySelector('.esri-legend__layer-cell--info')
+            const label = infoCell ? (infoCell.textContent || '').trim() : ''
+            const row: LegendRow = { kind: 'item', label, dataUrl: labelsOnly ? (symCell ? 'data:,' : null) : null, indent }
+            rows.push(row)
+            if (!labelsOnly) pending.push({ row, cell: symCell })
+        }
+    }
+    // parallel swatch extraction (bounded): rows keep document order, only
+    // the pixel work is concurrent
+    if (pending.length) {
+        const CONC = 8
+        let next = 0
+        const workers = new Array(Math.min(CONC, pending.length)).fill(0).map(async () => {
+            while (next < pending.length) {
+                const mine = pending[next++]
+                mine.row.dataUrl = await swatchFromCell(mine.cell)
+            }
+        })
+        await Promise.all(workers)
+    }
+    // drop leading orphan items with neither label nor swatch
+    return rows.filter(r => r.kind !== 'item' || r.label || r.dataUrl)
+}
+
+/** Locate the bound (or any) Legend widget's legend DOM on the page.
+ *  ExB wraps widgets differently across versions, so several container
+ *  conventions are tried; if the bound widget cannot be located, this
+ *  degrades to the first legend on the page (automatic behavior) rather
+ *  than losing the legend entirely. */
+export function findLegendDom (widgetId?: string): Element | null {
+    try {
+        if (widgetId) {
+            const esc = (window as any).CSS && (CSS as any).escape ? (CSS as any).escape(widgetId) : widgetId
+            const holders = [
+                '[data-widgetid="' + widgetId + '"]',
+                '[data-widget-id="' + widgetId + '"]',
+                '.widget-renderer[data-widgetid="' + widgetId + '"]',
+                '#' + esc,
+                '.exbmap-ui [data-widgetid="' + widgetId + '"]'
+            ]
+            for (const sel of holders) {
+                try {
+                    const holder = document.querySelector(sel)
+                    if (holder) {
+                        const el = holder.querySelector('.esri-legend')
+                        if (el) {
+                            try { console.info('[print-advanced] legend widget located via ' + sel) } catch (e2) { /* noop */ }
+                            return el
+                        }
+                    }
+                } catch (e2) { /* try next */ }
+            }
+            try { console.info('[print-advanced] bound legend widget "' + widgetId + '" not found in DOM; using first legend on page') } catch (e2) { /* noop */ }
+        }
+        return document.querySelector('.esri-legend')
+    } catch (e) { return null }
+}
+
+/** Build legend rows from the JSAPI Legend widget's own model
+ *  (activeLayerInfos), so the printed legend mirrors exactly what the
+ *  Legend widget shows: layer visibility, legendEnabled, scale ranges,
+ *  group layers, map-service sublayers, and every renderer type the API
+ *  supports. Falls back to a renderer walk when the module is missing. */
+export async function buildLegendRows(view: MapView, maxItems: number, onProgress: RenderProgress, legendWidgetId?: string): Promise<LegendRow[]> {
+    onProgress('Building legend\u2026')
+    // 1) a live Legend widget's rendered DOM: exactly what the user sees
+    try {
+        const dom = findLegendDom(legendWidgetId)
+        if (dom) {
+            const rows = await harvestLegendDom(dom)
+            const items = rows.filter(r => r.kind === 'item')
+            const withSwatch = items.filter(r => isEmbeddableSwatch(r.dataUrl)).length
+            try { console.info('[print-advanced] legend source: widget-dom, ' + rows.length + ' rows, ' + withSwatch + '/' + items.length + ' swatches') } catch (e) { /* noop */ }
+            if (rows.length && withSwatch > 0) {
+                // upgrade map-service swatches to print resolution: the DOM
+                // bitmaps are screen-density; the REST legend at high dpi is not
+                try {
+                    const services: any[] = []
+                    const svcLayers = (view.map.allLayers || ({ toArray: () => [] } as any))
+                        .filter((l: any) => l.visible !== false && (l.type === 'map-image' || l.type === 'tile') && typeof l.url === 'string')
+                    const arr: any[] = svcLayers.toArray ? svcLayers.toArray() : svcLayers
+                    await Promise.all(arr.map(async (l: any) => {
+                        try { services.push(await fetchRestLegend(l.url)) } catch (e) { /* per-service best-effort */ }
+                    }))
+                    const upgraded = matchRestSwatches(rows, services)
+                    try { console.info('[print-advanced] hi-res swatches: ' + upgraded + '/' + items.length + ' upgraded to ' + LEGEND_SWATCH_DPI + ' dpi') } catch (e) { /* noop */ }
+                } catch (e) { /* enrichment is best-effort */ }
+                return rows.slice(0, MAX_LEGEND_ROWS)
+            }
+        } else {
+            try { console.info('[print-advanced] legend source: no legend DOM found' + (legendWidgetId ? ' for widget ' + legendWidgetId : '') + ', trying model') } catch (e) { /* noop */ }
+        }
+    } catch (e) { /* fall through */ }
+    // 2) headless Legend model (+ REST swatch repair)
+    try {
+        const rows = await buildRowsFromLegendModel(view)
+        if (rows.length) return rows.slice(0, MAX_LEGEND_ROWS)
+    } catch (e) { /* fall through to renderer walk */ }
+    // 3) renderer walk
+    return buildRowsFromRenderers(view, Math.max(maxItems, 200))
+}
+
+/** Map a service /legend?f=json response for one sublayer into rows.
+ *  Pure and exported for tests. */
+export function mapRestLegendToRows (json: any, sublayerId: number, indent: number): LegendRow[] {
+    const rows: LegendRow[] = []
+    const entry = (json && json.layers || []).find((l: any) => l.layerId === sublayerId)
+    if (!entry) return rows
+    for (const item of (entry.legend || [])) {
+        const data = item && item.imageData
+            ? 'data:' + (item.contentType || 'image/png') + ';base64,' + item.imageData
+            : null
+        rows.push({ kind: 'item', label: (item && item.label) ? String(item.label) : '', dataUrl: data, indent })
+    }
+    return rows
+}
+
+/** Only data: URLs can be embedded by every export backend. */
+export function isEmbeddableSwatch (src: string | null | undefined): boolean {
+    return !!src && String(src).startsWith('data:')
+}
+
+let _esriRequestP: Promise<any> | null = null
+function esriRequestModule (): Promise<any> {
+    if (!_esriRequestP) _esriRequestP = loadArcGISJSAPIModules(['esri/request']).then(m => m[0])
+    return _esriRequestP
+}
+
+const _swatchUrlCache = new Map<string, Promise<string | null>>()
+
+/** Normalize an http(s)/blob swatch URL to a data URL so jsPDF and the
+ *  raster/SVG backends can embed it. Goes through esri/request so portal
+ *  tokens apply to secured services. Cached per URL: repeated symbols
+ *  cost one fetch, not one per legend row. */
+async function urlToDataUrl (src: string): Promise<string | null> {
+    if (!src) return null
+    if (src.startsWith('data:')) return src
+    let p = _swatchUrlCache.get(src)
+    if (!p) {
+        p = (async () => {
+            try {
+                const esriRequest = await esriRequestModule()
+                const res = await esriRequest(src, { responseType: 'blob' })
+                const blob = res && res.data
+                if (!blob) return null
+                return await new Promise<string | null>((resolve) => {
+                    const fr = new FileReader()
+                    fr.onload = () => resolve(String(fr.result))
+                    fr.onerror = () => resolve(null)
+                    fr.readAsDataURL(blob)
+                })
+            } catch (e) { return null }
+        })()
+        _swatchUrlCache.set(src, p)
+        // do not let a transient failure poison the cache forever
+        p.then(v => { if (v === null) _swatchUrlCache.delete(src) })
+    }
+    return p
+}
+
+/** Server-rendered swatch resolution. ~3x screen density downscales
+ *  crisply at print sizes. */
+const LEGEND_SWATCH_DPI = 288
+
+const _restLegendCache = new Map<string, Promise<any>>()
+
+/** Fetch a map service's REST legend (server-rendered swatches), through
+ *  esri/request so portal tokens and interceptors apply. Cached per URL. */
+async function fetchRestLegend (serviceUrl: string, dpi: number = LEGEND_SWATCH_DPI): Promise<any> {
+    const key = serviceUrl + '#' + dpi
+    let p = _restLegendCache.get(key)
+    if (!p) {
+        p = (async () => {
+            const esriRequest = await esriRequestModule()
+            const res = await esriRequest(serviceUrl.replace(/\/$/, '') + '/legend', {
+                query: { f: 'json', dpi },
+                responseType: 'json'
+            })
+            return res && res.data
+        })()
+        _restLegendCache.set(key, p)
+    }
+    return p
+}
+
+/** Service URL + sublayer id for an ActiveLayerInfo that wraps a map
+ *  service sublayer; null for anything else. */
+function sublayerRestTarget (ali: any): { url: string, id: number } | null {
+    const lyr = ali && ali.layer
+    if (!lyr) return null
+    const id = lyr.id
+    if (typeof id !== 'number' || !isFinite(id)) return null
+    const parent = lyr.layer // Sublayer -> parent MapImageLayer/TileLayer
+    const url = (parent && typeof parent.url === 'string' && parent.url) ||
+        (typeof lyr.url === 'string' ? lyr.url.replace(/\/\d+\/?$/, '') : '')
+    if (!url) return null
+    return { url, id }
+}
+
+async function buildRowsFromLegendModel(view: MapView): Promise<LegendRow[]> {
+    const [LegendCls] = await loadArcGISJSAPIModules(['esri/widgets/Legend'])
+    const holder = document.createElement('div')
+    holder.style.cssText = 'position:absolute;left:-10000px;top:0;width:300px;height:10px;overflow:hidden;'
+    document.body.appendChild(holder)
+    const legend: any = new LegendCls({ view, container: holder })
+    try {
+        // Wait for the legend model to settle: activeLayerInfos populated and
+        // each info past its loading state (children included).
+        const deadline = Date.now() + 8000
+        const settled = (): boolean => {
+            const alis = legend.activeLayerInfos
+            if (!alis || alis.length === 0) return false
+            let ok = true
+            alis.forEach((a: any) => { if (!infoSettled(a)) ok = false })
+            return ok
+        }
+        const infoSettled = (a: any): boolean => {
+            if (a.ready === false) return false
+            if (a.children && a.children.length) {
+                let ok = true
+                a.children.forEach((c: any) => { if (!infoSettled(c)) ok = false })
+                return ok
+            }
+            // a leaf without legend elements is usually still loading
+            // (map service legends arrive async); the deadline bounds this
+            return !!(a.legendElements && a.legendElements.length)
+        }
+        while (!settled() && Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, 150))
+        }
+        const rows: LegendRow[] = []
+        const walk = async (ali: any, depth: number): Promise<void> => {
+            if (rows.length >= MAX_LEGEND_ROWS) return
+            const elements = (ali.legendElements || []) as any[]
+            const kids = ali.children && ali.children.length ? ali.children.toArray ? ali.children.toArray() : ali.children : []
+            if (!elements.length && !kids.length) return
+            rows.push({ kind: 'layer', label: ali.title || 'Layer', indent: depth })
+            for (const el of elements) {
+                if (rows.length >= MAX_LEGEND_ROWS) return
+                if (el.type === 'symbol-table') {
+                    if (el.title && typeof el.title === 'string') {
+                        rows.push({ kind: 'heading', label: el.title, indent: depth })
+                    }
+                    for (const info of (el.infos || [])) {
+                        if (rows.length >= MAX_LEGEND_ROWS) return
+                        // nested symbol tables (e.g. unique value groups)
+                        if (info && info.type === 'symbol-table') {
+                            if (info.title) rows.push({ kind: 'heading', label: String(info.title), indent: depth })
+                            for (const sub of (info.infos || [])) {
+                                if (rows.length >= MAX_LEGEND_ROWS) return
+                                rows.push(await infoToRow(sub, depth))
+                            }
+                        } else {
+                            rows.push(await infoToRow(info, depth))
+                        }
+                    }
+                } else if (el.type === 'color-ramp' || el.type === 'size-ramp' || el.type === 'heatmap-ramp' || el.type === 'opacity-ramp') {
+                    if (el.title && typeof el.title === 'string') {
+                        rows.push({ kind: 'heading', label: String(el.title), indent: depth })
+                    }
+                    for (const info of (el.infos || [])) {
+                        if (rows.length >= MAX_LEGEND_ROWS) return
+                        const col = info && info.color
+                            ? [info.color.r ?? info.color[0] ?? 0, info.color.g ?? info.color[1] ?? 0, info.color.b ?? info.color[2] ?? 0] as [number, number, number]
+                            : null
+                        const label = (info && (info.label || info.value != null)) ? String(info.label ?? info.value) : ''
+                        if (label || col) rows.push({ kind: 'item', label, color: col, dataUrl: null, indent: depth })
+                    }
+                }
+            }
+            // Map service sublayers: server-side symbols often arrive as DOM
+            // previews the headless model cannot serve. Replace any empty
+            // swatches for this layer with the service's REST legend, which
+            // returns the swatches as base64 images.
+            const mine = rows.filter(r => r.kind === 'item' && r.indent === depth)
+            const startedAt = rows.length
+            const emptyItems = mine.filter(r => !isEmbeddableSwatch(r.dataUrl) && !r.color)
+            if (emptyItems.length) {
+                const target = sublayerRestTarget(ali)
+                if (target) {
+                    try {
+                        const json = await fetchRestLegend(target.url)
+                        const restRows = mapRestLegendToRows(json, target.id, depth)
+                        try { console.info('[print-advanced] REST legend ' + target.url + ' layer ' + target.id + ': ' + restRows.length + ' swatches') } catch (e) { /* noop */ }
+                        if (restRows.length) {
+                            // remove THIS layer's just-added item rows, keep its
+                            // heading rows, append the REST-derived items
+                            for (let i = rows.length - 1; i >= 0; i--) {
+                                const r = rows[i]
+                                if (r.kind === 'item' && r.indent === depth && !isEmbeddableSwatch(r.dataUrl) && !r.color) rows.splice(i, 1)
+                                if (r.kind === 'layer' && r.indent === depth) break
+                            }
+                            rows.push(...restRows)
+                        }
+                    } catch (e) { /* REST legend is best-effort */ }
+                }
+            }
+            void startedAt
+            for (const kid of kids) await walk(kid, depth + 1)
+        }
+        const alis = legend.activeLayerInfos
+        const top: any[] = alis && alis.toArray ? alis.toArray() : (alis || [])
+        for (const ali of top) await walk(ali, 0)
+        try {
+            const items = rows.filter(r => r.kind === 'item')
+            console.info('[print-advanced] legend model: ' + rows.length + ' rows; swatches embeddable=' +
+                items.filter(i => isEmbeddableSwatch(i.dataUrl)).length + ' colored=' + items.filter(i => !!i.color).length +
+                ' empty=' + items.filter(i => !isEmbeddableSwatch(i.dataUrl) && !i.color).length +
+                '; layers: ' + rows.filter(r => r.kind === 'layer').map(r => r.label).join(' | '))
+        } catch (e) { /* noop */ }
+        return rows
+    } finally {
+        try { legend.destroy() } catch (e) { /* noop */ }
+        try { holder.remove() } catch (e) { /* noop */ }
+    }
+}
+
+async function infoToRow(info: any, depth: number): Promise<LegendRow> {
+    let dataUrl: string | null = null
+    try {
+        if (info && info.symbol) dataUrl = await symbolToDataUrl(info.symbol)
+        if (!dataUrl && info && info.preview && info.preview.querySelector) {
+            const canvas = info.preview.querySelector('canvas')
+            if (canvas) {
+                try { dataUrl = (canvas as HTMLCanvasElement).toDataURL('image/png') } catch (e) { /* tainted */ }
+            }
+            if (!dataUrl) {
+                const img = info.preview.querySelector('img')
+                if (img && img.src) dataUrl = await urlToDataUrl(img.src)
+            }
+        }
+    } catch (e) { /* swatch is best-effort */ }
+    return { kind: 'item', label: (info && info.label) ? String(info.label) : '', dataUrl, indent: depth }
+}
+
+/** Fallback: manual renderer walk (no JSAPI Legend module available). */
+async function buildRowsFromRenderers(view: MapView, maxItems: number): Promise<LegendRow[]> {
     const rows: LegendRow[] = []
     let count = 0
     try {
-        onProgress('Building legend…')
         const layers = view.map.allLayers
-            .filter((l: any) => l.visible && l.type === 'feature' && l.listMode !== 'hide')
+            .filter((l: any) => l.visible && l.legendEnabled !== false && l.type === 'feature' && l.listMode !== 'hide')
             .toArray() as any[]
-
         for (const layer of layers) {
             if (count >= maxItems) break
             try {
@@ -442,7 +950,6 @@ export async function buildLegendRows(view: MapView, maxItems: number, onProgres
                 const renderer = layer.renderer
                 if (!renderer) continue
                 rows.push({ kind: 'layer', label: layer.title || 'Layer' })
-
                 if (renderer.type === 'simple' && renderer.symbol) {
                     rows.push({ kind: 'item', label: '', dataUrl: await symbolToDataUrl(renderer.symbol) })
                     count++
@@ -459,7 +966,7 @@ export async function buildLegendRows(view: MapView, maxItems: number, onProgres
                         count++
                     }
                 } else {
-                    rows.push({ kind: 'item', label: '(symbology not supported)', dataUrl: null })
+                    rows.push({ kind: 'note', label: '(symbology not supported)' })
                     count++
                 }
             } catch (e) { /* one bad layer never kills the export */ }
@@ -661,6 +1168,35 @@ function drawBarOfStyle(
             }
             break
         }
+        case 'alternating2': {
+            // alternating fill with division ticks rising above the bar
+            const tick = Math.min(3, barH * 0.5)
+            for (let i = 0; i < segments; i++) {
+                d.setFill(i % 2 === 0 ? r1 : r2, i % 2 === 0 ? g1 : g2, i % 2 === 0 ? b1 : b2)
+                d.rect(x + i * segPt, top, segPt, barH, 'FD')
+            }
+            for (let i = 0; i <= segments; i++) {
+                d.line(x + i * segPt, top, x + i * segPt, top - tick)
+            }
+            break
+        }
+        case 'line2': {
+            // baseline at the top, ticks descend (labels sit below the bar)
+            d.setLineWidth(1.2)
+            d.line(x, top, x + barPt, top)
+            for (let i = 0; i <= segments; i++) d.line(x + i * segPt, top, x + i * segPt, top + barH)
+            break
+        }
+        case 'scaleLine2': {
+            // center axis with full ticks crossing it
+            d.setLineWidth(1.2)
+            const cy = top + barH / 2
+            d.line(x, cy, x + barPt, cy)
+            for (let i = 0; i <= segments; i++) {
+                d.line(x + i * segPt, top, x + i * segPt, top + barH)
+            }
+            break
+        }
         case 'singleDivision': {
             d.setFill(r1, g1, b1)
             d.rect(x, top, barPt, barH, 'FD')
@@ -700,14 +1236,16 @@ function drawBarOfStyle(
             break
         }
         case 'line': {
+            // baseline at the bottom, ticks rise (Pro's Line scale bar)
             d.setLineWidth(1.2)
-            d.line(x, top, x + barPt, top)
-            for (let i = 0; i <= segments; i++) d.line(x + i * segPt, top, x + i * segPt, top + barH)
+            d.line(x, top + barH, x + barPt, top + barH)
+            for (let i = 0; i <= segments; i++) d.line(x + i * segPt, top + barH, x + i * segPt, top)
             break
         }
         case 'steppedFilled': {
+            // two-height alternation reads crisply at print sizes
             for (let i = 0; i < segments; i++) {
-                const h = barH * (1 - (i / Math.max(1, segments)) * 0.6)
+                const h = i % 2 === 0 ? barH : barH * 0.55
                 d.setFill(i % 2 === 0 ? r1 : r2, i % 2 === 0 ? g1 : g2, i % 2 === 0 ? b1 : b2)
                 d.rect(x + i * segPt, top + (barH - h), segPt, h, 'FD')
             }
@@ -731,9 +1269,20 @@ function drawScaleBarEl(d: Drawer, el: ScaleBarEl, printedScale: number, opts: R
     const boxW = el.wIn * PT_PER_IN
     const boxH = el.hIn * PT_PER_IN
 
-    const style: ScaleBarStyle = opts.scaleBarStyle || el.style || 'doubleAlternating'
+    // Dual semantics (Pro dual scale bars): a user-selected Double style is
+    // a dual-measurement bar, ALWAYS two units. The second unit defaults to
+    // the natural complement and can be overridden. Layout-default style
+    // keeps the authored CIM bar untouched.
+    const COMPLEMENT_UNIT: Record<ScaleBarUnits, ScaleBarUnits> = {
+        miles: 'feet', feet: 'miles', meters: 'kilometers', kilometers: 'meters'
+    }
+    const userStyle = opts.scaleBarStyle
+    const dualMode = userStyle === 'doubleAlternating' || userStyle === 'hollowDouble'
+    const style: ScaleBarStyle = userStyle || el.style || 'doubleAlternating'
     const units: ScaleBarUnits = opts.scaleBarUnits || el.units
-    const units2 = opts.scaleBarUnits2 && opts.scaleBarUnits2 !== units ? opts.scaleBarUnits2 : undefined
+    const units2: ScaleBarUnits | undefined = dualMode
+        ? ((opts.scaleBarUnits2 && opts.scaleBarUnits2 !== units) ? opts.scaleBarUnits2 : (COMPLEMENT_UNIT[units] || 'feet'))
+        : undefined
 
     const segments = Math.max(1, el.divisions) * Math.max(1, el.subdivisions)
     const labelSize = Math.min(el.labelSizePt || 8, boxH * 0.45)
@@ -747,15 +1296,17 @@ function drawScaleBarEl(d: Drawer, el: ScaleBarEl, printedScale: number, opts: R
         const barH = Math.max(3, Math.min(el.barHeightPt || 8, boxH * 0.45))
         const labelGap = Math.max(3, labelSize * 0.4)
         // Vertically centre the [numbers row | bar] group within the frame.
+        // 'line2' inverts the arrangement: bar first, numbers row below.
+        const labelsBelow = style === 'line2'
         const groupH = labelSize + labelGap + barH
         const groupTop = boxY + Math.max(0, (boxH - groupH) / 2)
-        const labelBaseline = groupTop + labelSize
-        const barTop = groupTop + labelSize + labelGap
+        const labelBaseline = labelsBelow ? groupTop + barH + labelGap + labelSize : groupTop + labelSize
+        const barTop = labelsBelow ? groupTop : groupTop + labelSize + labelGap
 
         // Reserve space so a centred "0" fits on the left and the unit label fits on the right.
         const unitStr = UNIT_LABEL[units]
         const leftInset = labelSize * 0.35
-        const unitReserve = textW(unitStr, unitSize) + 8
+        const unitReserve = textW(unitStr, unitSize) + textW('10,000', labelSize) / 2 + 12
         const availIn = Math.max(0.2, (boxW - leftInset - unitReserve) / PT_PER_IN)
         const { dist, barIn } = niceBarDistance(printedScale, units, availIn)
         const barPt = barIn * PT_PER_IN
@@ -768,16 +1319,25 @@ function drawScaleBarEl(d: Drawer, el: ScaleBarEl, printedScale: number, opts: R
         d.text('0', x0, labelBaseline, 'center')
         if (midLabels) d.text(fmt(dist / 2), x0 + barPt / 2, labelBaseline, 'center')
         d.text(fmt(dist), x0 + barPt, labelBaseline, 'center')
-        // Unit label: vertically centred on the bar, just right of its end.
-        d.setFont('normal', unitSize)
-        d.text(unitStr, x0 + barPt + 4, barTop + barH / 2 + unitSize * 0.34, 'left')
+        // single-mode unit on numbers row: '0 ... 0.5 ... 1 Miles', clear of
+        // the centered end number (same convention as the dual bar)
+        d.setFont('normal', Math.min(unitSize, labelSize + 2))
+        d.text(unitStr, x0 + barPt + textW(fmt(dist), labelSize) / 2 + 5, labelBaseline, 'left')
         return
     }
 
     // Dual scale bar (Pro: upper and lower unit sharing the zero point). The whole
     // [upper labels | upper bar | lower bar | lower labels] group is centred in the frame.
-    const labelBand = labelSize + 3
-    const barH = Math.max(3, Math.min((el.barHeightPt || 8) * 0.75, (boxH - 2 * labelBand) / 2))
+    // double-banded styles need height for two visible rows; borrow from
+    // the label bands if the frame is tight rather than collapsing to hairlines
+    const isDoubleStyle = style === 'doubleAlternating' || style === 'hollowDouble'
+    let labelBand = labelSize + 3
+    const desiredBarH = isDoubleStyle ? Math.max(8, el.barHeightPt || 8) : (el.barHeightPt || 8) * 0.75
+    let barH = Math.max(3, Math.min(desiredBarH, (boxH - 2 * labelBand) / 2))
+    if (isDoubleStyle && barH < 6) {
+        labelBand = labelSize + 1
+        barH = Math.max(4, Math.min(desiredBarH, (boxH - 2 * labelBand) / 2))
+    }
     const totalH = 2 * labelBand + 2 * barH
     const top0 = boxY + Math.max(0, (boxH - totalH) / 2)
     const upperTop = top0 + labelBand
@@ -787,7 +1347,10 @@ function drawScaleBarEl(d: Drawer, el: ScaleBarEl, printedScale: number, opts: R
     const uStr = UNIT_LABEL[units]
     const u2Str = UNIT_LABEL[units2]
     const leftInset = labelSize * 0.35
-    const reserve = Math.max(textW(uStr, dualUnitSize), textW(u2Str, dualUnitSize)) + 8
+    // units sit on the number rows, after the end numbers: reserve room for
+    // half the widest end number plus the unit word
+    const endNumHalf = textW('10,000', labelSize) / 2
+    const reserve = Math.max(textW(uStr, dualUnitSize), textW(u2Str, dualUnitSize)) + endNumHalf + 12
     const availIn = Math.max(0.2, (boxW - leftInset - reserve) / PT_PER_IN)
     const up = niceBarDistance(printedScale, units, availIn)
     const lo = niceBarDistance(printedScale, units2, availIn)
@@ -795,8 +1358,12 @@ function drawScaleBarEl(d: Drawer, el: ScaleBarEl, printedScale: number, opts: R
     const loPt = lo.barIn * PT_PER_IN
     const x0 = boxX + leftInset
 
-    drawBarOfStyle(d, style, x0, upperTop, upPt, barH, segments, el.color1, el.color2)
-    drawBarOfStyle(d, style, x0, axis, loPt, barH, segments, el.color2, el.color1)
+    // each measurement bar draws as the single-row counterpart of the
+    // chosen Double style: two stacked single bars ARE the dual bar
+    const barStyle: ScaleBarStyle = style === 'doubleAlternating' ? 'alternating'
+        : style === 'hollowDouble' ? 'hollow' : style
+    drawBarOfStyle(d, barStyle, x0, upperTop, upPt, barH, segments, el.color1, el.color2)
+    drawBarOfStyle(d, barStyle, x0, axis, loPt, barH, segments, el.color2, el.color1)
 
     d.setTextColor(30, 30, 30)
     d.setFont('normal', labelSize)
@@ -804,12 +1371,16 @@ function drawScaleBarEl(d: Drawer, el: ScaleBarEl, printedScale: number, opts: R
     d.text('0', x0, upY, 'center')
     if (midLabels) d.text(fmt(up.dist / 2), x0 + upPt / 2, upY, 'center')
     d.text(fmt(up.dist), x0 + upPt, upY, 'center')
-    const loY = Math.min(axis + barH + labelSize, boxY + boxH - labelSize * 0.2)
+    const loY = Math.max(axis + barH + labelSize * 0.9, Math.min(axis + barH + labelSize, boxY + boxH - labelSize * 0.1))
     if (midLabels) d.text(fmt(lo.dist / 2), x0 + loPt / 2, loY, 'center')
     d.text(fmt(lo.dist), x0 + loPt, loY, 'center')
+    // unit words share the number rows (Pro-style: '... 1 Miles'), placed
+    // clear of the centered end numbers
     d.setFont('normal', dualUnitSize)
-    d.text(uStr, x0 + upPt + 4, upperTop + barH / 2 + dualUnitSize * 0.34, 'left')
-    d.text(u2Str, x0 + loPt + 4, axis + barH / 2 + dualUnitSize * 0.34, 'left')
+    const upEndHalf = textW(fmt(up.dist), labelSize) / 2
+    const loEndHalf = textW(fmt(lo.dist), labelSize) / 2
+    d.text(uStr, x0 + upPt + upEndHalf + 5, upY, 'left')
+    d.text(u2Str, x0 + loPt + loEndHalf + 5, loY, 'left')
 }
 
 function drawTextEl(d: Drawer, el: TextEl, tokens: TextTokens): void {
@@ -880,49 +1451,463 @@ async function drawPictureEl(d: Drawer, el: PictureEl, defaultLogo?: string): Pr
     d.text(el.sourceName || 'image', x + w / 2, y + h / 2 + 3, 'center')
 }
 
-async function drawLegendEl(d: Drawer, el: LegendEl, rows: LegendRow[]): Promise<void> {
+/* ------------------------------------------------------------------ */
+/* Legend layout engine (pure, testable)                                */
+/* ------------------------------------------------------------------ */
+
+export const LEGEND_DEFAULTS: LegendConfig = {
+    enabled: false,
+    position: 'rightPanel',
+    widthIn: 3,
+    heightIn: 3.5,
+    marginIn: 0.25,
+    title: 'Legend',
+    showTitle: true,
+    columns: 0,
+    baseFontPt: 8,
+    patchSize: 'medium',
+    showLayerNames: true,
+    background: true,
+    bgColor: [255, 255, 255],
+    borderColor: [150, 150, 150],
+    borderWidthPt: 0.5
+}
+
+export interface PlacedLegendItem {
+    row: LegendRow
+    xPt: number
+    yPt: number
+    labelLines: string[]
+    fontPt: number
+    patchWPt: number
+    patchHPt: number
+    heightPt: number
+}
+
+export interface LegendLayout {
+    columns: number
+    colWidthPt: number
+    fontPt: number
+    items: PlacedLegendItem[]
+    truncated: number
+    titleFontPt: number
+    usedHeightPt: number
+}
+
+export function legendPatchPt (size: LegendPatchSize | undefined, fontPt: number): { w: number, h: number } {
+    const base = size === 'small' ? 9 : size === 'large' ? 18 : 13
+    // Patches shrink proportionally with the font (Pro's AdjustFontSize
+    // behavior); otherwise a fixed patch height defeats the shrink pass.
+    const scaled = base * Math.min(1, fontPt / 8)
+    const h = Math.max(fontPt + 2, scaled)
+    return { w: h * 1.5, h }
+}
+
+/** Fit legend rows into a box. Strategy chain in the spirit of Pro's
+ *  fitting strategies: try column counts (auto), then shrink the font,
+ *  then truncate with an honest "+ N more" footer. Pure and testable:
+ *  the measurement callback abstracts the Drawer. */
+export function layoutLegend (
+    rows: LegendRow[],
+    boxWPt: number,
+    boxHPt: number,
+    cfg: LegendConfig,
+    measure: (text: string, fontPt: number) => number
+): LegendLayout {
+    const pad = 8
+    const gutter = 10
+    const innerW = boxWPt - pad * 2
+    const titleFontPt = cfg.showTitle !== false ? Math.max(9, (cfg.baseFontPt || 8) + 3) : 0
+    const titleH = cfg.showTitle !== false ? titleFontPt + 10 : 4
+    const innerH = boxHPt - pad - titleH - pad / 2
+
+    const filtered = rows.filter(r => cfg.showLayerNames !== false || r.kind !== 'layer')
+
+    interface Block { rows: LegendRow[] }
+    const blocks: Block[] = []
+    let cur: Block | null = null
+    for (const r of filtered) {
+        if (r.kind === 'layer') { cur = { rows: [r] }; blocks.push(cur) }
+        else {
+            if (!cur) { cur = { rows: [] }; blocks.push(cur) }
+            cur.rows.push(r)
+        }
+    }
+
+    const wrap = (text: string, width: number, fontPt: number, maxLines: number): string[] => {
+        const words = (text || '').split(/\s+/).filter(Boolean)
+        const lines: string[] = []
+        let line = ''
+        for (const w of words) {
+            const cand = line ? line + ' ' + w : w
+            if (measure(cand, fontPt) <= width || !line) line = cand
+            else {
+                lines.push(line); line = w
+                if (lines.length === maxLines) break
+            }
+        }
+        if (line && lines.length < maxLines) lines.push(line)
+        if (lines.length === 0) lines.push('')
+        const kept = lines.join(' ').length
+        if (kept + 2 < (text || '').trim().length) {
+            let last = lines[lines.length - 1]
+            while (last.length && measure(last + '\u2026', fontPt) > width) last = last.slice(0, -1)
+            lines[lines.length - 1] = last + '\u2026'
+        }
+        return lines
+    }
+
+    const measureRow = (r: LegendRow, fontPt: number, colW: number): { h: number, lines: string[] } => {
+        const indentPt = (r.indent || 0) * 8
+        if (r.kind === 'layer') {
+            const lines = wrap(r.label, colW - indentPt, fontPt + 1, 2)
+            return { h: lines.length * (fontPt + 5) + 3, lines }
+        }
+        if (r.kind === 'heading') {
+            return { h: fontPt + 5, lines: wrap(r.label, colW - indentPt - 4, fontPt, 1) }
+        }
+        if (r.kind === 'note') {
+            return { h: fontPt + 4, lines: wrap(r.label, colW - indentPt, Math.max(5, fontPt - 1), 1) }
+        }
+        const patch = legendPatchPt(cfg.patchSize, fontPt)
+        const maxItemLines = 3
+        const lines = wrap(r.label, colW - indentPt - patch.w - 8, fontPt, maxItemLines)
+        return { h: Math.max(patch.h + 5, lines.length * (fontPt + 2) + 4), lines }
+    }
+
+    const tryFit = (cols: number, fontPt: number): LegendLayout | null => {
+        const colW = (innerW - gutter * (cols - 1)) / cols
+        if (colW < 50) return null
+        const patch = legendPatchPt(cfg.patchSize, fontPt)
+        const flow = (target: number): LegendLayout | null => {
+            const items: PlacedLegendItem[] = []
+            let col = 0
+            let y = 0
+            let maxBottom = 0
+            for (const blk of blocks) {
+                const headH = blk.rows.length ? measureRow(blk.rows[0], fontPt, colW).h : 0
+                const firstItemH = blk.rows.length > 1 ? measureRow(blk.rows[1], fontPt, colW).h : 0
+                if (y > 0 && y + headH + firstItemH > target) { col++; y = 0 }
+                for (const r of blk.rows) {
+                    const mm = measureRow(r, fontPt, colW)
+                    if (y + mm.h > (y === 0 ? innerH : target)) { col++; y = 0 }
+                    if (col >= cols) return null
+                    items.push({
+                        row: r,
+                        xPt: pad + col * (colW + gutter),
+                        yPt: titleH + pad / 2 + y,
+                        labelLines: mm.lines,
+                        fontPt,
+                        patchWPt: patch.w,
+                        patchHPt: patch.h,
+                        heightPt: mm.h
+                    })
+                    y += mm.h
+                    maxBottom = Math.max(maxBottom, titleH + pad / 2 + y)
+                }
+            }
+            return { columns: cols, colWidthPt: colW, fontPt, items, truncated: 0, titleFontPt, usedHeightPt: maxBottom + pad }
+        }
+        // balance columns: aim for equal heights, fall back to strict fill
+        if (cols > 1) {
+            let total = 0
+            for (const blk of blocks) for (const r of blk.rows) total += measureRow(r, fontPt, colW).h
+            const target = Math.min(innerH, Math.max(total / cols * 1.05, innerH * 0.25))
+            const balanced = flow(target)
+            if (balanced) return balanced
+        }
+        return flow(innerH)
+    }
+
+    const colChoices = cfg.columns && cfg.columns > 0
+        ? [Math.min(6, Math.round(cfg.columns))]
+        : [1, 2, 3, 4]
+    const baseFont = Math.max(5, cfg.baseFontPt || 8)
+
+    for (const cols of colChoices) {
+        const fit = tryFit(cols, baseFont)
+        if (fit) return fit
+    }
+    const maxCols = colChoices[colChoices.length - 1]
+    // noShrink: pagination mode; keep the base font and truncate instead,
+    // the paginator turns the remainder into further pages
+    if (!(cfg as any).noShrink) {
+        for (let f = baseFont - 0.5; f >= 5; f -= 0.5) {
+            const fit = tryFit(maxCols, f)
+            if (fit) return fit
+        }
+    }
+    // Truncate at minimum font, honest footer with the remainder count.
+    const minFont = (cfg as any).noShrink ? baseFont : 5
+    const colW = (innerW - gutter * (maxCols - 1)) / maxCols
+    const items: PlacedLegendItem[] = []
+    const patch = legendPatchPt(cfg.patchSize, minFont)
+    const footerH = minFont + 9
+    const flat = blocks.flatMap(bk => bk.rows)
+    let col = 0
+    let y = 0
+    let i = 0
+    for (; i < flat.length; i++) {
+        const mm = measureRow(flat[i], minFont, colW)
+        const reserve = col === maxCols - 1 ? footerH : 0
+        if (y + mm.h > innerH - reserve) { col++; y = 0 }
+        if (col >= maxCols) break
+        items.push({ row: flat[i], xPt: pad + col * (colW + gutter), yPt: titleH + pad / 2 + y, labelLines: mm.lines, fontPt: minFont, patchWPt: patch.w, patchHPt: patch.h, heightPt: mm.h })
+        y += mm.h
+    }
+    // widow control on the truncated tail: never end on a bare heading
+    while (items.length && (items[items.length - 1].row.kind === 'layer' || items[items.length - 1].row.kind === 'heading')) {
+        items.pop()
+    }
+    const truncated = flat.slice(i).filter(r => r.kind === 'item').length
+    return { columns: maxCols, colWidthPt: colW, fontPt: minFont, items, truncated, titleFontPt, usedHeightPt: boxHPt }
+}
+
+export function approxTextWidthPt (text: string, fontPt: number): number {
+    return (text || '').length * fontPt * 0.52
+}
+
+export interface LegendPanelResult {
+    box: { xIn: number, yIn: number, wIn: number, hIn: number }
+    mapFrame: { xIn: number, yIn: number, wIn: number, hIn: number }
+}
+
+/** Dynamically size a legend panel ADJACENT to the map: the map frame
+ *  shrinks to make room instead of the legend overlaying map content.
+ *  Panel size follows the legend content at the configured font, clamped
+ *  so the map keeps at least 55% of its original dimension. */
+/** Trim a panel rectangle so it does not overlap other layout elements
+ *  (pictures, texts, scale bars authored over the frame corners). Trims
+ *  from whichever end preserves more panel; vertical for side panels,
+ *  horizontal for the bottom panel. */
+export function trimPanelBox (
+    box: { xIn: number, yIn: number, wIn: number, hIn: number },
+    others: Array<{ xIn: number, yIn: number, wIn: number, hIn: number }>,
+    vertical: boolean
+): { xIn: number, yIn: number, wIn: number, hIn: number } {
+    const EPS = 0.02
+    const GAP = 0.08
+    let b = { ...box }
+    for (const o of others || []) {
+        if (!o || !(o.wIn > 0) || !(o.hIn > 0)) continue
+        const ix = Math.min(b.xIn + b.wIn, o.xIn + o.wIn) - Math.max(b.xIn, o.xIn)
+        const iy = Math.min(b.yIn + b.hIn, o.yIn + o.hIn) - Math.max(b.yIn, o.yIn)
+        if (ix <= EPS || iy <= EPS) continue
+        if (vertical) {
+            const topSpace = o.yIn - b.yIn                    // panel kept above the element
+            const bottomSpace = (b.yIn + b.hIn) - (o.yIn + o.hIn) // panel kept below it
+            if (topSpace >= bottomSpace) {
+                b = { ...b, hIn: Math.max(0, topSpace - GAP) }
+            } else {
+                const newTop = o.yIn + o.hIn + GAP
+                b = { ...b, yIn: newTop, hIn: Math.max(0, b.yIn + b.hIn - newTop) }
+            }
+        } else {
+            const leftSpace = o.xIn - b.xIn
+            const rightSpace = (b.xIn + b.wIn) - (o.xIn + o.wIn)
+            if (leftSpace >= rightSpace) {
+                b = { ...b, wIn: Math.max(0, leftSpace - GAP) }
+            } else {
+                const newLeft = o.xIn + o.wIn + GAP
+                b = { ...b, xIn: newLeft, wIn: Math.max(0, b.xIn + b.wIn - newLeft) }
+            }
+        }
+    }
+    return b
+}
+
+export function computeLegendPanel (
+    rows: LegendRow[],
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number },
+    cfg: LegendConfig,
+    others: Array<{ xIn: number, yIn: number, wIn: number, hIn: number }> = []
+): LegendPanelResult | null {
+    const posn = cfg.position as string
+    if (posn !== 'leftPanel' && posn !== 'rightPanel' && posn !== 'bottomPanel') return null
+    const gapIn = 0.08
+    const font = Math.max(5, cfg.baseFontPt || 8)
+    const patch = legendPatchPt(cfg.patchSize, font)
+    const PT = 72
+    const rowH = (r: LegendRow): number => {
+        if (r.kind === 'layer') return font + 9
+        if (r.kind === 'heading' || r.kind === 'note') return font + 5
+        return Math.max(patch.h + 5, font + 6)
+    }
+    const rowW = (r: LegendRow): number => {
+        const indent = (r.indent || 0) * 8
+        if (r.kind === 'layer') return indent + approxTextWidthPt(r.label, font + 1)
+        if (r.kind === 'heading' || r.kind === 'note') return indent + approxTextWidthPt(r.label, font) + 4
+        return indent + patch.w + 8 + approxTextWidthPt(r.label, font)
+    }
+    const totalH = rows.reduce((a, r) => a + rowH(r), 0)
+    const maxRowW = rows.reduce((a, r) => Math.max(a, rowW(r)), 60)
+    const pad = 8
+    const gutter = 10
+    const titleH = cfg.showTitle !== false ? Math.max(9, font + 3) + 10 : 4
+    if (posn === 'bottomPanel') {
+        const innerW = mf.wIn * PT - pad * 2
+        const colW = Math.max(90, Math.min(maxRowW, 220))
+        const cols = Math.max(1, Math.min(6, Math.floor((innerW + gutter) / (colW + gutter))))
+        const hPt = titleH + Math.ceil(totalH / cols) + pad * 2
+        const fixed = (cfg as any).panelSizeMode === 'fixed' && Number(cfg.heightIn) > 0
+        const hIn = Math.min(mf.hIn * 0.45, Math.max(0.8, fixed ? Number(cfg.heightIn) : hPt / PT))
+        return {
+            box: trimPanelBox({ xIn: mf.xIn, yIn: mf.yIn + mf.hIn - hIn, wIn: mf.wIn, hIn }, others, false),
+            mapFrame: { xIn: mf.xIn, yIn: mf.yIn, wIn: mf.wIn, hIn: mf.hIn - hIn - gapIn }
+        }
+    }
+    const oneColH = titleH + totalH + pad * 2
+    const cols = oneColH <= mf.hIn * PT ? 1 : 2
+    const wPt = pad * 2 + cols * Math.min(maxRowW, 220) + (cols - 1) * gutter
+    const fixed = (cfg as any).panelSizeMode === 'fixed' && Number(cfg.widthIn) > 0
+    const wIn = Math.min(mf.wIn * 0.45, Math.max(1.4, fixed ? Number(cfg.widthIn) : wPt / PT))
+    if (posn === 'leftPanel') {
+        return {
+            box: trimPanelBox({ xIn: mf.xIn, yIn: mf.yIn, wIn, hIn: mf.hIn }, others, true),
+            mapFrame: { xIn: mf.xIn + wIn + gapIn, yIn: mf.yIn, wIn: mf.wIn - wIn - gapIn, hIn: mf.hIn }
+        }
+    }
+    return {
+        box: trimPanelBox({ xIn: mf.xIn + mf.wIn - wIn, yIn: mf.yIn, wIn, hIn: mf.hIn }, others, true),
+        mapFrame: { xIn: mf.xIn, yIn: mf.yIn, wIn: mf.wIn - wIn - gapIn, hIn: mf.hIn }
+    }
+}
+
+/** Split legend rows into as many full pages as needed, keeping the base
+ *  font (no shrinking, no truncation across the whole document). Blocks
+ *  that split across pages repeat their heading with '(continued)'.
+ *  Pure and exported for tests. */
+export function paginateLegendRows (
+    rows: LegendRow[],
+    boxWPt: number,
+    boxHPt: number,
+    cfg: LegendConfig,
+    measure: (text: string, fontPt: number) => number,
+    maxPages: number = 10
+): LegendRow[][] {
+    const pages: LegendRow[][] = []
+    let remaining = rows.slice()
+    let guard = 0
+    while (remaining.length && pages.length < maxPages && guard++ < maxPages * 2) {
+        const L = layoutLegend(remaining, boxWPt, boxHPt, { ...(cfg as any), noShrink: true } as LegendConfig, measure)
+        const placedSet = new Set(L.items.map(it => it.row))
+        let placed = remaining.filter(r => placedSet.has(r))
+        if (!placed.length) {
+            // a single row taller than the page: force it through alone
+            placed = [remaining[0]]
+        }
+        pages.push(placed)
+        const placedAll = new Set(placed)
+        remaining = remaining.filter(r => !placedAll.has(r))
+        if (remaining.length && remaining[0].kind === 'item') {
+            // repeat the split block's heading for context
+            for (let i = placed.length - 1; i >= 0; i--) {
+                const r = placed[i]
+                if (r.kind === 'heading' || r.kind === 'layer') {
+                    remaining = [{ kind: r.kind, label: r.label + ' (continued)', indent: r.indent }, ...remaining]
+                    break
+                }
+            }
+        }
+    }
+    return pages
+}
+
+/** Compose a dedicated legend page: same sheet size and orientation as
+ *  the map page, 0.5in margins, fitting engine given the whole sheet. */
+export async function drawLegendPage (d: Drawer, pageWIn: number, pageHIn: number, rows: LegendRow[], cfgIn?: LegendConfig): Promise<void> {
+    const margin = 0.5
+    const el: LegendEl = {
+        type: 'legend',
+        name: 'legendPage',
+        xIn: margin,
+        yIn: margin,
+        wIn: Math.max(1, pageWIn - margin * 2),
+        hIn: Math.max(1, pageHIn - margin * 2),
+        maxItems: 0
+    } as LegendEl
+    await drawLegendEl(d, el, rows, cfgIn, true)
+}
+
+async function drawLegendEl (d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?: LegendConfig, isPanel?: boolean): Promise<number> {
+    const cfg: LegendConfig = { ...LEGEND_DEFAULTS, ...(cfgIn || {}), enabled: true }
     const lx = el.xIn * PT_PER_IN
     const ly = el.yIn * PT_PER_IN
     const lw = el.wIn * PT_PER_IN
     const lh = el.hIn * PT_PER_IN
 
-    d.setFill(255, 255, 255)
-    d.setStroke(150, 150, 150)
-    d.setLineWidth(0.5)
-    d.rect(lx, ly, lw, lh, 'FD')
+    const layout = layoutLegend(rows, lw, lh, cfg, (t, f) => { d.setFont('normal', f); return d.textWidth(t) })
+    // Panels sit beside the map inside the composition frame: no inner
+    // border box, and the background covers the full panel strip.
+    const boxH = isPanel ? lh : Math.min(lh, Math.max(layout.usedHeightPt, layout.titleFontPt + 20))
 
-    d.setFont('bold', 10)
-    d.setTextColor(30, 30, 30)
-    d.text('Legend', lx + 8, ly + 15)
-
-    let cy = ly + 30
-    const bottom = ly + lh - 8
-    for (const row of rows) {
-        if (cy > bottom - 8) {
-            d.setFont('italic', 7)
-            d.setTextColor(120, 120, 120)
-            d.text('…more items not shown', lx + 8, bottom)
-            break
-        }
-        if (row.kind === 'layer') {
-            d.setFont('bold', 8)
-            d.setTextColor(30, 30, 30)
-            d.text(splitText(d, row.label, lw - 16)[0] || '', lx + 8, cy)
-            cy += 12
+    if (cfg.background !== false) {
+        const bg = cfg.bgColor || [255, 255, 255]
+        d.setFill(bg[0], bg[1], bg[2])
+        if (!isPanel && cfg.borderWidthPt > 0) {
+            const bc = cfg.borderColor || [150, 150, 150]
+            d.setStroke(bc[0], bc[1], bc[2])
+            d.setLineWidth(cfg.borderWidthPt)
+            d.roundedRect(lx, ly, lw, boxH, 2, 'FD')
         } else {
-            if (row.dataUrl) {
-                try { await d.image(row.dataUrl, 'PNG', lx + 11, cy - 7.5, 10, 10) } catch (e) {
-                    d.setFill(200, 200, 200); d.rect(lx + 11, cy - 7.5, 10, 10, 'F')
-                }
-            } else {
-                d.setFill(200, 200, 200); d.rect(lx + 11, cy - 7.5, 10, 10, 'F')
-            }
-            d.setFont('normal', 7)
-            d.setTextColor(50, 50, 50)
-            d.text(splitText(d, row.label || '', lw - 40)[0] || '', lx + 26, cy)
-            cy += 12
+            d.rect(lx, ly, lw, boxH, 'F')
         }
     }
+
+    if (cfg.showTitle !== false) {
+        d.setFont('bold', layout.titleFontPt)
+        d.setTextColor(30, 30, 30)
+        d.text(cfg.title || 'Legend', lx + 8, ly + layout.titleFontPt + 6)
+    }
+
+    for (const it of layout.items) {
+        const r = it.row
+        const indentPt = (r.indent || 0) * 8
+        const x = lx + it.xPt + indentPt
+        const y = ly + it.yPt
+        if (r.kind === 'layer') {
+            d.setFont('bold', it.fontPt + 1)
+            d.setTextColor(30, 30, 30)
+            let ty = y + it.fontPt + 3
+            for (const line of it.labelLines) { d.text(line, x, ty); ty += it.fontPt + 5 }
+        } else if (r.kind === 'heading') {
+            d.setFont('italic', it.fontPt)
+            d.setTextColor(70, 70, 70)
+            d.text(it.labelLines[0] || '', x + 2, y + it.fontPt + 1)
+        } else if (r.kind === 'note') {
+            d.setFont('italic', Math.max(5, it.fontPt - 1))
+            d.setTextColor(120, 120, 120)
+            d.text(it.labelLines[0] || '', x, y + it.fontPt + 1)
+        } else {
+            const py = y + 2
+            if (r.dataUrl) {
+                // contain fit: line swatches stay wide and thin, markers stay
+                // round; never stretch a symbol into the patch box
+                try { await d.image(r.dataUrl, 'PNG', x + 2, py, it.patchWPt, it.patchHPt, 'contain', 'left', 'middle') } catch (e) {
+                    d.setFill(210, 210, 210); d.rect(x + 2, py, it.patchWPt, it.patchHPt, 'F')
+                }
+            } else if (r.color) {
+                d.setFill(r.color[0], r.color[1], r.color[2])
+                d.setStroke(120, 120, 120)
+                d.setLineWidth(0.4)
+                d.rect(x + 2, py, it.patchWPt, it.patchHPt, 'FD')
+            } else {
+                d.setFill(228, 228, 228); d.rect(x + 2, py, it.patchWPt, it.patchHPt, 'F')
+            }
+            d.setFont('normal', it.fontPt)
+            d.setTextColor(50, 50, 50)
+            let ty = py + Math.min(it.patchHPt - 1, it.fontPt + 2)
+            for (const line of it.labelLines) { d.text(line, x + it.patchWPt + 8, ty); ty += it.fontPt + 2 }
+        }
+    }
+
+    if (layout.truncated > 0) {
+        d.setFont('italic', Math.max(5, layout.fontPt))
+        d.setTextColor(120, 120, 120)
+        d.text('+ ' + layout.truncated + ' more item' + (layout.truncated === 1 ? '' : 's') + ' not shown',
+            lx + 8, ly + boxH - 5)
+    }
+    return layout.truncated
 }
 
 /* ------------------------------------------------------------------ */
@@ -1375,17 +2360,7 @@ export async function composePage(
                     const geom = opts.gridGeomOverride || (gridCfg.type === 'reference'
                         ? buildReferenceGrid(mf, Number(gridCfg.refCols) || 4, Number(gridCfg.refRows) || 4, gridCfg.labels !== false)
                         : buildGridGeometry(cap, mf, gridCfg))
-                    try {
-                        console.info('[print-advanced] grid gate OPEN: type=' + gridCfg.type +
-                            ' geom=' + (geom ? (geom.lines.length + ' lines, ' + geom.ticks.length + ' ticks, ' + geom.crosses.length + ' crosses, ' + geom.labels.length + ' labels') : 'null'))
-                    } catch (e) { /* noop */ }
                     if (geom) drawGrid(d, geom, gridCfg)
-                } else if (gridCfg) {
-                    try {
-                        console.info('[print-advanced] grid gate CLOSED: enabled=' + String(gridCfg.enabled) +
-                            ' showGrid=' + String(opts.showGrid) + ' rotation=' + String(cap.rotation) +
-                            ' groundExtent=' + String(!!cap.groundExtent))
-                    } catch (e) { /* noop */ }
                 }
                 if (mf.borderColor && mf.borderWidthPt > 0) {
                     d.setStroke(mf.borderColor[0], mf.borderColor[1], mf.borderColor[2])
@@ -1438,9 +2413,94 @@ export async function composePage(
                 await drawPictureEl(d, el as PictureEl, opts.defaultLogo)
                 break
             case 'legend':
-                await drawLegendEl(d, el as LegendEl, legendRows)
+                {
+                    const miss = await drawLegendEl(d, el as LegendEl, legendRows, layout.legend)
+                    if (miss > 0) (opts as any)._legendTruncated = Math.max(Number((opts as any)._legendTruncated) || 0, miss)
+                }
                 break
         }
+    }
+
+    // Settings-defined legend (no legend frame in the .pagx): draw last so
+    // it sits above the map, grid, and inset, in the configured corner of
+    // the map frame. Suppressed by the runtime toggle via legendRows = [].
+    const lCfg = layout.legend
+    const pagxHasLegend = (layout.elements || []).some(e => (e as LayoutElement).type === 'legend')
+    if (lCfg && lCfg.enabled && String(lCfg.position || '') !== 'secondPage' &&
+        !pagxHasLegend && legendRows.length && opts.includeLegend !== false) {
+        try {
+            const mf = getMapFrame(layout)
+            const box = opts.legendBox || overviewBoxIn(mf, {
+                position: lCfg.position || 'bottomLeft',
+                widthIn: lCfg.widthIn || 3,
+                heightIn: lCfg.heightIn || 3.5,
+                marginIn: lCfg.marginIn ?? 0.25
+            } as any)
+            {
+                const miss = await drawLegendEl(d, { type: 'legend', name: 'settingsLegend', xIn: box.xIn, yIn: box.yIn, wIn: box.wIn, hIn: box.hIn, maxItems: 0 } as LegendEl, legendRows, lCfg, !!opts.legendBox)
+                if (miss > 0) (opts as any)._legendTruncated = Math.max(Number((opts as any)._legendTruncated) || 0, miss)
+            }
+        } catch (e) { /* legend is best-effort */ }
+    }
+
+    // Credits fallback: author/copyright always print when populated, even
+    // if the layout has no text element consuming {author}/{copyright}.
+    // Cartographic convention: a small credit line in the bottom page
+    // margin, left-aligned with the layout's outermost border; if the
+    // margin strip is occupied, attribution style inside the frame.
+    if (!(opts as any).mapOnly && ((opts.author && String(opts.author).trim()) || (opts.copyright && String(opts.copyright).trim()))) {
+        const consumes = (tok: string): boolean => (layout.elements || []).some(e =>
+            (e as LayoutElement).type === 'text' && String(((e as TextEl).text) || '').indexOf(tok) >= 0)
+        const creditParts: string[] = []
+        if (opts.author && String(opts.author).trim() && !consumes('{author}')) creditParts.push('Author: ' + String(opts.author).trim())
+        if (opts.copyright && String(opts.copyright).trim() && !consumes('{copyright}')) {
+            const cp = String(opts.copyright).trim()
+            creditParts.push(cp.startsWith('\u00a9') || cp.toLowerCase().startsWith('copyright') ? cp : '\u00a9 ' + cp)
+        }
+        if (creditParts.length) {
+            const creditText = creditParts.join('    ')
+            const size = 6.5
+            let leftIn = 0.25
+            try {
+                const xs = (layout.elements || [])
+                    .map(e => (e as any).xIn)
+                    .filter((v: any) => typeof v === 'number' && isFinite(v) && v >= 0)
+                if (xs.length) leftIn = Math.max(0.1, Math.min(...xs))
+            } catch (e) { /* default margin */ }
+            const boxes = ((layout.elements || []) as any[])
+                .filter(e => e.type !== 'line' && typeof e.yIn === 'number' && e.hIn > 0)
+            const bottomMost = boxes.length ? Math.max(...boxes.map(e => e.yIn + e.hIn)) : 0
+            d.setFont('normal', size)
+            d.setTextColor(70, 70, 70)
+            if (layout.pageHeightIn - bottomMost >= 0.12) {
+                // free bottom margin strip: baseline centered within it
+                const stripTop = Math.max(bottomMost, layout.pageHeightIn - 0.3)
+                const yPt = Math.min(
+                    (stripTop + (layout.pageHeightIn - stripTop) / 2) * PT_PER_IN + size * 0.34,
+                    layout.pageHeightIn * PT_PER_IN - 3)
+                d.text(creditText, leftIn * PT_PER_IN, yPt, 'left')
+            } else {
+                // attribution style inside the frame, bottom-left, haloed
+                const mfc = getMapFrame(layout)
+                const tx = mfc.xIn * PT_PER_IN + 4
+                const ty = (mfc.yIn + mfc.hIn) * PT_PER_IN - 4
+                if (typeof (d as any).haloText === 'function') {
+                    (d as any).haloText(creditText, tx, ty, 'left', [255, 255, 255], Math.max(1.2, size * 0.11))
+                } else {
+                    d.text(creditText, tx, ty, 'left')
+                }
+            }
+        }
+    }
+
+    // Restore the authored composition: the ORIGINAL frame border wraps the
+    // map and the legend panel together, so banner stubs and neatlines meet
+    // the frame exactly where the layout author drew them.
+    const outer = opts.legendPanelOuter
+    if (outer && outer.color && outer.widthPt > 0) {
+        d.setStroke(outer.color[0], outer.color[1], outer.color[2])
+        d.setLineWidth(outer.widthPt)
+        d.rect(outer.xIn * PT_PER_IN, outer.yIn * PT_PER_IN, outer.wIn * PT_PER_IN, outer.hIn * PT_PER_IN, 'S')
     }
 }
 
@@ -1689,22 +2749,94 @@ export async function renderLayout(
     }
     const pageW = useLayout.pageWidthIn * PT_PER_IN
     const pageH = useLayout.pageHeightIn * PT_PER_IN
-    const mf = getMapFrame(useLayout)
+    // apply per-export user overrides from the widget's advanced options
+    if (options.legendPositionOverride && useLayout.legend && useLayout.legend.enabled) {
+        useLayout = { ...useLayout, legend: { ...useLayout.legend, position: options.legendPositionOverride as any } }
+    }
+    if (options.gridTypeOverride && useLayout.grid && useLayout.grid.enabled) {
+        useLayout = { ...useLayout, grid: { ...useLayout.grid, type: options.gridTypeOverride as any } }
+    }
+
+    let mf = getMapFrame(useLayout)
+
+    // Legend rows are built BEFORE the capture so an adjacent legend panel
+    // can shrink the map frame to make room. Capture, grid, and overview
+    // all derive from the frame, so the shrink propagates everywhere.
+    const legendCfg = useLayout.legend
+    const hasLegendEl = (useLayout.elements || []).some(e => e.type === 'legend')
+    const hasLegend = !options.mapOnly && options.includeLegend !== false &&
+        (hasLegendEl || (legendCfg && legendCfg.enabled))
+    const legendRowsPromise: Promise<LegendRow[]> = hasLegend
+        ? buildLegendRows(
+            liveView,
+            Math.max(1, ((useLayout.elements.find(e => e.type === 'legend') as LegendEl)?.maxItems) || 30),
+            onProgress,
+            options.legendWidgetId
+        )
+        : Promise.resolve([])
+    // Second-page legends need a multi-page format: PDF keeps it; raster
+    // and SVG formats fall back to a right panel with a note.
+    let legendSecondPage = !options.mapOnly && !hasLegendEl && legendCfg && legendCfg.enabled &&
+        options.includeLegend !== false && String(legendCfg.position || '') === 'secondPage'
+    if (legendSecondPage && format !== 'pdf') {
+        legendSecondPage = false
+        useLayout = { ...useLayout, legend: { ...legendCfg, position: 'rightPanel' } as LegendConfig }
+        try { console.info('[print-advanced] additional-pages legend requires PDF; using right panel for ' + format) } catch (e) { /* noop */ }
+    }
+    const legendCfg2 = useLayout.legend
+
+    // Panel placements need the rows BEFORE capture (they shrink the frame);
+    // overlay/pagx legends build concurrently with the capture instead.
+    const panelPlacement = !options.mapOnly && !hasLegendEl && legendCfg2 && legendCfg2.enabled &&
+        options.includeLegend !== false &&
+        String(legendCfg2.position || '').endsWith('Panel')
+    let legendRows: LegendRow[] = panelPlacement ? await legendRowsPromise : []
+
+    if (panelPlacement && !options.mapOnly && !hasLegendEl && legendCfg2 && legendCfg2.enabled &&
+        options.includeLegend !== false && legendRows.length) {
+        const otherBoxes = (useLayout.elements || [])
+            .filter(e => (e as LayoutElement).type !== 'mapFrame' && (e as LayoutElement).type !== 'line')
+            .map(e => e as any)
+            .filter(e => typeof e.xIn === 'number' && e.wIn > 0 && e.hIn > 0)
+            .map(e => ({ xIn: e.xIn, yIn: e.yIn, wIn: e.wIn, hIn: e.hIn }))
+        const panel = computeLegendPanel(legendRows, mf, legendCfg2, otherBoxes)
+        if (panel && panel.mapFrame.wIn > 1 && panel.mapFrame.hIn > 1 &&
+            panel.box.wIn > 0.9 && panel.box.hIn > 0.9) {
+            onProgress('Placing legend panel beside the map...')
+            const origFrame = { xIn: mf.xIn, yIn: mf.yIn, wIn: mf.wIn, hIn: mf.hIn }
+            const mfBorder = (useLayout.elements || []).find(e => (e as LayoutElement).type === 'mapFrame') as MapFrameEl
+            useLayout = {
+                ...useLayout,
+                elements: (useLayout.elements || []).map(e =>
+                    (e as LayoutElement).type === 'mapFrame'
+                        ? ({ ...(e as MapFrameEl), ...panel.mapFrame } as MapFrameEl)
+                        : e)
+            }
+            mf = getMapFrame(useLayout)
+            try {
+                if (typeof options.onPanelComputed === 'function') {
+                    options.onPanelComputed({ position: String(legendCfg2.position), wIn: panel.box.wIn, hIn: panel.box.hIn })
+                }
+            } catch (e) { /* preview feedback is best-effort */ }
+            options = {
+                ...options,
+                legendBox: panel.box,
+                legendPanelOuter: {
+                    ...origFrame,
+                    color: mfBorder && mfBorder.borderColor ? mfBorder.borderColor : null,
+                    widthPt: mfBorder && mfBorder.borderWidthPt > 0 ? mfBorder.borderWidthPt : 0
+                }
+            }
+        }
+    }
 
     const cap = await captureMapHiRes(liveView, mf.wIn, mf.hIn, useLayout, maxImagePx, options, onProgress)
+    if (!panelPlacement) legendRows = await legendRowsPromise
 
     // A grid cannot be drawn correctly on a rotated capture or when an
     // output WKID reprojected the map; say so on the result instead of
     // drawing wrong lines.
     const gCfg = useLayout.grid
-    // Forensic: report exactly what reached the renderer (harmless info log).
-    try {
-        console.info('[print-advanced] layout "' + useLayout.name + '" grid=' +
-            JSON.stringify(gCfg || null) + ' overview=' + JSON.stringify(useLayout.overview || null) +
-            ' showGrid=' + String(options.showGrid) + ' showOverview=' + String(options.showOverview) +
-            ' rotation=' + String(cap.rotation) + ' groundExtent=' + String(!!cap.groundExtent) +
-            ' projection=' + String(cap.projection))
-    } catch (e) { /* logging must never break an export */ }
     if (gCfg && gCfg.enabled && options.showGrid !== false && !options.mapOnly) {
         if (cap.rotation !== 0) {
             cap.warning = (cap.warning ? cap.warning + ' ' : '') +
@@ -1763,9 +2895,10 @@ export async function renderLayout(
         const ovCap = await captureMapHiRes(
             liveView, box.wIn, box.hIn,
             { ...useLayout, dpi: Math.min(useLayout.dpi || 96, 150) },
-            maxImagePx,
+            Math.min(maxImagePx, 2048),
             {
                 ...options,
+                maxWaitMs: 15000,
                 scaleMode: 'fixed',
                 fixedScale: ovScale,
                 lockedCenter: options.lockedCenter && typeof options.lockedCenter.x === 'number'
@@ -1783,15 +2916,6 @@ export async function renderLayout(
             }
         }
     }
-
-    const hasLegend = !options.mapOnly && options.includeLegend !== false && (useLayout.elements || []).some(e => e.type === 'legend')
-    const legendRows = hasLegend
-        ? await buildLegendRows(
-            liveView,
-            Math.max(1, ((useLayout.elements.find(e => e.type === 'legend') as LegendEl)?.maxItems) || 30),
-            onProgress
-        )
-        : []
 
     onProgress('Composing page…')
     const safeName = (fileName || 'map').replace(/[\\/:*?"<>|]+/g, '_')
@@ -1812,6 +2936,25 @@ export async function renderLayout(
             pd.setCustomFont(options.customFont.name)
         }
         await composePage(pd, useLayout, cap, legendRows, title, options)
+        if (!options.mapOnly && options.includeLegend !== false && legendRows.length &&
+            useLayout.legend && useLayout.legend.enabled &&
+            String(useLayout.legend.position || '') === 'secondPage' &&
+            !(useLayout.elements || []).some(e => (e as LayoutElement).type === 'legend')) {
+            const margin = 0.5
+            const legendPages = paginateLegendRows(
+                legendRows,
+                Math.max(1, useLayout.pageWidthIn - margin * 2) * PT_PER_IN,
+                Math.max(1, useLayout.pageHeightIn - margin * 2) * PT_PER_IN,
+                useLayout.legend,
+                (t, f) => { pd.setFont('normal', f); return pd.textWidth(t) }
+            )
+            for (let pi = 0; pi < legendPages.length; pi++) {
+                onProgress('Composing legend page ' + (pi + 1) + ' of ' + legendPages.length + '\u2026')
+                doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
+                await drawLegendPage(pd, useLayout.pageWidthIn, useLayout.pageHeightIn, legendPages[pi], useLayout.legend)
+            }
+            try { console.info('[print-advanced] legend paginated across ' + legendPages.length + ' additional page(s)') } catch (e) { /* noop */ }
+        }
         const pdfBlob: Blob = doc.output('blob')
         lastUrl = downloadBlob(pdfBlob, outName); lastSize = pdfBlob.size
     } else if (format === 'svg' || format === 'svgz') {
@@ -1860,7 +3003,9 @@ export async function renderLayout(
     return {
         fileName: outName,
         effectiveDpi: Math.round(cap.effectiveDpi),
-        warning: cap.warning,
+        warning: [cap.warning, (Number((options as any)._legendTruncated) || 0) > 0
+            ? 'Legend truncated: ' + (options as any)._legendTruncated + ' item(s) not shown. Additional pages (PDF) includes everything.'
+            : ''].filter(Boolean).join(' \u00b7 ') || undefined,
         printedScale: Math.round(cap.printedScale),
         url: lastUrl || undefined,
         sizeKb: lastSize ? Math.round(lastSize / 1024) : undefined

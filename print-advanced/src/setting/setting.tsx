@@ -14,7 +14,7 @@ import { Button, Select, TextInput, TextArea, NumericInput, Alert, Switch, Check
 // pdfRenderer imports esri/* modules; pulling it into the settings bundle makes
 // the settings panel fail to load in the builder (no AMD loader there yet).
 import { FORMAT_LABELS, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } from '../printConstants'
-import { IMConfig, PrintLayout, PictureEl, LegendEl, newLayoutId, OverviewConfig, GridConfig } from '../config'
+import { IMConfig, PrintLayout, PictureEl, LegendEl, newLayoutId, OverviewConfig, GridConfig, LegendConfig } from '../config'
 import { parsePagx } from '../pagxParser'
 import defaultMessages from './translations/default'
 
@@ -197,6 +197,36 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
             ? (raw as any).asMutable({ deep: true })
             : [...(raw as any)]
         return arr as PrintLayout[]
+    }
+
+    /** Scan the app for Legend widgets (OOTB manifest name 'legend') so the
+     *  admin can bind the printed legend to a specific one. */
+    findLegendWidgets = (): Array<{ id: string, label: string }> => {
+        try {
+            const { getAppStore } = require('jimu-core')
+            const state: any = getAppStore().getState()
+            const appConfig: any = (state.appStateInBuilder && state.appStateInBuilder.appConfig) || state.appConfig
+            const widgets: any = appConfig && appConfig.widgets
+            if (!widgets) return []
+            const out: Array<{ id: string, label: string }> = []
+            Object.keys(widgets).forEach(k => {
+                const w = widgets[k]
+                const name = (w && (w.manifest && w.manifest.name)) || ''
+                const uri = (w && w.uri) || ''
+                if (name === 'legend' || /widgets\/legend\//.test(uri)) {
+                    out.push({ id: w.id, label: w.label || w.id })
+                }
+            })
+            return out
+        } catch (e) { return [] }
+    }
+
+    setLegendWidgetId = (id: string): void => {
+        const base: any = (this.props.config as any) || Immutable({})
+        this.props.onSettingChange({
+            id: this.props.id,
+            config: id ? base.set('legendWidgetId', id) : base.without('legendWidgetId')
+        })
     }
 
     commitLayouts = (layouts: PrintLayout[]): void => {
@@ -536,6 +566,43 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         refRows: 4
     }
 
+    private readonly legendDefaults: LegendConfig = {
+        enabled: false,
+        position: 'rightPanel',
+        panelSizeMode: 'auto',
+        widthIn: 3,
+        heightIn: 3.5,
+        marginIn: 0.25,
+        title: 'Legend',
+        showTitle: true,
+        columns: 0,
+        baseFontPt: 8,
+        patchSize: 'medium',
+        showLayerNames: true,
+        background: true,
+        bgColor: [255, 255, 255],
+        borderColor: [150, 150, 150],
+        borderWidthPt: 0.5
+    }
+
+    /** Copy the editing layout's feature config (overview/grid/legend) to
+     *  every layout, so admins do not have to re-enter it eight times. */
+    applyToAllLayouts = (key: 'overview' | 'grid' | 'legend'): void => {
+        const editing = this.getEditing()
+        if (!editing || !(editing as any)[key]) return
+        const cfg = JSON.parse(JSON.stringify((editing as any)[key]))
+        this.commitLayouts(this.getLayouts().map(l => ({ ...l, [key]: JSON.parse(JSON.stringify(cfg)) })))
+    }
+
+    patchLegend = (partial: Partial<LegendConfig>): void => {
+        const editing = this.getEditing()
+        if (!editing) return
+        const cur = (editing as any).legend
+            ? JSON.parse(JSON.stringify((editing as any).legend))
+            : {}
+        this.patch({ legend: { ...this.legendDefaults, ...cur, ...partial } } as any)
+    }
+
     patchGrid = (partial: Partial<GridConfig>): void => {
         const editing = this.getEditing()
         if (!editing) return
@@ -591,7 +658,34 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                 }
             })
             if (added.length) {
-                this.commitLayouts([...this.getLayouts(), ...added])
+                // Reimporting a layout must never wipe its capture options or
+                // feature settings: match by source file (or name) and carry
+                // over dpi/format/preserve plus overview/grid/legend, then
+                // REPLACE the existing layout in place instead of duplicating.
+                const existing = this.getLayouts()
+                const replacedIds = new Set<string>()
+                const merged = added.map(a => {
+                    const match = existing.find(l =>
+                        (l.sourceFile && a.sourceFile && l.sourceFile === a.sourceFile) || l.name === a.name)
+                    if (!match) return a
+                    replacedIds.add(match.id)
+                    const carryover: any = {
+                        id: match.id,
+                        dpi: match.dpi,
+                        imageFormat: match.imageFormat,
+                        preserve: match.preserve
+                    }
+                    if ((match as any).overview) carryover.overview = (match as any).overview
+                    if ((match as any).grid) carryover.grid = (match as any).grid
+                    if ((match as any).legend) carryover.legend = (match as any).legend
+                    return { ...a, ...carryover }
+                })
+                const kept = existing.map(l => merged.find(m => m.id === l.id) || l)
+                const brandNew = merged.filter(m => !replacedIds.has(m.id))
+                this.commitLayouts([...kept, ...brandNew])
+                if (replacedIds.size) {
+                    warnings.push(replacedIds.size + ' existing layout(s) updated in place; capture and feature settings kept.')
+                }
             }
             const error = failed.length ? 'Could not import: ' + failed.join('; ') : null
             this.setState({
@@ -683,12 +777,21 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
 
     /* ---------------- render helpers ---------------- */
 
+    /** SettingRow's label is visual only; clone the control with the same
+     *  text as aria-label so assistive tech announces every select/input. */
+    private withAria = (label: string, control: React.ReactNode): React.ReactNode => {
+        if (React.isValidElement(control) && !(control.props as any)['aria-label']) {
+            return React.cloneElement(control as React.ReactElement, { 'aria-label': label } as any)
+        }
+        return control
+    }
+
     rowWrap = (label: string, control: React.ReactNode) => (
-        <SettingRow flow='wrap' label={label} truncateLabel>{control}</SettingRow>
+        <SettingRow flow='wrap' label={label} truncateLabel>{this.withAria(label, control)}</SettingRow>
     )
 
     rowInline = (label: string, control: React.ReactNode) => (
-        <SettingRow label={label} truncateLabel>{control}</SettingRow>
+        <SettingRow label={label} truncateLabel>{this.withAria(label, control)}</SettingRow>
     )
 
     select = (value: string, onChange: (v: string) => void, options: Array<{ value: string, label: string }>) => (
@@ -888,6 +991,13 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                     onChange={(e) => this.patchOverview({ enabled: e.target.checked })} />
                             </SettingRow>
                             {(editing as any).overview?.enabled && (
+                                <SettingRow>
+                                    <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('overview')}>
+                                        {messages.applyAllLayouts}
+                                    </Button>
+                                </SettingRow>
+                            )}
+                            {(editing as any).overview?.enabled && (
                                 <React.Fragment>
                                     {this.rowWrap(messages.overviewPosition, this.select(
                                         ((editing as any).overview?.position) || 'topRight',
@@ -966,6 +1076,13 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                 <Switch checked={!!(editing as any).grid?.enabled}
                                     onChange={(e) => this.patchGrid({ enabled: e.target.checked })} />
                             </SettingRow>
+                            {(editing as any).grid?.enabled && (
+                                <SettingRow>
+                                    <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('grid')}>
+                                        {messages.applyAllLayouts}
+                                    </Button>
+                                </SettingRow>
+                            )}
                             {(editing as any).grid?.enabled && (
                                 <React.Fragment>
                                     {this.rowWrap(messages.gridType, this.select(
@@ -1063,6 +1180,123 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                                 ]))}
                                         </React.Fragment>
                                     )}
+                                </React.Fragment>
+                            )}
+                        </SettingSection>
+
+                        <SettingSection title={messages.legendSection}>
+                            <SettingRow>
+                                <div className='pd-hint'>{messages.legendHint}</div>
+                            </SettingRow>
+                            <SettingRow tag='label' label={messages.legendEnabled} truncateLabel>
+                                <Switch checked={!!(editing as any).legend?.enabled}
+                                    onChange={(e) => this.patchLegend({ enabled: e.target.checked })} />
+                            </SettingRow>
+                            {(editing as any).legend?.enabled && (
+                                <SettingRow>
+                                    <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('legend')}>
+                                        {messages.applyAllLayouts}
+                                    </Button>
+                                </SettingRow>
+                            )}
+                            {(editing as any).legend?.enabled && (
+                                <React.Fragment>
+                                    {!((editing.elements || []) as any[]).some((e: any) => e.type === 'legend') && (
+                                        <React.Fragment>
+                                            {this.rowWrap(messages.overviewPosition, this.select(
+                                                ((editing as any).legend?.position) || 'rightPanel',
+                                                v => this.patchLegend({ position: v as any }),
+                                                [
+                                                    { value: 'rightPanel', label: messages.legendRightPanel },
+                                                    { value: 'secondPage', label: messages.legendSecondPage },
+                                                    { value: 'leftPanel', label: messages.legendLeftPanel },
+                                                    { value: 'bottomPanel', label: messages.legendBottomPanel },
+                                                    { value: 'topLeft', label: messages.posTopLeft },
+                                                    { value: 'topRight', label: messages.posTopRight },
+                                                    { value: 'bottomLeft', label: messages.posBottomLeft },
+                                                    { value: 'bottomRight', label: messages.posBottomRight }
+                                                ]))}
+                                            {String((editing as any).legend?.position || 'rightPanel').endsWith('Panel') && (
+                                                this.rowWrap(messages.legendPanelSize, this.select(
+                                                    ((editing as any).legend?.panelSizeMode) || 'auto',
+                                                    v => this.patchLegend({ panelSizeMode: v as any }),
+                                                    [
+                                                        { value: 'auto', label: messages.legendPanelAuto },
+                                                        { value: 'fixed', label: messages.legendPanelFixed }
+                                                    ]))
+                                            )}
+                                            {(!String((editing as any).legend?.position || 'rightPanel').endsWith('Panel') ||
+                                                ((editing as any).legend?.panelSizeMode) === 'fixed') &&
+                                                String((editing as any).legend?.position || '') !== 'secondPage' && (
+                                                <React.Fragment>
+                                                    <SettingRow flow='wrap' label={messages.overviewWidth} truncateLabel>
+                                                        <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
+                                                            value={Number((editing as any).legend?.widthIn) || 3}
+                                                            onChange={(v: number) => this.patchLegend({ widthIn: v })} />
+                                                    </SettingRow>
+                                                    <SettingRow flow='wrap' label={messages.overviewHeight} truncateLabel>
+                                                        <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
+                                                            value={Number((editing as any).legend?.heightIn) || 3.5}
+                                                            onChange={(v: number) => this.patchLegend({ heightIn: v })} />
+                                                    </SettingRow>
+                                                </React.Fragment>
+                                            )}
+                                        </React.Fragment>
+                                    )}
+                                    <SettingRow flow='wrap' label={messages.legendTitle} truncateLabel>
+                                        <TextInput size='sm' className='w-100'
+                                            value={String((editing as any).legend?.title ?? 'Legend')}
+                                            onChange={(e: any) => this.patchLegend({ title: e.target.value })} />
+                                    </SettingRow>
+                                    <SettingRow tag='label' label={messages.legendShowTitle} truncateLabel>
+                                        <Switch checked={((editing as any).legend?.showTitle) !== false}
+                                            onChange={(e) => this.patchLegend({ showTitle: e.target.checked })} />
+                                    </SettingRow>
+                                    <SettingRow tag='label' label={messages.legendLayerNames} truncateLabel>
+                                        <Switch checked={((editing as any).legend?.showLayerNames) !== false}
+                                            onChange={(e) => this.patchLegend({ showLayerNames: e.target.checked })} />
+                                    </SettingRow>
+                                    {this.rowWrap(messages.legendColumns, this.select(
+                                        String(Number((editing as any).legend?.columns) || 0),
+                                        v => this.patchLegend({ columns: Number(v) }),
+                                        [
+                                            { value: '0', label: messages.legendAuto },
+                                            { value: '1', label: '1' },
+                                            { value: '2', label: '2' },
+                                            { value: '3', label: '3' },
+                                            { value: '4', label: '4' }
+                                        ]))}
+                                    {this.rowWrap(messages.legendFont, this.select(
+                                        String(Number((editing as any).legend?.baseFontPt) || 8),
+                                        v => this.patchLegend({ baseFontPt: Number(v) }),
+                                        [
+                                            { value: '6', label: '6 pt' },
+                                            { value: '7', label: '7 pt' },
+                                            { value: '8', label: '8 pt' },
+                                            { value: '9', label: '9 pt' },
+                                            { value: '10', label: '10 pt' },
+                                            { value: '12', label: '12 pt' },
+                                            { value: '14', label: '14 pt (large formats)' }
+                                        ]))}
+                                    {this.rowWrap(messages.legendPatch, this.select(
+                                        ((editing as any).legend?.patchSize) || 'medium',
+                                        v => this.patchLegend({ patchSize: v as any }),
+                                        [
+                                            { value: 'small', label: messages.patchSmall },
+                                            { value: 'medium', label: messages.patchMedium },
+                                            { value: 'large', label: messages.patchLarge }
+                                        ]))}
+                                    {this.rowWrap(messages.legendSourceLabel, this.select(
+                                        String((this.props.config as any).legendWidgetId || ''),
+                                        v => this.setLegendWidgetId(v),
+                                        [
+                                            { value: '', label: messages.legendSourceAuto },
+                                            ...this.findLegendWidgets().map(w => ({ value: w.id, label: messages.legendSourceWidget + ': ' + w.label }))
+                                        ]))}
+                                    <SettingRow tag='label' label={messages.legendBackground} truncateLabel>
+                                        <Switch checked={((editing as any).legend?.background) !== false}
+                                            onChange={(e) => this.patchLegend({ background: e.target.checked })} />
+                                    </SettingRow>
                                 </React.Fragment>
                             )}
                         </SettingSection>

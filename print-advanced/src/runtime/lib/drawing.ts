@@ -180,13 +180,26 @@ export class PdfDrawer implements Drawer {
 /* Canvas backend                                                      */
 /* ------------------------------------------------------------------ */
 
+const _imgCache = new Map<string, Promise<HTMLImageElement>>()
+
 function loadImage (dataUrl: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('image load failed'))
-    img.src = dataUrl
-  })
+  let p = _imgCache.get(dataUrl)
+  if (!p) {
+    p = new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => reject(new Error('image load failed'))
+      img.src = dataUrl
+    })
+    _imgCache.set(dataUrl, p)
+    p.catch(() => _imgCache.delete(dataUrl))
+    // bound the cache: map captures are huge; keep it small
+    if (_imgCache.size > 64) {
+      const first = _imgCache.keys().next().value
+      if (first) _imgCache.delete(first)
+    }
+  }
+  return p
 }
 
 export class CanvasDrawer implements Drawer {

@@ -4,7 +4,7 @@ export type ImageFormat = 'jpg' | 'png'
 export type PreserveMode = 'scale' | 'extent'
 export type ScaleBarUnits = 'feet' | 'miles' | 'meters' | 'kilometers'
 /** Pro scale bar styles (CIM structural styles + line styles). */
-export type ScaleBarStyle = 'alternating' | 'doubleAlternating' | 'hollow' | 'hollowDouble' | 'singleDivision' | 'line' | 'scaleLine' | 'steppedLine' | 'steppedFilled'
+export type ScaleBarStyle = 'alternating' | 'alternating2' | 'doubleAlternating' | 'hollow' | 'hollowDouble' | 'singleDivision' | 'line' | 'line2' | 'scaleLine' | 'scaleLine2' | 'steppedLine' | 'steppedFilled'
 /** Widget north arrow archetypes (Pro's are proprietary font glyphs). */
 export type NorthArrowStyle = 'splitArrow' | 'solidTriangle' | 'outlineArrow' | 'needle' | 'simpleArrow' | 'chevron' | 'meridian' | 'compassStar' | 'compassRose' | 'starburst' | 'circledArrow' | 'filledCircleArrow'
 export type RGB = [number, number, number]
@@ -95,6 +95,38 @@ export interface LegendEl extends ElBase {
 export type LayoutElement =
   | MapFrameEl | TextEl | LineEl | NorthArrowEl | ScaleBarEl | PictureEl | LegendEl
 
+export type LegendPatchSize = 'small' | 'medium' | 'large'
+
+/** Settings-defined legend configuration (per layout). The legend content
+ *  mirrors the JSAPI Legend model (what the Legend widget shows); these
+ *  options control placement and Pro-style presentation. */
+export type LegendPosition = OverviewPosition | 'leftPanel' | 'rightPanel' | 'bottomPanel' | 'secondPage'
+
+export interface LegendConfig {
+  enabled: boolean
+  /** Corner overlay, or a panel ADJACENT to the map (the map frame shrinks
+   *  to make room). Used when the .pagx has no legend frame. */
+  position: LegendPosition
+  /** Panel modes: 'auto' sizes the panel to the legend content;
+   *  'fixed' uses widthIn (side panels) or heightIn (bottom panel). */
+  panelSizeMode?: 'auto' | 'fixed'
+  widthIn: number
+  heightIn: number
+  marginIn: number
+  title: string
+  showTitle: boolean
+  /** 0 = automatic column count; 1-6 fixed. */
+  columns: number
+  /** Base item font size; layer headings +1, title +3. Auto-shrinks to fit. */
+  baseFontPt: number
+  patchSize: LegendPatchSize
+  showLayerNames: boolean
+  background: boolean
+  bgColor: RGB
+  borderColor: RGB
+  borderWidthPt: number
+}
+
 export type GridType = 'graticule' | 'measured' | 'reference'
 export type GridLineStyle = 'solid' | 'ticks' | 'crosses'
 
@@ -160,6 +192,9 @@ export interface PrintLayout {
 
   /** Optional settings-defined grid/graticule. Same backfill caveat. */
   grid?: GridConfig
+
+  /** Optional settings-defined legend. Same backfill caveat. */
+  legend?: LegendConfig
 
   elements: LayoutElement[]
 }

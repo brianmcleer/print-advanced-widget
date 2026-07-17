@@ -19,7 +19,7 @@ import SpatialReference from 'esri/geometry/SpatialReference'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
 import { metersPerMapUnit, printExtent, extentRings, extentFitScale, resolvePrintedScale } from './lib/scaleMath'
 import defaultMessages from './translations/default'
-import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES } from './lib/pdfRenderer'
+import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend } from './lib/pdfRenderer'
 
 const printIcon = require('./assets/icons/icon.svg')
 
@@ -50,6 +50,12 @@ interface State {
   includeLegend: boolean
   showOverview: boolean
   showGrid: boolean
+  legendPositionOv: string
+  gridTypeOv: string
+  legendHint: { level: 'tight' | 'cramped', count: number, missed: number, fontPt: number } | null
+  legendHintDismissed: boolean
+  legendPosUserSet: boolean
+  legendAutoPaged: boolean
   mapOnly: boolean
   mapOnlyW: string
   mapOnlyH: string
@@ -94,6 +100,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       includeLegend: true,
       showOverview: true,
       showGrid: true,
+      legendPositionOv: '',
+      gridTypeOv: '',
+      legendHint: null,
+      legendHintDismissed: false,
+      legendPosUserSet: false,
+      legendAutoPaged: false,
       mapOnly: false,
       mapOnlyW: '',
       mapOnlyH: '',
@@ -189,6 +201,23 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         g = <React.Fragment>
           {[0,1,2,3].map(i => <rect key={i} x={x0 + i*seg} y={14} width={seg} height={8} fill={i % 2 === 0 ? c : 'none'} stroke={c} strokeWidth={1} />)}
         </React.Fragment>; break
+      case 'alternating2':
+        g = <React.Fragment>
+          {[0,1,2,3].map(i => <rect key={i} x={x0 + i*seg} y={15} width={seg} height={7} fill={i % 2 === 0 ? c : 'none'} stroke={c} strokeWidth={1} />)}
+          {[0,1,2,3,4].map(i => <line key={'t'+i} x1={x0 + i*seg} y1={15} x2={x0 + i*seg} y2={11} stroke={c} strokeWidth={1} />)}
+        </React.Fragment>; break
+      case 'line2':
+        g = <React.Fragment>
+          <line x1={x0} y1={13} x2={x1} y2={13} stroke={c} strokeWidth={1} />
+          {[0,1,2,3,4].map(i => <line key={i} x1={x0+i*seg} y1={13} x2={x0+i*seg} y2={20} stroke={c} strokeWidth={1} />)}
+          <line x1={x0+4} y1={24} x2={x0+10} y2={24} stroke={c} strokeWidth={1.6} />
+          <line x1={30} y1={24} x2={36} y2={24} stroke={c} strokeWidth={1.6} />
+        </React.Fragment>; break
+      case 'scaleLine2':
+        g = <React.Fragment>
+          <line x1={x0} y1={17} x2={x1} y2={17} stroke={c} strokeWidth={1} />
+          {[0,1,2,3,4].map(i => <line key={i} x1={x0+i*seg} y1={13} x2={x0+i*seg} y2={21} stroke={c} strokeWidth={1} />)}
+        </React.Fragment>; break
       case 'doubleAlternating':
         g = <React.Fragment>
           {[0,1,2,3].map(i => <rect key={'t'+i} x={x0 + i*seg} y={13} width={seg} height={4} fill={i % 2 === 0 ? c : 'none'} stroke={c} strokeWidth={0.8} />)}
@@ -223,10 +252,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           <rect x={x0} y={17} width={w} height={4} fill='none' stroke={c} strokeWidth={0.8} />
           {[1,2,3].map(i => <line key={i} x1={x0+i*seg} y1={13} x2={x0+i*seg} y2={21} stroke={c} strokeWidth={0.8} />)}
         </React.Fragment>; break
-      case 'line':
+      case 'line': // 'line' tile bottom baseline, ticks rise (matches render)
         g = <React.Fragment>
-          <line x1={x0} y1={13} x2={x1} y2={13} stroke={c} strokeWidth={1} />
-          {[0,1,2,3,4].map(i => <line key={i} x1={x0+i*seg} y1={13} x2={x0+i*seg} y2={20} stroke={c} strokeWidth={1} />)}
+          <line x1={x0} y1={21} x2={x1} y2={21} stroke={c} strokeWidth={1} />
+          {[0,1,2,3,4].map(i => <line key={i} x1={x0+i*seg} y1={21} x2={x0+i*seg} y2={14} stroke={c} strokeWidth={1} />)}
         </React.Fragment>; break
       case 'steppedFilled':
         g = <React.Fragment>
@@ -333,6 +362,126 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     return layout.elements.find((e: any) => e.type === 'mapFrame') || null
   }
 
+  /** Last legend panel actually computed during an export, so the live
+   *  print-extent preview matches the shrunken frame exactly next time. */
+  private lastPanel: { position: string, wIn: number, hIn: number } | null = null
+
+  /** Live panel sizing: measure the Legend widget's DOM (labels only, no
+   *  swatch extraction) and run the export's own panel math, so the print
+   *  extent preview is exact BEFORE the first export. */
+  private estimateSeq = 0
+  private estimatePanel = async (): Promise<void> => {
+    try {
+      const seq = ++this.estimateSeq
+      const layout: any = this.getSelectedLayout()
+      const lc = layout && layout.legend
+      let pos = this.state.legendPositionOv || String((lc && lc.position) || '')
+      // auto-default to additional pages: while the auto flag holds, keep
+      // evaluating the underlying placement so we can revert when it fits
+      const autoHolding = this.state.legendAutoPaged && !this.state.legendPosUserSet &&
+          this.state.legendPositionOv === 'secondPage'
+      if (autoHolding) pos = String((lc && lc.position) || '')
+      const isPanel = pos.endsWith('Panel')
+      const isOverlay = pos === 'topLeft' || pos === 'topRight' || pos === 'bottomLeft' || pos === 'bottomRight'
+      if (!lc || !lc.enabled || !this.state.includeLegend || (!isPanel && !isOverlay) ||
+          (this.meMapOnly() && this.state.mapOnly)) {
+        this.lastPanel = null
+        if (this.state.legendHint) this.setState({ legendHint: null })
+        // estimator preview guards: never draw the graphic while preview is off
+        if (this.state.previewOn) this.updatePreview()
+        return
+      }
+      const dom = findLegendDom(String((this.cfg() as any).legendWidgetId || '') || undefined)
+      if (!dom) { if (this.state.previewOn) this.updatePreview(); return }
+      const rows = await harvestLegendDom(dom, true)
+      if (seq !== this.estimateSeq) return
+      if (!rows.length) { if (this.state.previewOn) this.updatePreview(); return }
+      const mf = this.frameOf()
+      if (!mf) return
+      const others = ((layout.elements || []) as any[])
+        .filter((e: any) => e.type !== 'mapFrame' && e.type !== 'line' && typeof e.xIn === 'number' && e.wIn > 0 && e.hIn > 0)
+        .map((e: any) => ({ xIn: e.xIn, yIn: e.yIn, wIn: e.wIn, hIn: e.hIn }))
+      const cfg: any = { ...LEGEND_DEFAULTS, ...(JSON.parse(JSON.stringify(lc))), position: pos }
+      const approx = (txt: string, f: number): number => (txt || '').length * f * 0.52
+      const itemCount = rows.filter(r => r.kind === 'item').length
+      const evalHint = (wIn: number, hIn: number): void => {
+        try {
+          const fit = layoutLegend(rows, wIn * 72, hIn * 72, cfg, approx)
+          let hint: State['legendHint'] = null
+          if (fit.truncated > 0 || fit.fontPt <= 6) {
+            hint = { level: 'cramped', count: itemCount, missed: fit.truncated, fontPt: fit.fontPt }
+          } else if (fit.fontPt < 8 || itemCount >= 40) {
+            hint = { level: 'tight', count: itemCount, missed: 0, fontPt: fit.fontPt }
+          }
+          const prev = this.state.legendHint
+          const same = (!hint && !prev) || (hint && prev && hint.level === prev.level && hint.count === prev.count && hint.missed === prev.missed)
+          if (!same) this.setState({ legendHint: hint })
+          // default to additional pages when items would actually drop
+          // (PDF only; explicit user placements are always respected)
+          const wouldDrop = !!hint && hint.level === 'cramped' && hint.missed > 0
+          if (!this.state.legendPosUserSet && this.state.format === 'pdf') {
+            if (wouldDrop && this.state.legendPositionOv !== 'secondPage') {
+              this.setState({ legendPositionOv: 'secondPage', legendAutoPaged: true })
+            } else if (this.state.legendAutoPaged && !wouldDrop && this.state.legendPositionOv === 'secondPage') {
+              this.setState({ legendPositionOv: '', legendAutoPaged: false })
+            }
+          }
+        } catch (e) { /* hint is best-effort */ }
+      }
+      if (isOverlay) {
+        // overlay boxes are small and fixed; evaluate the configured box
+        this.lastPanel = null
+        const wIn = Number(cfg.widthIn) > 0 ? Number(cfg.widthIn) : 2.5
+        const hIn = Number(cfg.heightIn) > 0 ? Number(cfg.heightIn) : 2
+        evalHint(wIn, hIn)
+        if (this.state.previewOn) this.updatePreview()
+        return
+      }
+      const panel = computeLegendPanel(rows, mf, cfg, others)
+      if (panel && panel.box.wIn > 0.9 && panel.box.hIn > 0.9) {
+        this.lastPanel = { position: pos, wIn: panel.box.wIn, hIn: panel.box.hIn }
+        // smart indicator: if fitting the panel means heavy shrink or
+        // truncation, suggest the additional-pages placement
+        evalHint(panel.box.wIn, panel.box.hIn)
+      }
+      if (this.state.previewOn) this.updatePreview()
+    } catch (e) { /* preview sizing is best-effort */ }
+  }
+
+  /** The frame the export will really use: shrunk when an adjacent legend
+   *  panel is active. Fixed panels are exact; auto panels use the last
+   *  export's computed size, falling back to a sensible estimate. */
+  private effFrameOf = (): any => {
+    const mf = this.frameOf()
+    if (!mf) return null
+    // map-only: layout furniture is skipped, so the legend panel never
+    // shrinks the frame; explicit pixel output changes the aspect (96 dpi)
+    if (this.meMapOnly() && this.state.mapOnly) {
+      const w = Number(this.state.mapOnlyW)
+      const h = Number(this.state.mapOnlyH)
+      if (w > 0 && h > 0) return { ...mf, wIn: w / 96, hIn: h / 96 }
+      return mf
+    }
+    const layout: any = this.getSelectedLayout()
+    const lc = layout && layout.legend
+    if (!lc || !lc.enabled || !this.state.includeLegend) return mf
+    const pos = this.state.legendPositionOv || String(lc.position || '')
+    if (!pos.endsWith('Panel')) return mf
+    const gap = 0.08
+    if (pos === 'bottomPanel') {
+      let h = lc.panelSizeMode === 'fixed' && Number(lc.heightIn) > 0 ? Number(lc.heightIn)
+        : (this.lastPanel && this.lastPanel.position === pos ? this.lastPanel.hIn : 1.5)
+      h = Math.min(mf.hIn * 0.45, Math.max(0.8, h))
+      return { ...mf, hIn: mf.hIn - h - gap }
+    }
+    let w = lc.panelSizeMode === 'fixed' && Number(lc.widthIn) > 0 ? Number(lc.widthIn)
+      : (this.lastPanel && this.lastPanel.position === pos ? this.lastPanel.wIn : 2.5)
+    w = Math.min(mf.wIn * 0.45, Math.max(1.4, w))
+    return pos === 'leftPanel'
+      ? { ...mf, xIn: mf.xIn + w + gap, wIn: mf.wIn - w - gap }
+      : { ...mf, wIn: mf.wIn - w - gap }
+  }
+
   captureAttribution = (view: any): string => {
     try {
       const out: string[] = []
@@ -359,7 +508,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     try {
       const jmv = this.state.jimuMapView
       const view: any = jmv && jmv.view
-      const mf = this.frameOf()
+      const mf = this.effFrameOf()
       if (!view || !mf) return
       let scale: number, center: { x: number, y: number }
       if (this.state.locked && this.lockedScale && this.lockedCenter) {
@@ -431,6 +580,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   componentDidUpdate (_prevProps: AllWidgetProps<IMConfig>, prevState: State): void {
     const s = this.state
     const view: any = s.jimuMapView && s.jimuMapView.view
+    if (s.jimuMapView !== prevState.jimuMapView && view) {
+      this.startLegendWatch(view)
+      void this.estimatePanel()
+    }
     if (s.jimuMapView !== prevState.jimuMapView && view && s.previewOn) {
       this.startPreviewWatch(view); this.updatePreview()
     }
@@ -440,14 +593,84 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
     if (s.previewOn && view && (
       s.scaleMode !== prevState.scaleMode || s.fixedScale !== prevState.fixedScale ||
-      s.selectedLayoutId !== prevState.selectedLayoutId || s.locked !== prevState.locked)) {
+      s.selectedLayoutId !== prevState.selectedLayoutId || s.locked !== prevState.locked ||
+      s.includeLegend !== prevState.includeLegend ||
+      s.legendPositionOv !== prevState.legendPositionOv ||
+      s.mapOnly !== prevState.mapOnly ||
+      s.mapOnlyW !== prevState.mapOnlyW ||
+      s.mapOnlyH !== prevState.mapOnlyH)) {
       this.updatePreview()
+    }
+    // legend-affecting changes re-measure from the live Legend widget:
+    // estimator runs regardless of preview so the fit hint always works,
+    // and preview accuracy comes along whenever preview is on
+    if (view && (
+      s.includeLegend !== prevState.includeLegend ||
+      s.legendPositionOv !== prevState.legendPositionOv ||
+      s.selectedLayoutId !== prevState.selectedLayoutId ||
+      s.mapOnly !== prevState.mapOnly ||
+      s.jimuMapView !== prevState.jimuMapView ||
+      s.format !== prevState.format ||
+      (s.previewOn && !prevState.previewOn))) {
+      void this.estimatePanel()
+    }
+    if (s.selectedLayoutId !== prevState.selectedLayoutId &&
+        (s.legendPosUserSet || s.legendAutoPaged)) {
+      this.setState({ legendPosUserSet: false, legendAutoPaged: false, legendPositionOv: '' })
+    }
+    // a new context deserves a fresh suggestion
+    if (s.legendHintDismissed && (
+      s.selectedLayoutId !== prevState.selectedLayoutId ||
+      s.legendPositionOv !== prevState.legendPositionOv ||
+      s.includeLegend !== prevState.includeLegend)) {
+      this.setState({ legendHintDismissed: false })
     }
   }
 
   componentWillUnmount (): void {
     this.clearPreview(); this.stopPreviewWatch()
+    this.stopLegendWatch()
     this.revokeResultUrls(this.state.results)
+  }
+
+  /** Legend responds to what is on the map: watch layer visibility so the
+   *  fit estimate (and the auto additional-pages hold) never goes stale. */
+  private legendWatchHandles: any[] = []
+  private legendLayerHandles: any[] = []
+  private legendWatchTimer: any = null
+
+  private queueEstimate = (): void => {
+    if (this.legendWatchTimer) clearTimeout(this.legendWatchTimer)
+    this.legendWatchTimer = setTimeout(() => { void this.estimatePanel() }, 400)
+  }
+
+  private stopLegendWatch = (): void => {
+    if (this.legendWatchTimer) { clearTimeout(this.legendWatchTimer); this.legendWatchTimer = null }
+    for (const h of this.legendLayerHandles) { try { h.remove() } catch (e) { /* noop */ } }
+    for (const h of this.legendWatchHandles) { try { h.remove() } catch (e) { /* noop */ } }
+    this.legendLayerHandles = []
+    this.legendWatchHandles = []
+  }
+
+  private startLegendWatch = (view: any): void => {
+    this.stopLegendWatch()
+    try {
+      const bindLayers = (): void => {
+        for (const h of this.legendLayerHandles) { try { h.remove() } catch (e) { /* noop */ } }
+        this.legendLayerHandles = []
+        try {
+          view.map.allLayers.forEach((l: any) => {
+            if (l && typeof l.watch === 'function') {
+              this.legendLayerHandles.push(l.watch('visible', this.queueEstimate))
+            }
+          })
+        } catch (e) { /* noop */ }
+      }
+      if (view && view.map && view.map.allLayers && typeof view.map.allLayers.on === 'function') {
+        this.legendWatchHandles.push(view.map.allLayers.on('change', () => { bindLayers(); this.queueEstimate() }))
+      }
+      bindLayers()
+    } catch (e) { /* watcher is best-effort */ }
   }
 
   /** All custom fonts: legacy single customFont + customFonts array, deduped by name. */
@@ -640,7 +863,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       if (this.state.naStyle) options.northArrowStyle = this.state.naStyle as any
       if (this.state.sbStyle) options.scaleBarStyle = this.state.sbStyle as any
       if (this.state.sbUnits) options.scaleBarUnits = this.state.sbUnits as any
-      if (this.state.sbUnits2) options.scaleBarUnits2 = this.state.sbUnits2 as any
+      if (this.state.sbUnits2 && (this.state.sbStyle === 'doubleAlternating' || this.state.sbStyle === 'hollowDouble')) options.scaleBarUnits2 = this.state.sbUnits2 as any
       const cfgLogo = (this.props.config as any)?.defaultLogo
       if (cfgLogo) options.defaultLogo = cfgLogo
       if (this.meEnabled()) {
@@ -661,6 +884,13 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       options.includeLegend = this.state.includeLegend
       options.showOverview = this.state.showOverview
       options.showGrid = this.state.showGrid
+      if (this.state.legendPositionOv) options.legendPositionOverride = this.state.legendPositionOv
+      if (this.state.gridTypeOv) options.gridTypeOverride = this.state.gridTypeOv
+      if ((this.cfg() as any).legendWidgetId) options.legendWidgetId = String((this.cfg() as any).legendWidgetId)
+      options.onPanelComputed = (panel) => {
+        this.lastPanel = panel
+        if (this.state.previewOn) this.updatePreview()
+      }
       if (this.outSREnabled() && parseInt(this.state.outWkid, 10) > 0) {
         options.outputWkid = parseInt(this.state.outWkid, 10)
       }
@@ -1130,7 +1360,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                   <Label className='pd-label' id={this.uid('sbstyle') + '-lbl'}>{messages.scaleBarStyleLabel}</Label>
                   <Tooltip title={messages.scaleBarStyleTip} placement='top'>
                     {this.renderStylePicker('sb', SCALE_BAR_STYLES as any, this.state.sbStyle,
-                      (v) => this.setState({ sbStyle: v }), this.uid('sbstyle') + '-lbl', messages.layoutDefault)}
+                      (v) => this.setState({ sbStyle: v, sbUnits2: (v === 'doubleAlternating' || v === 'hollowDouble') ? this.state.sbUnits2 : '' }), this.uid('sbstyle') + '-lbl', messages.layoutDefault)}
                   </Tooltip>
                 </div>
                 <div className='pd-row'>
@@ -1145,13 +1375,14 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                     </Select>
                   </Tooltip>
                 </div>
+                {(this.state.sbStyle === 'doubleAlternating' || this.state.sbStyle === 'hollowDouble') && (
                 <div className='pd-row'>
                   <Label className='pd-label' id={this.uid('sbunits2') + '-lbl'}>{messages.scaleBarUnits2Label}</Label>
                   <Tooltip title={messages.scaleBarUnits2Tip} placement='top'>
                     <Select id={this.uid('sbunits2')} aria-labelledby={this.uid('sbunits2') + '-lbl'} size='sm' value={this.state.sbUnits2}
                       aria-describedby={this.uid('sbunits2-desc')}
                       onChange={(e: any) => this.setState({ sbUnits2: e.target.value })}>
-                      <option value=''>{messages.dualNone}</option>
+                      <option value=''>{messages.layoutDefault}</option>
                       {SCALE_BAR_UNITS.map(u => (
                         <option key={u.value} value={u.value}>{u.label}</option>
                       ))}
@@ -1159,6 +1390,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                   </Tooltip>
                   <div id={this.uid('sbunits2-desc')} className='pd-desc'>{messages.dualHint}</div>
                 </div>
+                )}
               </React.Fragment>
             )}
 
@@ -1182,11 +1414,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             </div>
             )}
 
-            {this.ctrl('legend') && layout && layout.elements && layout.elements.some(e => e.type === 'legend') && (
+            {this.ctrl('legend') && layout && ((layout.elements && layout.elements.some(e => e.type === 'legend')) || (layout as any).legend?.enabled) && (
             <div className='pd-row pd-pa-switch'>
               <Label className='pd-label' id={this.uid('leg') + '-lbl'}>{messages.includeLegendLabel}</Label>
-              <Tooltip title={messages.includeLegendTip} placement='top'>
-                <Switch aria-labelledby={this.uid('leg') + '-lbl'} checked={this.state.includeLegend}
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.includeLegendTip} placement='top'>
+                <Switch aria-labelledby={this.uid('leg') + '-lbl'} disabled={this.state.mapOnly} checked={this.state.includeLegend}
                   onChange={(e) => this.setState({ includeLegend: e.target.checked })} />
               </Tooltip>
             </div>
@@ -1195,8 +1427,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             {this.ctrl('overview') && layout && (layout as any).overview?.enabled && (
             <div className='pd-row pd-pa-switch'>
               <Label className='pd-label' id={this.uid('ovw') + '-lbl'}>{messages.overviewToggleLabel}</Label>
-              <Tooltip title={messages.overviewToggleTip} placement='top'>
-                <Switch aria-labelledby={this.uid('ovw') + '-lbl'} checked={this.state.showOverview}
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.overviewToggleTip} placement='top'>
+                <Switch aria-labelledby={this.uid('ovw') + '-lbl'} disabled={this.state.mapOnly} checked={this.state.showOverview}
                   onChange={(e) => this.setState({ showOverview: e.target.checked })} />
               </Tooltip>
             </div>
@@ -1205,9 +1437,82 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             {this.ctrl('grid') && layout && (layout as any).grid?.enabled && (
             <div className='pd-row pd-pa-switch'>
               <Label className='pd-label' id={this.uid('grd') + '-lbl'}>{messages.gridToggleLabel}</Label>
-              <Tooltip title={messages.gridToggleTip} placement='top'>
-                <Switch aria-labelledby={this.uid('grd') + '-lbl'} checked={this.state.showGrid}
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.gridToggleTip} placement='top'>
+                <Switch aria-labelledby={this.uid('grd') + '-lbl'} disabled={this.state.mapOnly} checked={this.state.showGrid}
                   onChange={(e) => this.setState({ showGrid: e.target.checked })} />
+              </Tooltip>
+            </div>
+            )}
+
+            {this.ctrl('legend') && layout && (layout as any).legend?.enabled && this.state.includeLegend && (
+            <div className='pd-row' data-testid='legendPosSelect'>
+              <Label className='pd-label' id={this.uid('legpos') + '-lbl'}>{messages.legendPositionLabel}</Label>
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.legendPositionTip} placement='top'>
+              <Select id={this.uid('legpos')} aria-labelledby={this.uid('legpos') + '-lbl'} size='sm' disabled={this.state.mapOnly} value={this.state.legendPositionOv}
+                onChange={(e: any) => this.setState({ legendPositionOv: e.target.value, legendPosUserSet: true, legendAutoPaged: false })}>
+                <option value=''>{messages.layoutDefaultOption}</option>
+                <option value='rightPanel'>{messages.legendPosRight}</option>
+                <option value='secondPage'>{messages.legendPosSecondPage}</option>
+                <option value='leftPanel'>{messages.legendPosLeft}</option>
+                <option value='bottomPanel'>{messages.legendPosBottom}</option>
+                <option value='topLeft'>{messages.legendPosTL}</option>
+                <option value='topRight'>{messages.legendPosTR}</option>
+                <option value='bottomLeft'>{messages.legendPosBL}</option>
+                <option value='bottomRight'>{messages.legendPosBR}</option>
+              </Select>
+              </Tooltip>
+            </div>
+            )}
+
+            {this.state.legendAutoPaged && this.state.legendPositionOv === 'secondPage' && this.state.includeLegend && !this.state.mapOnly && (
+            <div className='pd-row' role='status' aria-live='polite'>
+              <Alert type='info' text={messages.legendAutoPagedText} withIcon size='small' className='w-100'
+                aria-label={messages.legendAutoPagedText} />
+              <Button size='sm' type='tertiary'
+                onClick={() => this.setState({ legendPositionOv: '', legendAutoPaged: false, legendPosUserSet: true })}>
+                {messages.legendKeepBeside}
+              </Button>
+            </div>
+            )}
+
+            {(() => {
+              const h = this.state.legendHint
+              if (!h || this.state.legendHintDismissed || this.state.legendPositionOv === 'secondPage' ||
+                  !this.state.includeLegend || this.state.mapOnly) return null
+              const text = (h.level === 'cramped'
+                ? (h.missed > 0
+                    ? messages.legendHintMissed.replace('{count}', String(h.count)).replace('{missed}', String(h.missed))
+                    : messages.legendHintShrunk.replace('{count}', String(h.count)).replace('{font}', String(h.fontPt)))
+                : messages.legendHintMany.replace('{count}', String(h.count))) + ' ' + messages.legendHintSuffix
+              return (
+                <div className='pd-row' role='status' aria-live='polite'>
+                  <Alert type={h.level === 'cramped' ? 'warning' : 'info'} text={text} withIcon size='small' className='w-100'
+                    aria-label={text} />
+                  <div className='pd-hint-actions'>
+                    <Button size='sm' type='primary'
+                      onClick={() => this.setState({ legendPositionOv: 'secondPage', legendHint: null })}>
+                      {messages.legendUseSecondPage}
+                    </Button>
+                    <Button size='sm' type='tertiary'
+                      onClick={() => this.setState({ legendHintDismissed: true })}>
+                      {messages.legendHintDismiss}
+                    </Button>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {this.ctrl('grid') && layout && (layout as any).grid?.enabled && this.state.showGrid && (
+            <div className='pd-row'>
+              <Label className='pd-label' id={this.uid('gridtype') + '-lbl'}>{messages.gridTypeLabel}</Label>
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.gridTypeSelTip} placement='top'>
+              <Select id={this.uid('gridtype')} aria-labelledby={this.uid('gridtype') + '-lbl'} size='sm' disabled={this.state.mapOnly} value={this.state.gridTypeOv}
+                onChange={(e: any) => this.setState({ gridTypeOv: e.target.value })}>
+                <option value=''>{messages.layoutDefaultOption}</option>
+                <option value='graticule'>{messages.gridTypeGraticule}</option>
+                <option value='measured'>{messages.gridTypeMeasured}</option>
+                <option value='reference'>{messages.gridTypeReference}</option>
+              </Select>
               </Tooltip>
             </div>
             )}
