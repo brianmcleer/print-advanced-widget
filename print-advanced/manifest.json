@@ -2,7 +2,7 @@
   "name": "print-advanced",
   "label": "Print Advanced",
   "type": "widget",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "exbVersion": "1.20.0",
   "author": "Brian McLeer, City of Grand Junction",
   "description": "Advanced client-side print widget for ArcGIS Experience Builder. Reproduces ArcGIS Pro .pagx layouts entirely in the browser (map frame, texts, lines, north arrow, scale bar, pictures, legend) exporting PDF, SVG, SVGZ, PNG32, PNG8, JPEG, GIF, TIFF, and EPS - no print service required. Optionally connects to an Esri ExportWebMap print service URL for server-side layouts. Includes print-area preview, scale controls, custom fonts, author/copyright/attribution, map-only export, and XML import/export of settings.",

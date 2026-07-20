@@ -646,13 +646,11 @@ export function findLegendDom (widgetId?: string): Element | null {
                     if (holder) {
                         const el = holder.querySelector('.esri-legend')
                         if (el) {
-                            try { console.info('[print-advanced] legend widget located via ' + sel) } catch (e2) { /* noop */ }
                             return el
                         }
                     }
                 } catch (e2) { /* try next */ }
             }
-            try { console.info('[print-advanced] bound legend widget "' + widgetId + '" not found in DOM; using first legend on page') } catch (e2) { /* noop */ }
         }
         return document.querySelector('.esri-legend')
     } catch (e) { return null }
@@ -672,7 +670,6 @@ export async function buildLegendRows(view: MapView, maxItems: number, onProgres
             const rows = await harvestLegendDom(dom)
             const items = rows.filter(r => r.kind === 'item')
             const withSwatch = items.filter(r => isEmbeddableSwatch(r.dataUrl)).length
-            try { console.info('[print-advanced] legend source: widget-dom, ' + rows.length + ' rows, ' + withSwatch + '/' + items.length + ' swatches') } catch (e) { /* noop */ }
             if (rows.length && withSwatch > 0) {
                 // upgrade map-service swatches to print resolution: the DOM
                 // bitmaps are screen-density; the REST legend at high dpi is not
@@ -685,12 +682,10 @@ export async function buildLegendRows(view: MapView, maxItems: number, onProgres
                         try { services.push(await fetchRestLegend(l.url)) } catch (e) { /* per-service best-effort */ }
                     }))
                     const upgraded = matchRestSwatches(rows, services)
-                    try { console.info('[print-advanced] hi-res swatches: ' + upgraded + '/' + items.length + ' upgraded to ' + LEGEND_SWATCH_DPI + ' dpi') } catch (e) { /* noop */ }
                 } catch (e) { /* enrichment is best-effort */ }
                 return rows.slice(0, MAX_LEGEND_ROWS)
             }
         } else {
-            try { console.info('[print-advanced] legend source: no legend DOM found' + (legendWidgetId ? ' for widget ' + legendWidgetId : '') + ', trying model') } catch (e) { /* noop */ }
         }
     } catch (e) { /* fall through */ }
     // 2) headless Legend model (+ REST swatch repair)
@@ -883,7 +878,6 @@ async function buildRowsFromLegendModel(view: MapView): Promise<LegendRow[]> {
                     try {
                         const json = await fetchRestLegend(target.url)
                         const restRows = mapRestLegendToRows(json, target.id, depth)
-                        try { console.info('[print-advanced] REST legend ' + target.url + ' layer ' + target.id + ': ' + restRows.length + ' swatches') } catch (e) { /* noop */ }
                         if (restRows.length) {
                             // remove THIS layer's just-added item rows, keep its
                             // heading rows, append the REST-derived items
@@ -903,13 +897,6 @@ async function buildRowsFromLegendModel(view: MapView): Promise<LegendRow[]> {
         const alis = legend.activeLayerInfos
         const top: any[] = alis && alis.toArray ? alis.toArray() : (alis || [])
         for (const ali of top) await walk(ali, 0)
-        try {
-            const items = rows.filter(r => r.kind === 'item')
-            console.info('[print-advanced] legend model: ' + rows.length + ' rows; swatches embeddable=' +
-                items.filter(i => isEmbeddableSwatch(i.dataUrl)).length + ' colored=' + items.filter(i => !!i.color).length +
-                ' empty=' + items.filter(i => !isEmbeddableSwatch(i.dataUrl) && !i.color).length +
-                '; layers: ' + rows.filter(r => r.kind === 'layer').map(r => r.label).join(' | '))
-        } catch (e) { /* noop */ }
         return rows
     } finally {
         try { legend.destroy() } catch (e) { /* noop */ }
@@ -1004,6 +991,11 @@ function drawNorthArrowEl(d: Drawer, el: NorthArrowEl, rotationDeg: number, styl
     ]
 
     const halfH = arrowH / 2
+    // radial styles (circles, starbursts) must respect the element WIDTH
+    // too: authored north-arrow frames are often tall and narrow, and a
+    // height-based radius spills into neighboring furniture
+    const radialR = Math.min(halfH, (W - pad * 2) / 2)
+    const rScale = halfH > 0 ? radialR / halfH : 1
     const tip = rot(0, -halfH)
     const baseL = rot(-arrowHalfW, halfH)
     const baseR = rot(arrowHalfW, halfH)
@@ -1053,11 +1045,11 @@ function drawNorthArrowEl(d: Drawer, el: NorthArrowEl, rotationDeg: number, styl
         case 'circledArrow': {
             d.setFill(255, 255, 255)
             d.setLineWidth(0.9)
-            d.circle(acx, acy, halfH, 'FD')
-            const t2 = rot(0, -halfH * 0.8)
-            const l2 = rot(-arrowHalfW * 0.8, halfH * 0.7)
-            const r2 = rot(arrowHalfW * 0.8, halfH * 0.7)
-            const k2 = rot(0, halfH * 0.35)
+            d.circle(acx, acy, radialR, 'FD')
+            const t2 = rot(0, -radialR * 0.8)
+            const l2 = rot(-Math.min(arrowHalfW, radialR * 0.5) * 0.8, radialR * 0.7)
+            const r2 = rot(Math.min(arrowHalfW, radialR * 0.5) * 0.8, radialR * 0.7)
+            const k2 = rot(0, radialR * 0.35)
             d.setFill(30, 30, 30)
             d.triangle(t2[0], t2[1], k2[0], k2[1], l2[0], l2[1], 'F')
             d.setFill(255, 255, 255)
@@ -1102,9 +1094,9 @@ function drawNorthArrowEl(d: Drawer, el: NorthArrowEl, rotationDeg: number, styl
         case 'compassRose':
         case 'starburst': {
             const rose = style === 'compassRose'
-            const Rlong = halfH
-            const Rshort = rose ? halfH * 0.45 : halfH * 0.62
-            const inner = halfH * 0.13
+            const Rlong = radialR
+            const Rshort = rose ? radialR * 0.45 : radialR * 0.62
+            const inner = radialR * 0.13
             const pt = (a: number, r: number): [number, number] => {
                 let px = acx + Math.sin(a) * r
                 const dx = Math.max(-arrowHalfW * 1.6, Math.min(arrowHalfW * 1.6, px - acx))
@@ -1124,10 +1116,10 @@ function drawNorthArrowEl(d: Drawer, el: NorthArrowEl, rotationDeg: number, styl
         }
         case 'filledCircleArrow': {
             d.setFill(30, 30, 30)
-            d.circle(acx, acy, halfH, 'F')
-            const t2 = rot(0, -halfH * 0.62)
-            const l2 = rot(-arrowHalfW * 0.7, halfH * 0.28)
-            const r2 = rot(arrowHalfW * 0.7, halfH * 0.28)
+            d.circle(acx, acy, radialR, 'F')
+            const t2 = rot(0, -radialR * 0.62)
+            const l2 = rot(-Math.min(arrowHalfW, radialR * 0.5) * 0.7, radialR * 0.28)
+            const r2 = rot(Math.min(arrowHalfW, radialR * 0.5) * 0.7, radialR * 0.28)
             d.setFill(255, 255, 255)
             d.triangle(t2[0], t2[1], l2[0], l2[1], r2[0], r2[1], 'F')
             break
@@ -1534,12 +1526,40 @@ export function layoutLegend (
         }
     }
 
+    let hardBreaks = 0
     const wrap = (text: string, width: number, fontPt: number, maxLines: number): string[] => {
-        const words = (text || '').split(/\s+/).filter(Boolean)
+        // tokens wider than the column split on slash/hyphen boundaries,
+        // then character-by-character as a last resort, so unbreakable
+        // labels like STORM/IRRIGATION can never overrun the neatline
+        const words: string[] = []
+        for (const raw of (text || '').split(/\s+/).filter(Boolean)) {
+            if (measure(raw, fontPt) <= width) { words.push(raw); continue }
+            const parts: string[] = []
+            let buf = ''
+            for (const ch of raw) {
+                buf += ch
+                if (ch === '/' || ch === '-') { parts.push(buf); buf = '' }
+            }
+            if (buf) parts.push(buf)
+            for (const part of parts) {
+                if (measure(part, fontPt) <= width) { words.push(part); continue }
+                // character-level chunking is a last resort: count it so the
+                // fit search can prefer layouts that avoid it, and hyphenate
+                const hyphenW = measure('-', fontPt)
+                let chunk = ''
+                for (const ch of part) {
+                    if (!chunk || measure(chunk + ch, fontPt) <= width - hyphenW) chunk += ch
+                    else { hardBreaks++; words.push(chunk + '-'); chunk = ch }
+                }
+                if (chunk) words.push(chunk)
+            }
+        }
+        const joins = (a: string, b2: string): string =>
+            (a.endsWith('/')) ? a + b2 : a + ' ' + b2
         const lines: string[] = []
         let line = ''
         for (const w of words) {
-            const cand = line ? line + ' ' + w : w
+            const cand = line ? joins(line, w) : w
             if (measure(cand, fontPt) <= width || !line) line = cand
             else {
                 lines.push(line); line = w
@@ -1553,6 +1573,14 @@ export function layoutLegend (
             let last = lines[lines.length - 1]
             while (last.length && measure(last + '\u2026', fontPt) > width) last = last.slice(0, -1)
             lines[lines.length - 1] = last + '\u2026'
+        }
+        // safety clamp: no line may exceed the column, ellipsis if needed
+        for (let i = 0; i < lines.length; i++) {
+            if (measure(lines[i], fontPt) > width) {
+                let t = lines[i]
+                while (t.length && measure(t + '\u2026', fontPt) > width) t = t.slice(0, -1)
+                lines[i] = t + '\u2026'
+            }
         }
         return lines
     }
@@ -1619,24 +1647,43 @@ export function layoutLegend (
         return flow(innerH)
     }
 
-    const colChoices = cfg.columns && cfg.columns > 0
-        ? [Math.min(6, Math.round(cfg.columns))]
-        : [1, 2, 3, 4]
+    const prefCols = cfg.columns && cfg.columns > 0 ? Math.min(6, Math.round(cfg.columns)) : 0
+    const colsList = prefCols ? Array.from({ length: prefCols }, (_, i) => i + 1) : [1, 2, 3, 4]
     const baseFont = Math.max(5, cfg.baseFontPt || 8)
+    const noShrink = !!(cfg as any).noShrink
 
-    for (const cols of colChoices) {
-        const fit = tryFit(cols, baseFont)
-        if (fit) return fit
-    }
-    const maxCols = colChoices[colChoices.length - 1]
-    // noShrink: pagination mode; keep the base font and truncate instead,
-    // the paginator turns the remainder into further pages
-    if (!(cfg as any).noShrink) {
-        for (let f = baseFont - 0.5; f >= 5; f -= 0.5) {
-            const fit = tryFit(maxCols, f)
-            if (fit) return fit
+    // Break-aware search: for each column count, find the largest font that
+    // fits, and the largest that fits with ZERO forced word breaks. A clean
+    // layout always beats a mangled one; then larger font; then the
+    // configured column preference; then wider columns (fewer of them).
+    interface Cand { lay: LegendLayout, cols: number, font: number, breaks: number }
+    const clean: Cand[] = []
+    const any: Cand[] = []
+    for (const cols of colsList) {
+        const fonts: number[] = []
+        if (noShrink) fonts.push(baseFont)
+        else for (let f = baseFont; f >= 5; f -= 0.5) fonts.push(f)
+        let recordedAny = false
+        for (const f of fonts) {
+            hardBreaks = 0
+            const lay = tryFit(cols, f)
+            if (!lay) continue
+            const cand = { lay, cols, font: f, breaks: hardBreaks }
+            if (!recordedAny) { any.push(cand); recordedAny = true }
+            if (cand.breaks === 0) { clean.push(cand); break }
         }
     }
+    const pick = (list: Cand[]): LegendLayout | null => {
+        if (!list.length) return null
+        list.sort((a2, b2) =>
+            (b2.font - a2.font) ||
+            ((prefCols ? (a2.cols === prefCols ? 0 : 1) - (b2.cols === prefCols ? 0 : 1) : 0)) ||
+            (a2.cols - b2.cols))
+        return list[0].lay
+    }
+    const chosen = pick(clean) || pick(any)
+    if (chosen) return chosen
+    const maxCols = colsList[colsList.length - 1]
     // Truncate at minimum font, honest footer with the remainder count.
     const minFont = (cfg as any).noShrink ? baseFont : 5
     const colW = (innerW - gutter * (maxCols - 1)) / maxCols
@@ -2262,6 +2309,62 @@ function drawGrid (d: Drawer, geom: GridGeometry, cfg: GridConfig): void {
 
 /** Inset box (page inches, top-left origin) for a settings-defined overview,
  *  positioned in a corner of the main map frame and clamped inside it. */
+interface BoxIn { xIn: number, yIn: number, wIn: number, hIn: number }
+
+function boxesIntersect (a: BoxIn, b: BoxIn): boolean {
+    const eps = 0.01
+    return !(a.xIn + a.wIn <= b.xIn + eps || b.xIn + b.wIn <= a.xIn + eps ||
+             a.yIn + a.hIn <= b.yIn + eps || b.yIn + b.hIn <= a.yIn + eps)
+}
+
+/** Corner-overlay placement that avoids overlapping other content inside
+ *  the map frame (overview inset, authored elements over the frame).
+ *  Strategy: keep the configured corner if free; otherwise slide within
+ *  the corner column past the obstacles; otherwise try the other corners
+ *  (same edge first). Pure and exported for tests. */
+export function resolveLegendCorner (
+    mf: BoxIn,
+    cfg: { position: string, widthIn: number, heightIn: number, marginIn: number },
+    obstacles: BoxIn[]
+): BoxIn {
+    const mk = (position: string): BoxIn => overviewBoxIn(mf, { ...cfg, position } as any)
+    const inside = (b: BoxIn): boolean =>
+        b.xIn >= mf.xIn - 0.01 && b.yIn >= mf.yIn - 0.01 &&
+        b.xIn + b.wIn <= mf.xIn + mf.wIn + 0.01 && b.yIn + b.hIn <= mf.yIn + mf.hIn + 0.01
+    const clear = (b: BoxIn): boolean => !obstacles.some(o => boxesIntersect(b, o))
+    const pos = cfg.position || 'bottomLeft'
+    const base = mk(pos)
+    if (clear(base)) return base
+    // slide vertically within the corner column, past every obstacle hit
+    const gap = 0.08
+    const top = pos === 'topLeft' || pos === 'topRight'
+    let slid: BoxIn = { ...base }
+    for (let pass = 0; pass < 4; pass++) {
+        const hits = obstacles.filter(o => boxesIntersect(slid, o))
+        if (!hits.length) break
+        if (top) {
+            const below = Math.max(...hits.map(o => o.yIn + o.hIn)) + gap
+            slid = { ...slid, yIn: below }
+        } else {
+            const above = Math.min(...hits.map(o => o.yIn)) - gap - slid.hIn
+            slid = { ...slid, yIn: above }
+        }
+    }
+    if (inside(slid) && clear(slid)) return slid
+    // try other corners: same horizontal edge first, then the rest
+    const order = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight']
+        .filter(c => c !== pos)
+        .sort((a2, b2) => {
+            const sameEdge = (c: string): number => ((c.startsWith('top') === top) ? 0 : 1)
+            return sameEdge(a2) - sameEdge(b2)
+        })
+    for (const c of order) {
+        const cand = mk(c)
+        if (clear(cand)) return cand
+    }
+    return base
+}
+
 export function overviewBoxIn (
     mf: { xIn: number, yIn: number, wIn: number, hIn: number },
     ov: OverviewConfig
@@ -2430,12 +2533,29 @@ export async function composePage(
         !pagxHasLegend && legendRows.length && opts.includeLegend !== false) {
         try {
             const mf = getMapFrame(layout)
-            const box = opts.legendBox || overviewBoxIn(mf, {
-                position: lCfg.position || 'bottomLeft',
-                widthIn: lCfg.widthIn || 3,
-                heightIn: lCfg.heightIn || 3.5,
-                marginIn: lCfg.marginIn ?? 0.25
-            } as any)
+            const box = opts.legendBox || (() => {
+                const cornerCfg = {
+                    position: String(lCfg.position || 'bottomLeft'),
+                    widthIn: lCfg.widthIn || 3,
+                    heightIn: lCfg.heightIn || 3.5,
+                    marginIn: lCfg.marginIn ?? 0.25
+                }
+                const obstacles: Array<{ xIn: number, yIn: number, wIn: number, hIn: number }> = []
+                const ovc: any = (layout as any).overview
+                if (ovc && ovc.enabled && opts.showOverview !== false) {
+                    obstacles.push(overviewBoxIn(mf, ovc))
+                }
+                for (const e of (layout.elements || []) as any[]) {
+                    if (e.type === 'mapFrame' || e.type === 'line' || e.type === 'legend') continue
+                    if (!(typeof e.xIn === 'number' && e.wIn > 0 && e.hIn > 0)) continue
+                    // only elements intruding into the frame interior matter
+                    if (e.xIn < mf.xIn + mf.wIn && e.xIn + e.wIn > mf.xIn &&
+                        e.yIn < mf.yIn + mf.hIn && e.yIn + e.hIn > mf.yIn) {
+                        obstacles.push({ xIn: e.xIn, yIn: e.yIn, wIn: e.wIn, hIn: e.hIn })
+                    }
+                }
+                return resolveLegendCorner(mf, cornerCfg, obstacles)
+            })()
             {
                 const miss = await drawLegendEl(d, { type: 'legend', name: 'settingsLegend', xIn: box.xIn, yIn: box.yIn, wIn: box.wIn, hIn: box.hIn, maxItems: 0 } as LegendEl, legendRows, lCfg, !!opts.legendBox)
                 if (miss > 0) (opts as any)._legendTruncated = Math.max(Number((opts as any)._legendTruncated) || 0, miss)
@@ -2781,7 +2901,6 @@ export async function renderLayout(
     if (legendSecondPage && format !== 'pdf') {
         legendSecondPage = false
         useLayout = { ...useLayout, legend: { ...legendCfg, position: 'rightPanel' } as LegendConfig }
-        try { console.info('[print-advanced] additional-pages legend requires PDF; using right panel for ' + format) } catch (e) { /* noop */ }
     }
     const legendCfg2 = useLayout.legend
 
@@ -2953,7 +3072,6 @@ export async function renderLayout(
                 doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
                 await drawLegendPage(pd, useLayout.pageWidthIn, useLayout.pageHeightIn, legendPages[pi], useLayout.legend)
             }
-            try { console.info('[print-advanced] legend paginated across ' + legendPages.length + ' additional page(s)') } catch (e) { /* noop */ }
         }
         const pdfBlob: Blob = doc.output('blob')
         lastUrl = downloadBlob(pdfBlob, outName); lastSize = pdfBlob.size

@@ -5,7 +5,7 @@
  * browser to PDF with vector page furniture and a high-resolution map capture.
  * Author: Brian McLeer, City of Grand Junction
  */
-import { React, AllWidgetProps, jsx, css } from 'jimu-core'
+import { React, AllWidgetProps, jsx, css, WidgetState } from 'jimu-core'
 import { Button, Select, TextInput, Label, WidgetPlaceholder, Loading, LoadingType, Alert, Tooltip, Switch } from 'jimu-ui'
 import { JimuMapView, JimuMapViewComponent } from 'jimu-arcgis'
 import { IMConfig, PrintLayout } from '../config'
@@ -580,6 +580,19 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   componentDidUpdate (_prevProps: AllWidgetProps<IMConfig>, prevState: State): void {
     const s = this.state
     const view: any = s.jimuMapView && s.jimuMapView.view
+    // panel closes: the print-extent graphic must leave the map with it;
+    // reopening restores it if the preview toggle is still on
+    const wState: any = (this.props as any).state
+    const prevWState: any = (_prevProps as any).state
+    if (wState !== prevWState) {
+      if (wState === WidgetState.Closed) {
+        this.clearPreview()
+        this.stopPreviewWatch()
+      } else if (prevWState === WidgetState.Closed && s.previewOn && view) {
+        this.startPreviewWatch(view)
+        this.updatePreview()
+      }
+    }
     if (s.jimuMapView !== prevState.jimuMapView && view) {
       this.startLegendWatch(view)
       void this.estimatePanel()
