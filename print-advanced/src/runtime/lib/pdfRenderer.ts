@@ -23,7 +23,7 @@ import * as symbolUtils from 'esri/symbols/support/symbolUtils'
 import { jsPDF } from 'jspdf'
 import {
     PrintLayout, ScaleBarUnits, ScaleBarStyle, NorthArrowStyle, FontFamily, LayoutElement,
-    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig, LegendConfig } from '../../config'
+    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig, LegendConfig, LegendPatchSize } from '../../config'
 import { Drawer, PdfDrawer, CanvasDrawer, SvgDrawer, splitText } from './drawing'
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -55,6 +55,8 @@ export interface RenderOptions {
     scaleMode?: PrintScaleMode
     fixedScale?: number
     lockedCenter?: { x: number, y: number }
+    /** Internal capture timeout override, in milliseconds. */
+    maxWaitMs?: number
     author?: string
     copyright?: string
     attribution?: string
@@ -1930,7 +1932,7 @@ async function drawLegendEl (d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?:
             if (r.dataUrl) {
                 // contain fit: line swatches stay wide and thin, markers stay
                 // round; never stretch a symbol into the patch box
-                try { await d.image(r.dataUrl, 'PNG', x + 2, py, it.patchWPt, it.patchHPt, 'contain', 'left', 'middle') } catch (e) {
+                try { await d.image(r.dataUrl, 'PNG', x + 2, py, it.patchWPt, it.patchHPt, 'contain', 'left', 'center') } catch (e) {
                     d.setFill(210, 210, 210); d.rect(x + 2, py, it.patchWPt, it.patchHPt, 'F')
                 }
             } else if (r.color) {

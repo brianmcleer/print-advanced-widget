@@ -10,7 +10,7 @@
  * All coordinates passed to a Drawer are in POINTS (72/in). Each backend
  * converts to its own device space.
  */
-import type { jsPDF } from 'jspdf'
+import type jsPDF from 'jspdf'
 
 export type ShapeStyle = 'F' | 'S' | 'FD'
 export type TextAlign = 'left' | 'center' | 'right'

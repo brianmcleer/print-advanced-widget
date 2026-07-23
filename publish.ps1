@@ -22,7 +22,7 @@ $ErrorActionPreference = "Stop"
 # ----- EDIT THESE THREE PER WIDGET -----------------------------------------
 $WidgetName    = "print-advanced"   # widget folder name (must match EB folder + repo subfolder)
 $RepoName      = "print-advanced-widget"
-$ExbWidgetPath = "C:\arcgis-experience-builder-1.20\client\your-extensions\widgets\$WidgetName"
+$ExbWidgetPath = "C:\arcgis-experience-builder-1.21\client\your-extensions\widgets\$WidgetName"
 # ----------------------------------------------------------------------------
 
 $RepoPath   = $PSScriptRoot

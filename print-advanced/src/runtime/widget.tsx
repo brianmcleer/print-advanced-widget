@@ -23,6 +23,11 @@ import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, NORTH_ARROW_S
 
 const printIcon = require('./assets/icons/icon.svg')
 
+type WidgetProps = AllWidgetProps<IMConfig> & {
+  id: string
+  useMapWidgetIds?: string[]
+}
+
 interface State {
   jimuMapView: JimuMapView | null
   selectedLayoutId: string
@@ -66,8 +71,13 @@ interface State {
   results: Array<{ name: string, url: string, meta: string }>
 }
 
-export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>, State> {
-  constructor (props: AllWidgetProps<IMConfig>) {
+type WidgetSetStateInput = Partial<State> | ((previousState: Readonly<State>, props: Readonly<WidgetProps>) => Partial<State> | State | null)
+
+export default class Widget extends React.PureComponent<WidgetProps, State> {
+  declare readonly props: Readonly<WidgetProps>
+  declare state: Readonly<State>
+  declare setState: (state: WidgetSetStateInput, callback?: () => void) => void
+  constructor (props: WidgetProps) {
     super(props)
     const layouts = this.getLayouts()
     const first = layouts.length > 0 ? layouts[0] : null

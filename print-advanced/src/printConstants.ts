@@ -22,7 +22,7 @@ export const FORMAT_LABELS: Array<{ value: OutputFormat, label: string, disabled
     { value: 'svg', label: 'Scalable Vector Graphics (SVG)' },
     { value: 'svgz', label: 'Compressed Scalable Vector Graphics (SVGZ)' },
     { value: 'aix', label: 'Adobe Illustrator Exchange (AIX)', disabled: true },
-    { value: 'tiff', label: 'Tag Image File Format (TIFF)' }
+    { value: 'tiff', label: 'Tag Image File Format (TIFF)' },
 ]
 
 export const FONT_FAMILIES: Array<{ value: FontFamily, label: string }> = [

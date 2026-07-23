@@ -18,6 +18,11 @@ import { IMConfig, PrintLayout, PictureEl, LegendEl, newLayoutId, OverviewConfig
 import { parsePagx } from '../pagxParser'
 import defaultMessages from './translations/default'
 
+type SettingProps = AllWidgetSettingProps<IMConfig> & {
+    id: string
+    useMapWidgetIds?: string[]
+}
+
 interface State {
     fontImport: string
     fontImportBusy: boolean
@@ -161,14 +166,19 @@ function xmlToConfig(xmlString: string): any {
     return nodeToValue(root)
 }
 
-export default class Setting extends React.PureComponent<AllWidgetSettingProps<IMConfig>, State> {
+type SettingSetStateInput = Partial<State> | ((previousState: Readonly<State>, props: Readonly<SettingProps>) => Partial<State> | State | null)
+
+export default class Setting extends React.PureComponent<SettingProps, State> {
+  declare readonly props: Readonly<SettingProps>
+  declare state: Readonly<State>
+  declare setState: (state: SettingSetStateInput, callback?: () => void) => void
     private fileInputRef = React.createRef<HTMLInputElement>()
     private pictureInputRef = React.createRef<HTMLInputElement>()
     private logoInputRef = React.createRef<HTMLInputElement>()
     private xmlInputRef = React.createRef<HTMLInputElement>()
     private pendingPictureIndex = -1
 
-    constructor(props: AllWidgetSettingProps<IMConfig>) {
+    constructor(props: SettingProps) {
         super(props)
         const layouts = this.getLayouts()
         this.state = {
@@ -633,7 +643,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
     }
 
     onPagxChosen = (e: React.ChangeEvent<HTMLInputElement>): void => {
-        const files = e.target.files ? Array.from(e.target.files) : []
+        const files: File[] = e.target.files ? Array.from(e.target.files) as File[] : []
         e.target.value = '' // reset so re-choosing the same file(s) fires change again
         if (!files.length) return
 
