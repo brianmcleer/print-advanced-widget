@@ -23,7 +23,7 @@ import * as symbolUtils from 'esri/symbols/support/symbolUtils'
 import { jsPDF } from 'jspdf'
 import {
     PrintLayout, ScaleBarUnits, ScaleBarStyle, NorthArrowStyle, FontFamily, LayoutElement,
-    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig, LegendConfig, LegendPatchSize } from '../../config'
+    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig, LegendConfig } from '../../config'
 import { Drawer, PdfDrawer, CanvasDrawer, SvgDrawer, splitText } from './drawing'
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -55,8 +55,6 @@ export interface RenderOptions {
     scaleMode?: PrintScaleMode
     fixedScale?: number
     lockedCenter?: { x: number, y: number }
-    /** Internal capture timeout override, in milliseconds. */
-    maxWaitMs?: number
     author?: string
     copyright?: string
     attribution?: string
@@ -529,11 +527,11 @@ export function matchRestSwatches (rows: LegendRow[], services: any[]): number {
 async function swatchFromCell (cell: Element | null): Promise<string | null> {
     if (!cell) return null
     try {
-        const canvas = cell.querySelector('canvas') as HTMLCanvasElement | null
+        const canvas = (cell.querySelector('canvas') || deepQuery(cell, 'canvas')) as HTMLCanvasElement | null
         if (canvas) {
             try { return canvas.toDataURL('image/png') } catch (e) { /* tainted */ }
         }
-        const img = cell.querySelector('img') as HTMLImageElement | null
+        const img = (cell.querySelector('img') || deepQuery(cell, 'img')) as HTMLImageElement | null
         if (img && img.src) {
             // already-rendered same-origin images can be copied via canvas
             try {
@@ -631,6 +629,52 @@ export async function harvestLegendDom (root: Element, labelsOnly?: boolean): Pr
  *  conventions are tried; if the bound widget cannot be located, this
  *  degrades to the first legend on the page (automatic behavior) rather
  *  than losing the legend entirely. */
+/** querySelectorAll that also descends into open shadow roots. Newer
+ *  ArcGIS Maps SDK builds (EB 1.21+) render widgets as web components
+ *  (e.g. <arcgis-legend>) whose internals live behind shadow DOM, which
+ *  plain querySelector cannot see. Bounded traversal, best-effort. */
+export function deepQueryAll (root: any, selector: string, cap: number = 400): Element[] {
+    const out: Element[] = []
+    const stack: any[] = [root]
+    const seen = new Set<any>()
+    while (stack.length && out.length < cap) {
+        const r = stack.pop()
+        if (!r || seen.has(r)) continue
+        seen.add(r)
+        let found: Element[] = []
+        try { found = r.querySelectorAll ? Array.from(r.querySelectorAll(selector)) : [] } catch (e) { /* noop */ }
+        for (const f of found) { if (out.length < cap) out.push(f) }
+        let all: Element[] = []
+        try { all = r.querySelectorAll ? Array.from(r.querySelectorAll('*')) : [] } catch (e) { /* noop */ }
+        for (const el of all) {
+            const sr = (el as any).shadowRoot
+            if (sr) stack.push(sr)
+        }
+    }
+    return out
+}
+
+export function deepQuery (root: any, selector: string): Element | null {
+    return deepQueryAll(root, selector, 1)[0] || null
+}
+
+/** Resolve a legend root from a holder: light-DOM .esri-legend first, then
+ *  shadow-DOM .esri-legend, then the <arcgis-legend> component itself. */
+function legendRootIn (holder: any): Element | null {
+    try {
+        const light = holder.querySelector && holder.querySelector('.esri-legend')
+        if (light) return light
+        const deep = deepQuery(holder, '.esri-legend')
+        if (deep) return deep
+        const comp = (holder.querySelector && holder.querySelector('arcgis-legend')) || deepQuery(holder, 'arcgis-legend')
+        if (comp) {
+            const inner = (comp as any).shadowRoot ? deepQuery((comp as any).shadowRoot, '.esri-legend') : null
+            return inner || comp
+        }
+    } catch (e) { /* noop */ }
+    return null
+}
+
 export function findLegendDom (widgetId?: string): Element | null {
     try {
         if (widgetId) {
@@ -646,7 +690,7 @@ export function findLegendDom (widgetId?: string): Element | null {
                 try {
                     const holder = document.querySelector(sel)
                     if (holder) {
-                        const el = holder.querySelector('.esri-legend')
+                        const el = legendRootIn(holder)
                         if (el) {
                             return el
                         }
@@ -654,7 +698,7 @@ export function findLegendDom (widgetId?: string): Element | null {
                 } catch (e2) { /* try next */ }
             }
         }
-        return document.querySelector('.esri-legend')
+        return legendRootIn(document)
     } catch (e) { return null }
 }
 
@@ -665,36 +709,50 @@ export function findLegendDom (widgetId?: string): Element | null {
  *  supports. Falls back to a renderer walk when the module is missing. */
 export async function buildLegendRows(view: MapView, maxItems: number, onProgress: RenderProgress, legendWidgetId?: string): Promise<LegendRow[]> {
     onProgress('Building legend\u2026')
-    // 1) a live Legend widget's rendered DOM: exactly what the user sees
+    const coverageOf = (rows: LegendRow[]): number => {
+        const items = rows.filter(r => r.kind === 'item')
+        if (!items.length) return 0
+        return items.filter(r => isEmbeddableSwatch(r.dataUrl)).length / items.length
+    }
+    const restUpgrade = async (rows: LegendRow[]): Promise<void> => {
+        // upgrade map-service swatches to print resolution: the DOM
+        // bitmaps are screen-density; the REST legend at high dpi is not
+        try {
+            const services: any[] = []
+            const svcLayers = (view.map.allLayers || ({ toArray: () => [] } as any))
+                .filter((l: any) => l.visible !== false && (l.type === 'map-image' || l.type === 'tile') && typeof l.url === 'string')
+            const arr: any[] = svcLayers.toArray ? svcLayers.toArray() : svcLayers
+            await Promise.all(arr.map(async (l: any) => {
+                try { services.push(await fetchRestLegend(l.url)) } catch (e) { /* per-service best-effort */ }
+            }))
+            matchRestSwatches(rows, services)
+        } catch (e) { /* enrichment is best-effort */ }
+    }
+    // 1) a live Legend widget's rendered DOM: exactly what the user sees.
+    //    Gate on swatch coverage: newer SDK builds can hide symbol canvases
+    //    behind shadow DOM, harvesting labels but no bitmaps; mostly-gray
+    //    rows must defer to the headless model rather than print placeholders
+    let domRows: LegendRow[] | null = null
+    let domCov = 0
     try {
         const dom = findLegendDom(legendWidgetId)
         if (dom) {
             const rows = await harvestLegendDom(dom)
-            const items = rows.filter(r => r.kind === 'item')
-            const withSwatch = items.filter(r => isEmbeddableSwatch(r.dataUrl)).length
-            if (rows.length && withSwatch > 0) {
-                // upgrade map-service swatches to print resolution: the DOM
-                // bitmaps are screen-density; the REST legend at high dpi is not
-                try {
-                    const services: any[] = []
-                    const svcLayers = (view.map.allLayers || ({ toArray: () => [] } as any))
-                        .filter((l: any) => l.visible !== false && (l.type === 'map-image' || l.type === 'tile') && typeof l.url === 'string')
-                    const arr: any[] = svcLayers.toArray ? svcLayers.toArray() : svcLayers
-                    await Promise.all(arr.map(async (l: any) => {
-                        try { services.push(await fetchRestLegend(l.url)) } catch (e) { /* per-service best-effort */ }
-                    }))
-                    const upgraded = matchRestSwatches(rows, services)
-                } catch (e) { /* enrichment is best-effort */ }
-                return rows.slice(0, MAX_LEGEND_ROWS)
+            if (rows.length) {
+                await restUpgrade(rows)
+                domRows = rows
+                domCov = coverageOf(rows)
+                if (domCov >= 0.5) return rows.slice(0, MAX_LEGEND_ROWS)
             }
-        } else {
         }
     } catch (e) { /* fall through */ }
-    // 2) headless Legend model (+ REST swatch repair)
+    // 2) headless Legend model (+ REST swatch repair): wins when its swatch
+    //    coverage beats the DOM harvest's
     try {
         const rows = await buildRowsFromLegendModel(view)
-        if (rows.length) return rows.slice(0, MAX_LEGEND_ROWS)
+        if (rows.length && coverageOf(rows) >= domCov) return rows.slice(0, MAX_LEGEND_ROWS)
     } catch (e) { /* fall through to renderer walk */ }
+    if (domRows && domRows.length) return domRows.slice(0, MAX_LEGEND_ROWS)
     // 3) renderer walk
     return buildRowsFromRenderers(view, Math.max(maxItems, 200))
 }
@@ -1932,7 +1990,7 @@ async function drawLegendEl (d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?:
             if (r.dataUrl) {
                 // contain fit: line swatches stay wide and thin, markers stay
                 // round; never stretch a symbol into the patch box
-                try { await d.image(r.dataUrl, 'PNG', x + 2, py, it.patchWPt, it.patchHPt, 'contain', 'left', 'center') } catch (e) {
+                try { await d.image(r.dataUrl, 'PNG', x + 2, py, it.patchWPt, it.patchHPt, 'contain', 'left', 'middle') } catch (e) {
                     d.setFill(210, 210, 210); d.rect(x + 2, py, it.patchWPt, it.patchHPt, 'F')
                 }
             } else if (r.color) {
