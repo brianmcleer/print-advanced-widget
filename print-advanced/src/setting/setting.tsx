@@ -587,9 +587,16 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
 
     /** Copy the editing layout's feature config (overview/grid/legend) to
      *  every layout, so admins do not have to re-enter it eight times. */
-    applyToAllLayouts = (key: 'overview' | 'grid' | 'legend'): void => {
+    applyToAllLayouts = (key: 'overview' | 'grid' | 'legend' | 'output'): void => {
         const editing = this.getEditing()
-        if (!editing || !(editing as any)[key]) return
+        if (!editing) return
+        if (key === 'output') {
+            // the capture trio is scalar keys on the layout, not one object
+            const { dpi, imageFormat, preserve } = editing as any
+            this.commitLayouts(this.getLayouts().map(l => ({ ...l, dpi, imageFormat, preserve })))
+            return
+        }
+        if (!(editing as any)[key]) return
         const cfg = JSON.parse(JSON.stringify((editing as any)[key]))
         this.commitLayouts(this.getLayouts().map(l => ({ ...l, [key]: JSON.parse(JSON.stringify(cfg)) })))
     }
@@ -980,6 +987,11 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                     { value: 'scale', label: messages.preserveScale },
                                     { value: 'extent', label: messages.preserveExtent }
                                 ]))}
+                            <SettingRow>
+                                <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('output')}>
+                                    {messages.applyAllLayouts}
+                                </Button>
+                            </SettingRow>
                         </SettingSection>
 
                         <SettingSection title={messages.overviewSection}>
