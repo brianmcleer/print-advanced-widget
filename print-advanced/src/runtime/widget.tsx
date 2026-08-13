@@ -954,9 +954,32 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   }
 
   getStyle = () => css`
-    padding: 12px;
+    padding: 0;
     height: 100%;
-    overflow: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    .pd-scroll { flex: 1 1 auto; overflow: auto; padding: 12px; min-height: 0; }
+    .pd-dock {
+      flex: 0 0 auto;
+      padding: 10px 12px;
+      border-top: 1px solid var(--ref-palette-neutral-500, #d5d5d5);
+      background: var(--sys-color-surface-paper, #fff);
+      box-shadow: 0 -3px 8px rgba(0, 0, 0, 0.07);
+    }
+    .pd-queue { margin-top: 8px; }
+    .pd-q-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .pd-q-title { font-size: 11px; font-weight: 700; color: var(--ref-palette-neutral-1100, #333); display: flex; align-items: center; gap: 6px; }
+    .pd-q-count { background: var(--sys-color-primary-main, #076fe5); color: #fff; border-radius: 9px; font-size: 10px; font-weight: 700; padding: 0 6px; line-height: 15px; min-width: 15px; text-align: center; }
+    .pd-q-list { list-style: none; margin: 0; padding: 0; max-height: 132px; overflow: auto; }
+    .pd-q-row { display: flex; align-items: center; gap: 7px; font-size: 11px; padding: 4px 2px; border-radius: 4px; }
+    .pd-q-row + .pd-q-row { border-top: 1px solid var(--ref-palette-neutral-300, #f0f0f0); }
+    .pd-q-active { color: var(--ref-palette-neutral-1100, #444); }
+    .pd-q-new { animation: pdQFlash 1.6s ease-out 1; }
+    @keyframes pdQFlash { 0% { background: var(--sys-color-info-light, #e3f0fd); } 100% { background: transparent; } }
+    .pd-q-pill { flex: 0 0 auto; font-size: 9px; font-weight: 700; letter-spacing: 0.03em; color: var(--sys-color-primary-dark, #0a5dc2); background: var(--sys-color-primary-light, #e8f1fd); border-radius: 3px; padding: 1px 5px; }
+    .pd-q-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pd-q-meta { flex: 0 0 auto; color: var(--ref-palette-neutral-1000, #6a6a6a); white-space: nowrap; font-size: 10px; }
     .pd-row { margin-bottom: 10px; }
     .pd-label { font-size: 12px; font-weight: 600; margin-bottom: 3px; display: block; }
     .pd-desc { font-size: 11px; color: var(--ref-palette-neutral-1100, #595959); margin-top: 3px; }
@@ -1028,6 +1051,80 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
   `
 
+  /** File-type pill text from a result name. */
+  resultKind = (name: string): string => {
+    const m = /\.([a-z0-9]+)$/i.exec(name || '')
+    return m ? m[1].toUpperCase() : 'FILE'
+  }
+
+  /** The export dock: pinned beneath the scrolling options so the Export
+   *  button and the job queue stay visible even with Advanced options
+   *  expanded. Shared by service and pagx modes. */
+  renderExportDock = (messages: any): React.ReactNode => {
+    const hasQueue = this.state.busy || !!this.state.error || this.state.results.length > 0
+    return (
+      <div className='pd-dock'>
+        <Tooltip title={this.state.jimuMapView ? messages.exportTip : messages.exportNoMap} placement='top'>
+          <Button
+            className='pd-export'
+            type='primary'
+            aria-busy={this.state.busy}
+            aria-describedby={!this.state.jimuMapView ? this.uid('export-desc') : undefined}
+            disabled={this.state.busy || !this.state.jimuMapView}
+            onClick={this.onExport}
+          >
+            {this.state.busy ? messages.exporting : messages.exportButton}
+          </Button>
+        </Tooltip>
+        {!this.state.jimuMapView && (
+          <span id={this.uid('export-desc')} className='pd-sr-only'>{messages.exportNoMap}</span>
+        )}
+        <div role='alert' aria-live='assertive'>
+          {this.state.error && (
+            <div style={{ marginTop: 8 }}>
+              <Alert type='error' text={this.state.error} withIcon style={{ width: '100%' }} />
+            </div>
+          )}
+        </div>
+        {hasQueue && (
+          <div className='pd-queue' role='status' aria-live='polite'>
+            <div className='pd-q-head'>
+              <span className='pd-q-title'>
+                {messages.resultsLabel}
+                {this.state.results.length > 0 && <span className='pd-q-count'>{this.state.results.length}</span>}
+              </span>
+              {this.state.results.length > 0 && (
+                <Tooltip title={messages.resultsClearTip} placement='top'>
+                  <Button size='sm' type='tertiary' className='pd-results-clear'
+                    aria-label={messages.resultsClear} onClick={this.clearResults}>{messages.resultsClear}</Button>
+                </Tooltip>
+              )}
+            </div>
+            <ul className='pd-q-list'>
+              {this.state.busy && (
+                <li className='pd-q-row pd-q-active'>
+                  <Loading type={LoadingType.Donut} width={14} height={14} />
+                  <span className='pd-q-name'>{messages.exporting}</span>
+                  <span className='pd-q-meta'>{this.state.status}</span>
+                </li>
+              )}
+              {this.state.results.map((r, i) => (
+                <li key={r.url + r.name} className={'pd-q-row' + (i === 0 && !this.state.busy ? ' pd-q-new' : '')}>
+                  <span className='pd-q-pill' aria-hidden='true'>{this.resultKind(r.name)}</span>
+                  <a className='pd-q-name' href={r.url} download={r.name}>{r.name}</a>
+                  <span className='pd-q-meta'>{r.meta}</span>
+                  <button type='button' className='pd-results-del' title={messages.resultRemove}
+                    aria-label={messages.resultRemove + ': ' + r.name}
+                    onClick={() => this.removeResult(i)}><span aria-hidden='true'>×</span></button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   render (): React.ReactNode {
     const { useMapWidgetIds } = this.props
     const layouts = this.getLayouts()
@@ -1044,6 +1141,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           useMapWidgetId={useMapWidgetIds[0]}
           onActiveViewChange={this.onActiveViewChange}
         />
+
+        <div className='pd-scroll'>
 
         {this.printSource() === 'service' && (
           <React.Fragment>
@@ -1137,49 +1236,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             </div>
             )}
 
-            <Tooltip title={messages.exportTip} placement='top'>
-              <Button className='pd-export' type='primary'
-                aria-busy={this.state.busy}
-                disabled={this.state.busy || !this.state.jimuMapView}
-                onClick={this.onExport}>
-                {this.state.busy ? messages.exporting : messages.exportButton}
-              </Button>
-            </Tooltip>
-            {this.state.busy && (
-              <div className='pd-status' role='status' aria-live='polite'>
-                <Loading type={LoadingType.Donut} width={16} height={16} />
-                <span>{this.state.status}</span>
-              </div>
-            )}
-            <div role='alert' aria-live='assertive'>
-              {this.state.error && (
-                <div style={{ marginTop: 8 }}>
-                  <Alert type='error' text={this.state.error} withIcon style={{ width: '100%' }} />
-                </div>
-              )}
-            </div>
-            {this.state.results.length > 0 && (
-              <div className='pd-results'>
-                <div className='pd-results-head'>
-                  <span>{messages.resultsLabel}</span>
-                  <Tooltip title={messages.resultsClearTip} placement='top'>
-                    <Button size='sm' type='tertiary' className='pd-results-clear'
-                      aria-label={messages.resultsClear} onClick={this.clearResults}>{messages.resultsClear}</Button>
-                  </Tooltip>
-                </div>
-                <ul>
-                  {this.state.results.map((r, i) => (
-                    <li key={r.url + r.name}>
-                      <a href={r.url} target='_blank' rel='noopener noreferrer'>{r.name}</a>
-                      <span className='pd-results-meta'>{r.meta}</span>
-                      <button type='button' className='pd-results-del' title={messages.resultRemove}
-                        aria-label={messages.resultRemove + ': ' + r.name}
-                        onClick={() => this.removeResult(i)}><span aria-hidden='true'>×</span></button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </React.Fragment>
         )}
 
@@ -1591,64 +1647,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             </div>
             )}
 
-            <Tooltip title={this.state.jimuMapView ? messages.exportTip : messages.exportNoMap} placement='top'>
-              <Button
-                className='pd-export'
-                type='primary'
-                aria-busy={this.state.busy}
-                aria-describedby={!this.state.jimuMapView ? this.uid('export-desc') : undefined}
-                disabled={this.state.busy || !this.state.jimuMapView}
-                onClick={this.onExport}
-              >
-                {this.state.busy ? messages.exporting : messages.exportButton}
-              </Button>
-            </Tooltip>
-            {!this.state.jimuMapView && (
-              <span id={this.uid('export-desc')} className='pd-sr-only'>{messages.exportNoMap}</span>
-            )}
-
-            {this.state.busy && (
-              <div className='pd-status' role='status' aria-live='polite'>
-                <Loading type={LoadingType.Donut} width={16} height={16} />
-                <span>{this.state.status}</span>
-              </div>
-            )}
-            <div role='alert' aria-live='assertive'>
-              {this.state.error && (
-                <div style={{ marginTop: 8 }}>
-                  <Alert type='error' text={this.state.error} withIcon style={{ width: '100%' }} />
-                </div>
-              )}
-            </div>
-            <div role='status' aria-live='polite'>
-              {this.state.lastResult && (
-                <div className='pd-result'><span aria-hidden='true'>✓ </span>{messages.exportComplete}: {this.state.lastResult}</div>
-              )}
-            </div>
-            {this.state.results.length > 0 && (
-              <div className='pd-results'>
-                <div className='pd-results-head'>
-                  <span>{messages.resultsLabel}</span>
-                  <Tooltip title={messages.resultsClearTip} placement='top'>
-                    <Button size='sm' type='tertiary' className='pd-results-clear'
-                      aria-label={messages.resultsClear} onClick={this.clearResults}>{messages.resultsClear}</Button>
-                  </Tooltip>
-                </div>
-                <ul>
-                  {this.state.results.map((r, i) => (
-                    <li key={r.url + r.name}>
-                      <a href={r.url} download={r.name}>{r.name}</a>
-                      <span className='pd-results-meta'>{r.meta}</span>
-                      <button type='button' className='pd-results-del' title={messages.resultRemove}
-                        aria-label={messages.resultRemove + ': ' + r.name}
-                        onClick={() => this.removeResult(i)}><span aria-hidden='true'>×</span></button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </React.Fragment>
         )}
+        </div>
+
+        {(this.printSource() === 'service' || layouts.length > 0) && this.renderExportDock(messages)}
       </div>
     )
   }

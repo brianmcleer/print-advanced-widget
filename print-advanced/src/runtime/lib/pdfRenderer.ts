@@ -1489,8 +1489,18 @@ async function drawPictureEl(d: Drawer, el: PictureEl, defaultLogo?: string): Pr
         const fmt = /^data:image\/jpe?g/i.test(dataUrl) ? 'JPEG' : 'PNG'
         // contain + element anchor: Pro-measured, BottomLeftCorner pictures sit at
         // the box bottom with the slack at top - never centered, never distorted.
+        // logo breathing room: widget-supplied logos (as opposed to pictures
+        // authored in the .pagx, which render at their exact Pro bounds) are
+        // often tightly cropped; inset them so the artwork never presses
+        // against adjacent borders or the frame line
+        let ix = x; let iy = y; let iw = w; let ih = h
+        if (!el.dataUrl && defaultLogo) {
+            const inset = Math.min(6, Math.max(1.5, Math.min(w, h) * 0.07))
+            ix += inset; iy += inset
+            iw = Math.max(1, w - inset * 2); ih = Math.max(1, h - inset * 2)
+        }
         try {
-            await d.image(dataUrl, fmt, x, y, w, h, 'contain', el.anchorH || 'left', el.anchorV || 'bottom')
+            await d.image(dataUrl, fmt, ix, iy, iw, ih, 'contain', el.anchorH || 'left', el.anchorV || 'bottom')
             return
         } catch (e) { /* fall through */ }
     }
