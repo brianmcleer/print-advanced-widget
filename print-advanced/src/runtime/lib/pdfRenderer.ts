@@ -255,7 +255,23 @@ export function gpuMaxCapturePx (): number {
     return max
 }
 
-export /** Draw a captured image onto a white-filled canvas and re-encode as
+/** True on devices where WebKit/OS hard-caps canvas + WebGL memory and
+ *  kills the tab past it: every iOS browser (Safari, Chrome/CriOS,
+ *  Firefox/FxiOS are all WebKit there, iPadOS reports as Mac with touch),
+ *  plus anything reporting very low device memory. */
+export function memoryConstrainedDevice (): boolean {
+    try {
+        const nav: any = typeof navigator !== 'undefined' ? navigator : null
+        if (!nav) return false
+        const ua = String(nav.userAgent || '')
+        const iosUa = /iPad|iPhone|iPod/.test(ua)
+        const iPadOs = nav.platform === 'MacIntel' && (nav.maxTouchPoints || 0) > 1
+        const lowMem = typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 4
+        return iosUa || iPadOs || lowMem
+    } catch (e) { return false }
+}
+
+/** Draw a captured image onto a white-filled canvas and re-encode as
  *  JPEG: guarantees no transparent pixel can render black downstream. */
 async function flattenToWhiteJpeg (dataUrl: string, w: number, h: number): Promise<string> {
     return await new Promise<string>((resolve, reject) => {
@@ -267,10 +283,18 @@ async function flattenToWhiteJpeg (dataUrl: string, w: number, h: number): Promi
                 c.height = img.naturalHeight || h
                 const ctx = c.getContext('2d')
                 if (!ctx) { resolve(dataUrl); return }
+                if (memoryConstrainedDevice() && c.width * c.height > 8388608) {
+                    // constrained devices: skip the extra full-size canvas;
+                    // the white view background already guards transparency
+                    resolve(dataUrl)
+                    return
+                }
                 ctx.fillStyle = '#ffffff'
                 ctx.fillRect(0, 0, c.width, c.height)
                 ctx.drawImage(img, 0, 0)
-                resolve(c.toDataURL('image/jpeg', 0.95))
+                const out = c.toDataURL('image/jpeg', 0.95)
+                c.width = 0; c.height = 0 // release WebKit canvas memory promptly
+                resolve(out)
             } catch (e) { resolve(dataUrl) }
         }
         img.onerror = () => resolve(dataUrl)
@@ -294,14 +318,20 @@ async function captureMapHiRes(
     // limit always wins - a canvas larger than MAX_TEXTURE_SIZE renders
     // blank or fails on takeScreenshot.
     const gpuMax = gpuMaxCapturePx()
-    const capLimit = Math.min(maxImagePx > 0 ? maxImagePx : Math.min(gpuMax, 8192), gpuMax)
+    const dpr = (typeof window !== 'undefined' && (window as any).devicePixelRatio) || 1
+    const deviceCap = memoryConstrainedDevice()
+        ? Math.max(1024, Math.floor(4096 / Math.max(1, dpr)))
+        : Number.POSITIVE_INFINITY
+    const capLimit = Math.min(maxImagePx > 0 ? maxImagePx : Math.min(gpuMax, 8192), gpuMax, deviceCap)
     const maxDim = Math.max(capW, capH)
     if (maxDim > capLimit) {
         const s = capLimit / maxDim
         capW = Math.round(capW * s)
         capH = Math.round(capH * s)
         onProgress('Map capture capped at ' + capLimit + ' px (' +
-            (maxImagePx > 0 && capLimit === maxImagePx ? 'settings limit' : 'graphics card limit') +
+            (capLimit === deviceCap
+                ? 'this device\u2019s memory limit'
+                : (maxImagePx > 0 && capLimit === maxImagePx ? 'settings limit' : 'graphics card limit')) +
             '); effective ' + Math.round(capW / frameWIn) + ' DPI.')
     }
     const effectiveDpi = capW / frameWIn
@@ -3199,8 +3229,13 @@ export async function renderLayout(
     } else {
         let pageDpi = useLayout.dpi
         const longEdgePx = Math.max(useLayout.pageWidthIn, useLayout.pageHeightIn) * pageDpi
-        const CANVAS_CAP = 8000
-        if (longEdgePx > CANVAS_CAP) pageDpi = Math.floor(CANVAS_CAP / Math.max(useLayout.pageWidthIn, useLayout.pageHeightIn))
+        const CANVAS_CAP = memoryConstrainedDevice() ? 4096 : 8000
+        if (longEdgePx > CANVAS_CAP) {
+            pageDpi = Math.floor(CANVAS_CAP / Math.max(useLayout.pageWidthIn, useLayout.pageHeightIn))
+            if (memoryConstrainedDevice()) {
+                onProgress('Page raster capped at ' + CANVAS_CAP + ' px for this device\u2019s memory; ' + pageDpi + ' DPI.')
+            }
+        }
         const drawer = new CanvasDrawer(pageW, pageH, pageDpi)
         drawer.setFontFamily(options.fontFamily || 'sans')
         if (options.customFont) {
