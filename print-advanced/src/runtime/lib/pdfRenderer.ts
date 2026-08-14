@@ -255,7 +255,30 @@ export function gpuMaxCapturePx (): number {
     return max
 }
 
-export async function captureMapHiRes(
+export /** Draw a captured image onto a white-filled canvas and re-encode as
+ *  JPEG: guarantees no transparent pixel can render black downstream. */
+async function flattenToWhiteJpeg (dataUrl: string, w: number, h: number): Promise<string> {
+    return await new Promise<string>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+            try {
+                const c = document.createElement('canvas')
+                c.width = img.naturalWidth || w
+                c.height = img.naturalHeight || h
+                const ctx = c.getContext('2d')
+                if (!ctx) { resolve(dataUrl); return }
+                ctx.fillStyle = '#ffffff'
+                ctx.fillRect(0, 0, c.width, c.height)
+                ctx.drawImage(img, 0, 0)
+                resolve(c.toDataURL('image/jpeg', 0.95))
+            } catch (e) { resolve(dataUrl) }
+        }
+        img.onerror = () => resolve(dataUrl)
+        img.src = dataUrl
+    })
+}
+
+async function captureMapHiRes(
     liveView: MapView,
     frameWIn: number,
     frameHIn: number,
@@ -317,7 +340,13 @@ export async function captureMapHiRes(
             rotation: liveView.rotation,
             ui: { components: [] } as any,
             constraints: { snapToZoom: false, rotationEnabled: true } as any,
-            popupEnabled: false
+            popupEnabled: false,
+            // transparent-to-black guard: cached basemaps with nodata
+            // collars (and the view itself where nothing draws) are
+            // transparent; JPEG has no alpha, so without an explicit
+            // background those pixels encode as BLACK. Inherit the live
+            // view's background if set, else white.
+            background: (liveView as any).background || ({ color: [255, 255, 255, 1] } as any)
         } as any)
 
         await tmp.when()
@@ -353,6 +382,13 @@ export async function captureMapHiRes(
         if (!shot || !shot.dataUrl) {
             throw new Error('Map capture returned no image at ' + capW + ' x ' + capH + ' px. ' +
                 'Lower the DPI, or set a smaller Max map capture in settings.')
+        }
+        // second guard for the same transparency issue: if the API ignored
+        // the view background, flatten the capture onto white ourselves
+        if (layout.imageFormat !== 'png') {
+            try {
+                shot = { ...shot, dataUrl: await flattenToWhiteJpeg(shot.dataUrl, capW, capH) }
+            } catch (e) { /* flatten is best-effort; the background guard remains */ }
         }
 
         const liveWkid = (liveView.spatialReference && (liveView.spatialReference as any).wkid) || 0
