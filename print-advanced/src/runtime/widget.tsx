@@ -505,6 +505,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   }
 
   updatePreview = (): void => {
+    if (!this.uiVisible) return
     try {
       const jmv = this.state.jimuMapView
       const view: any = jmv && jmv.view
@@ -640,7 +641,38 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
   }
 
+  /** The widget's rendered visibility. Sidebar collapse and some panel
+   *  containers hide the widget's DOM WITHOUT setting WidgetState.Closed,
+   *  so the print-extent preview must track real on-screen visibility:
+   *  hidden -> graphic leaves the map; visible again -> restored if the
+   *  preview toggle is still on. */
+  private uiVisible = true
+  private rootRef: any = React.createRef()
+  private visObserver: any = null
+
+  componentDidMount (): void {
+    try {
+      if (typeof (window as any).IntersectionObserver === 'function' && this.rootRef.current) {
+        this.visObserver = new (window as any).IntersectionObserver((entries: any[]) => {
+          const vis = !!(entries && entries.length && entries[entries.length - 1].isIntersecting)
+          if (vis === this.uiVisible) return
+          this.uiVisible = vis
+          const view: any = this.state.jimuMapView && this.state.jimuMapView.view
+          if (!vis) {
+            this.clearPreview()
+            this.stopPreviewWatch()
+          } else if (this.state.previewOn && view) {
+            this.startPreviewWatch(view)
+            this.updatePreview()
+          }
+        })
+        this.visObserver.observe(this.rootRef.current)
+      }
+    } catch (e) { /* observer is best-effort; Closed-state handling remains */ }
+  }
+
   componentWillUnmount (): void {
+    if (this.visObserver) { try { this.visObserver.disconnect() } catch (e) { /* noop */ } this.visObserver = null }
     this.clearPreview(); this.stopPreviewWatch()
     this.stopLegendWatch()
     this.revokeResultUrls(this.state.results)
@@ -1136,7 +1168,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
 
     return (
-      <div css={this.getStyle()}>
+      <div css={this.getStyle()} ref={this.rootRef}>
         <JimuMapViewComponent
           useMapWidgetId={useMapWidgetIds[0]}
           onActiveViewChange={this.onActiveViewChange}
