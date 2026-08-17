@@ -255,6 +255,281 @@ export function gpuMaxCapturePx (): number {
     return max
 }
 
+/** Draw series tile outlines and page numbers over an index-page capture.
+ *  Ground-to-page via the capture's groundExtent, clipped to the frame. */
+export function drawIndexOverlay (
+    d: Drawer,
+    layout: PrintLayout,
+    cap: { groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number } },
+    tiles: Array<{ page: number, xmin: number, ymin: number, xmax: number, ymax: number }>
+): number {
+    const ext = cap.groundExtent
+    if (!ext || !tiles.length) return 0
+    const mf = getMapFrame(layout)
+    const fx = mf.xIn * PT_PER_IN; const fy = mf.yIn * PT_PER_IN
+    const fw = mf.wIn * PT_PER_IN; const fh = mf.hIn * PT_PER_IN
+    const gx = (x: number): number => fx + (x - ext.xmin) / (ext.xmax - ext.xmin) * fw
+    const gy = (y: number): number => fy + (ext.ymax - y) / (ext.ymax - ext.ymin) * fh
+    let drawn = 0
+    for (const t of tiles) {
+        // stroke state per tile: the page-number halo changes the draw
+        // color, so without this every tile after the first strokes white
+        d.setLineWidth(1)
+        d.setStroke(200, 60, 40)
+        const x1 = Math.max(fx, gx(t.xmin)); const x2 = Math.min(fx + fw, gx(t.xmax))
+        const y1 = Math.max(fy, gy(t.ymax)); const y2 = Math.min(fy + fh, gy(t.ymin))
+        if (x2 - x1 < 2 || y2 - y1 < 2) continue
+        d.rect(x1, y1, x2 - x1, y2 - y1, 'D')
+        const label = String(t.page)
+        const fs = Math.max(7, Math.min(14, (y2 - y1) * 0.25))
+        d.setFont('bold', fs)
+        d.setTextColor(200, 60, 40)
+        if (typeof (d as any).haloText === 'function') {
+            (d as any).haloText(label, (x1 + x2) / 2, (y1 + y2) / 2 + fs * 0.34, 'center', [255, 255, 255], Math.max(1.2, fs * 0.12))
+        } else {
+            d.text(label, (x1 + x2) / 2, (y1 + y2) / 2 + fs * 0.34, 'center')
+        }
+        drawn++
+    }
+    return drawn
+}
+
+/** Adjacent-page labels on a series page's frame edges (ArcGIS Pro map
+ *  series convention): the right edge names the page to the right, the
+ *  bottom edge the page below, and so on. Grid adjacency from row/col. */
+export function drawSeriesAdjacency (
+    d: Drawer,
+    layout: PrintLayout,
+    tile: { page: number, row: number, col: number },
+    tiles: Array<{ page: number, row: number, col: number }>
+): void {
+    const byRC = new Map<string, number>()
+    for (const t of tiles) byRC.set(t.row + ':' + t.col, t.page)
+    const mf = getMapFrame(layout)
+    const fx = mf.xIn * PT_PER_IN; const fy = mf.yIn * PT_PER_IN
+    const fw = mf.wIn * PT_PER_IN; const fh = mf.hIn * PT_PER_IN
+    const size = 8
+    d.setFont('bold', size)
+    // edge TABS (Pro atlas style): white boxed labels flush to each edge,
+    // with arrows, readable over any imagery
+    // tabs live OUTSIDE the map frame (ArcMap dynamic-text convention):
+    // top/bottom in the adjacent bands, left/right rotated to fit the
+    // narrow page margins; never covering map content
+    const gap = 1.5
+    const tab = (label: string, edge: 'top' | 'bottom' | 'left' | 'right'): void => {
+        d.setFont('bold', size)
+        const tw = d.textWidth(label)
+        const padX = 5; const padY = 3
+        d.setFill(45, 45, 48)
+        d.setStroke(255, 255, 255)
+        d.setLineWidth(0.8)
+        d.setTextColor(255, 255, 255)
+        if (edge === 'top' || edge === 'bottom') {
+            const bw = tw + padX * 2
+            const bh = size + padY * 2
+            const x = fx + fw / 2 - bw / 2
+            const y = edge === 'top' ? fy - bh - gap : fy + fh + gap
+            d.rect(x, y, bw, bh, 'FD')
+            d.text(label, x + bw / 2, y + padY + size * 0.86, 'center')
+        } else {
+            // vertical tab: slim box outside the edge, rotated text
+            const bw = size + padY * 2
+            const bh = tw + padX * 2
+            const x = edge === 'left' ? fx - bw - gap : fx + fw + gap
+            const y = fy + fh / 2 - bh / 2
+            d.rect(x, y, bw, bh, 'FD')
+            const doc: any = (d as any).doc
+            if (doc && typeof doc.text === 'function') {
+                // reading bottom-to-top on the left, top-to-bottom mirrored on the right
+                doc.text(label, x + padY + size * 0.86, y + bh - padX, { angle: 90 })
+            } else {
+                d.text(label, x + bw / 2, y + bh / 2, 'center')
+            }
+        }
+    }
+    const n = (r: number, c: number): number | undefined => byRC.get(r + ':' + c)
+    const up = n(tile.row - 1, tile.col)
+    const down = n(tile.row + 1, tile.col)
+    const left = n(tile.row, tile.col - 1)
+    const right = n(tile.row, tile.col + 1)
+    if (up !== undefined) tab('^ Page ' + up, 'top')
+    if (down !== undefined) tab('v Page ' + down, 'bottom')
+    if (left !== undefined) tab('< Page ' + left, 'left')
+    if (right !== undefined) tab('Page ' + right + ' >', 'right')
+}
+
+/** True when a capture is essentially a blank white image: the telltale
+ *  of screenshotting a zoom level whose basemap tiles have not painted
+ *  yet. Samples a small downscale; best-effort (false on any error). */
+async function captureLooksBlank (dataUrl: string): Promise<boolean> {
+    try {
+        if (typeof document === 'undefined') return false
+        return await new Promise<boolean>((resolve) => {
+            const img = new Image()
+            img.onload = () => {
+                try {
+                    const c = document.createElement('canvas')
+                    c.width = 48; c.height = 48
+                    const ctx = c.getContext('2d')
+                    if (!ctx) { resolve(false); return }
+                    ctx.drawImage(img, 0, 0, 48, 48)
+                    const px = ctx.getImageData(0, 0, 48, 48).data
+                    let white = 0
+                    const total = 48 * 48
+                    for (let i = 0; i < px.length; i += 4) {
+                        if (px[i] > 246 && px[i + 1] > 246 && px[i + 2] > 246) white++
+                    }
+                    c.width = 0; c.height = 0
+                    resolve(white / total > 0.985)
+                } catch (e) { resolve(false) }
+            }
+            img.onerror = () => resolve(false)
+            img.src = dataUrl
+        })
+    } catch (e) { return false }
+}
+
+/** Key map (ArcGIS Pro map series convention): a small diagram of the
+ *  whole page grid in the frame's top-right corner with the CURRENT page
+ *  filled, so every printed sheet answers "where am I in the atlas?".
+ *  Pure vector from tile geometry; no extra capture. */
+export function drawSeriesKeymap (
+    d: Drawer,
+    layout: PrintLayout,
+    tiles: Array<{ page: number, xmin: number, ymin: number, xmax: number, ymax: number }>,
+    currentPage: number
+): void {
+    if (tiles.length < 2) return
+    let exmin = Infinity; let eymin = Infinity; let exmax = -Infinity; let eymax = -Infinity
+    for (const t of tiles) { exmin = Math.min(exmin, t.xmin); eymin = Math.min(eymin, t.ymin); exmax = Math.max(exmax, t.xmax); eymax = Math.max(eymax, t.ymax) }
+    const ew = exmax - exmin; const eh = eymax - eymin
+    const mf = getMapFrame(layout)
+    const maxSide = 1.25 * PT_PER_IN
+    const scale = Math.min(maxSide / ew, maxSide / eh)
+    const kw = ew * scale; const kh = eh * scale
+    const pad = 4
+    const bx = (mf.xIn + mf.wIn) * PT_PER_IN - kw - pad * 2 - 6
+    const by = mf.yIn * PT_PER_IN + 6
+    d.setFill(255, 255, 255)
+    d.setStroke(150, 150, 150)
+    d.setLineWidth(0.6)
+    d.rect(bx, by, kw + pad * 2, kh + pad * 2, 'FD')
+    for (const t of tiles) {
+        const x = bx + pad + (t.xmin - exmin) * scale
+        const y = by + pad + (eymax - t.ymax) * scale
+        const w = (t.xmax - t.xmin) * scale
+        const h = (t.ymax - t.ymin) * scale
+        d.setLineWidth(0.5)
+        d.setStroke(120, 120, 120)
+        if (t.page === currentPage) {
+            d.setFill(225, 110, 20)
+            d.rect(x, y, w, h, 'FD')
+        } else {
+            d.rect(x, y, w, h, 'D')
+        }
+    }
+}
+
+/** Map series export: one PDF, a page per tile plus an index page.
+ *  Captures run SEQUENTIALLY through the proven single-capture path so
+ *  every safeguard (SR handling, iOS budgets, white background, honest
+ *  warnings) applies per tile. Legend prints on page 1 only. */
+export async function renderSeries (
+    view: MapView,
+    layout: PrintLayout,
+    title: string,
+    fileName: string,
+    maxImagePx: number,
+    series: { tiles: Array<{ page: number, row: number, col: number, xmin: number, ymin: number, xmax: number, ymax: number, centerX: number, centerY: number }>, scaleDenom: number },
+    options: RenderOptions,
+    onProgress: RenderProgress
+): Promise<{ url: string, fileName: string, sizeKb: number, pages: number, warning?: string }> {
+    const tiles = series.tiles || []
+    if (!tiles.length) throw new Error('Map series has no pages. Adjust the area or scale.')
+    const mf0 = getMapFrame(layout)
+    const pageW = layout.pageWidthIn * PT_PER_IN
+    const pageH = layout.pageHeightIn * PT_PER_IN
+    const doc = new jsPDF({
+        orientation: pageW >= pageH ? 'landscape' : 'portrait',
+        unit: 'pt',
+        format: [pageW, pageH].sort((a, b) => a - b) as any,
+        compress: true
+    })
+    const pd = new PdfDrawer(doc)
+    pd.setFontFamily(options.fontFamily || 'sans')
+    if (options.customFont) {
+        await registerPdfFont(doc, options.customFont.name, options.customFont.url, options.customFont.boldUrl)
+        pd.setCustomFont(options.customFont.name)
+    }
+    let legendRows: LegendRow[] = []
+    if (options.includeLegend !== false && layout.legend && layout.legend.enabled) {
+        try { legendRows = await buildLegendRows(view as any, 200, (options as any).legendWidgetId) } catch (e) { legendRows = [] }
+    }
+    const warnings: string[] = []
+    const n = tiles.length
+    for (let i = 0; i < n; i++) {
+        const t = tiles[i]
+        onProgress('Exporting page ' + (i + 1) + ' of ' + n + '\u2026')
+        const tileOpts: RenderOptions = {
+            ...options,
+            scaleMode: 'fixed' as any,
+            fixedScale: series.scaleDenom,
+            lockedCenter: { x: t.centerX, y: t.centerY } as any,
+            includeLegend: i === 0 ? options.includeLegend : false
+        }
+        const cap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, layout, maxImagePx, tileOpts, onProgress)
+        if (cap.warning && warnings.indexOf(cap.warning) < 0) warnings.push(cap.warning)
+        if (i > 0) doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
+        const pageTitle = (title || layout.name || 'Map')
+            .replace(/\{page\}/g, String(i + 1))
+            .replace(/\{pages\}/g, String(n)) +
+            (/\{page\}/.test(title || '') ? '' : '  (' + (i + 1) + ' of ' + n + ')')
+        await composePage(pd, layout, cap, i === 0 ? legendRows : [], pageTitle, tileOpts)
+        drawSeriesAdjacency(pd, layout, t as any, tiles as any)
+        drawSeriesKeymap(pd, layout, tiles as any, t.page)
+    }
+    // index page: the whole series envelope with tile outlines and numbers
+    onProgress('Creating index page\u2026')
+    let xmin = Infinity; let ymin = Infinity; let xmax = -Infinity; let ymax = -Infinity
+    for (const t of tiles) { xmin = Math.min(xmin, t.xmin); ymin = Math.min(ymin, t.ymin); xmax = Math.max(xmax, t.xmax); ymax = Math.max(ymax, t.ymax) }
+    const padX = (xmax - xmin) * 0.05; const padY = (ymax - ymin) * 0.05
+    const mpu = metersPerMapUnit((view as any).scale, (view as any).resolution)
+    const idxScale = Math.max(
+        ((xmax - xmin + padX * 2) * mpu) / (mf0.wIn * 0.0254),
+        ((ymax - ymin + padY * 2) * mpu) / (mf0.hIn * 0.0254))
+    const idxOpts: RenderOptions = {
+        ...options,
+        includeLegend: false,
+        scaleMode: 'fixed' as any,
+        fixedScale: Math.ceil(idxScale),
+        lockedCenter: { x: (xmin + xmax) / 2, y: (ymin + ymax) / 2 } as any
+    }
+    // the index sits at a zoom level the session has likely never loaded:
+    // give tiles a generous settle budget, and if the capture still comes
+    // back blank white, wait for the basemap and try once more
+    ;(idxOpts as any).maxWaitMs = Math.max(Number((idxOpts as any).maxWaitMs) || 0, 45000)
+    let idxCap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, layout, maxImagePx, idxOpts, onProgress)
+    try {
+        if (await captureLooksBlank(idxCap.dataUrl)) {
+            onProgress('Waiting for basemap tiles on the index page\u2026')
+            await new Promise<void>((r) => setTimeout(r, 5000))
+            idxCap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, layout, maxImagePx, idxOpts, onProgress)
+        }
+    } catch (e) { /* retry is best-effort */ }
+    doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
+    await composePage(pd, layout, idxCap, [], (title || layout.name || 'Map') + '  (Index)', idxOpts)
+    drawIndexOverlay(pd, layout, idxCap as any, tiles)
+    const blob: Blob = doc.output('blob')
+    const url = downloadBlob(blob, fileName)
+    return {
+        url,
+        fileName,
+        sizeKb: Math.round(blob.size / 1024),
+        pages: n + 1,
+        warning: warnings.length ? warnings.join(' \u00b7 ') : undefined
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /* QR code (byte mode, ECC M, versions 1-10, mask 0) - self-contained  */
 /* ------------------------------------------------------------------ */

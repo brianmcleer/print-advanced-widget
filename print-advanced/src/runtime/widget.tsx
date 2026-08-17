@@ -19,7 +19,9 @@ import SpatialReference from 'esri/geometry/SpatialReference'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
 import { metersPerMapUnit, printExtent, extentRings, extentFitScale, resolvePrintedScale } from './lib/scaleMath'
 import defaultMessages from './translations/default'
-import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner } from './lib/pdfRenderer'
+import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner, renderSeries } from './lib/pdfRenderer'
+import { gridTilesByCount, envelopeForFrame } from './lib/seriesMath'
+import { metersPerMapUnit } from './lib/scaleMath'
 
 const printIcon = require('./assets/icons/icon.svg')
 
@@ -56,6 +58,10 @@ interface State {
   legendHintDismissed: boolean
   legendPosUserSet: boolean
   qrOn: boolean
+  seriesOpen: boolean
+  seriesRows: string
+  seriesSizePct: string
+  seriesCols: string
   legendAutoPaged: boolean
   mapOnly: boolean
   mapOnlyW: string
@@ -98,15 +104,20 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       lastResult: null,
       author: cfgAny.defaultAuthor || ((this.props as any).user && (this.props as any).user.username) || '',
       copyright: cfgAny.defaultCopyright || '',
-      includeLegend: true,
-      showOverview: true,
-      showGrid: true,
+      // toggles honor admin defaults from runtimeDefaults; on unless set off
+      includeLegend: (d as any).includeLegend !== false,
+      showOverview: (d as any).showOverview !== false,
+      showGrid: (d as any).showGrid !== false,
       legendPositionOv: '',
       gridTypeOv: '',
       legendHint: null,
       legendHintDismissed: false,
       legendPosUserSet: false,
       qrOn: false,
+      seriesOpen: false,
+      seriesRows: '2',
+      seriesSizePct: '100',
+      seriesCols: '2',
       legendAutoPaged: false,
       mapOnly: false,
       mapOnlyW: '',
@@ -300,6 +311,109 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   }
 
   private previewGraphic: any = null
+  private seriesGraphics: any[] = []
+  private busyStart = 0
+  private busyTimer: any = null
+
+  private beginBusyClock = (): void => {
+    this.busyStart = Date.now()
+    if (this.busyTimer) clearInterval(this.busyTimer)
+    this.busyTimer = setInterval(() => { if (this.state.busy) this.forceUpdate(); else { clearInterval(this.busyTimer); this.busyTimer = null } }, 1000)
+  }
+  private seriesPreviewView: any = null
+
+  /** Live map series preview: numbered page outlines on the map that
+   *  follow panning, zooming, and every rows/columns change, so the
+   *  atlas is visible BEFORE it is exported. */
+  clearSeriesPreview = (): void => {
+    try {
+      const v: any = this.seriesPreviewView || (this.state.jimuMapView && this.state.jimuMapView.view)
+      if (v) for (const g of this.seriesGraphics) { try { v.graphics.remove(g) } catch (e) { /* noop */ } }
+    } catch (e) { /* noop */ }
+    this.seriesGraphics = []
+    this.seriesPreviewView = null
+  }
+
+  private seriesHighlight: any = null
+
+  /** Light up the page currently being captured, so users watch the
+   *  export march across the map page by page. */
+  highlightSeriesTile = (tiles: any[], idx: number): void => {
+    try {
+      const view: any = this.state.jimuMapView && this.state.jimuMapView.view
+      if (!view) return
+      if (this.seriesHighlight) { try { view.graphics.remove(this.seriesHighlight) } catch (e) { /* noop */ } this.seriesHighlight = null }
+      const t = tiles[idx - 1]
+      if (!t) return
+      const rings = [[t.xmin, t.ymin], [t.xmax, t.ymin], [t.xmax, t.ymax], [t.xmin, t.ymax], [t.xmin, t.ymin]]
+      this.seriesHighlight = new Graphic({
+        geometry: { type: 'polygon', rings: [rings], spatialReference: view.spatialReference } as any,
+        symbol: { type: 'simple-fill', color: [235, 110, 20, 0.3], outline: { color: [225, 75, 10, 1], width: 3, style: 'solid' } } as any
+      })
+      view.graphics.add(this.seriesHighlight)
+      this.seriesGraphics.push(this.seriesHighlight)
+    } catch (e) { /* highlight is best-effort */ }
+  }
+
+  updateSeriesPreview = (): void => {
+    if (!this.uiVisible) return
+    try {
+      const view: any = this.state.jimuMapView && this.state.jimuMapView.view
+      const layout = this.getSelectedLayout()
+      const active = !!view && !!layout && this.ctrl('series') && this.state.format === 'pdf' &&
+        this.state.seriesOpen && this.seriesPageCount() <= 31
+      this.clearSeriesPreview()
+      if (!active) return
+      const mfEl: any = (layout.elements || []).find((e: any) => e.type === 'mapFrame')
+      if (!mfEl) return
+      const ext = view.extent
+      const rows = Math.max(1, Math.min(8, parseInt(this.state.seriesRows, 10) || 1))
+      const cols = Math.max(1, Math.min(8, parseInt(this.state.seriesCols, 10) || 1))
+      const env = this.seriesScaleEnv(envelopeForFrame(
+        { xmin: ext.xmin, ymin: ext.ymin, xmax: ext.xmax, ymax: ext.ymax },
+        rows, cols, mfEl.wIn, mfEl.hIn, 0.1))
+      const tiles = gridTilesByCount(env, rows, cols, mfEl.wIn, mfEl.hIn, 0.1)
+      const sr = view.spatialReference
+      const fontPx = Math.max(12, Math.min(28, 220 / Math.max(rows, cols)))
+      for (const t of tiles) {
+        const rings = [[t.xmin, t.ymin], [t.xmax, t.ymin], [t.xmax, t.ymax], [t.xmin, t.ymax], [t.xmin, t.ymin]]
+        const geometry: any = { type: 'polygon', rings: [rings], spatialReference: sr }
+        // white casing UNDER the dashed stroke: readable on aerial imagery
+        const casing = new Graphic({
+          geometry,
+          symbol: {
+            type: 'simple-fill',
+            color: [0, 0, 0, 0],
+            outline: { color: [255, 255, 255, 0.95], width: 4.5, style: 'solid' }
+          } as any
+        })
+        const outline = new Graphic({
+          geometry,
+          symbol: {
+            type: 'simple-fill',
+            color: [235, 110, 20, 0.08],
+            outline: { color: [225, 75, 10, 1], width: 2.4, style: 'dash' }
+          } as any
+        })
+        const num = new Graphic({
+          geometry: { type: 'point', x: t.centerX, y: t.centerY, spatialReference: sr } as any,
+          symbol: {
+            type: 'text',
+            text: String(t.page),
+            color: [200, 50, 10, 1],
+            haloColor: [255, 255, 255, 1],
+            haloSize: 3,
+            font: { size: Math.round(fontPx * 1.15), weight: 'bold' }
+          } as any
+        })
+        view.graphics.add(casing)
+        view.graphics.add(outline)
+        view.graphics.add(num)
+        this.seriesGraphics.push(casing, outline, num)
+      }
+      this.seriesPreviewView = view
+    } catch (e) { /* preview is best-effort */ }
+  }
   private previewView: any = null
   private previewWatch: any = null
   private lockedCenter: { x: number, y: number } | null = null
@@ -590,10 +704,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (wState !== prevWState) {
       if (wState === WidgetState.Closed) {
         this.clearPreview()
+        this.clearSeriesPreview()
         this.stopPreviewWatch()
-      } else if (prevWState === WidgetState.Closed && s.previewOn && view) {
-        this.startPreviewWatch(view)
-        this.updatePreview()
+      } else if (prevWState === WidgetState.Closed && view) {
+        if (s.previewOn) { this.startPreviewWatch(view); this.updatePreview() }
+        this.updateSeriesPreview()
       }
     }
     if (s.jimuMapView !== prevState.jimuMapView && view) {
@@ -637,6 +752,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if ((Widget as any).PREF_KEYS.some((k: string) => (s as any)[k] !== (prevState as any)[k])) {
       this.savePrefsSoon()
     }
+    if (s.seriesOpen !== prevState.seriesOpen ||
+        s.seriesSizePct !== prevState.seriesSizePct ||
+        s.seriesRows !== prevState.seriesRows || s.seriesCols !== prevState.seriesCols ||
+        s.format !== prevState.format || s.selectedLayoutId !== prevState.selectedLayoutId) {
+      this.updateSeriesPreview()
+    }
     // a new context deserves a fresh suggestion
     if (s.legendHintDismissed && (
       s.selectedLayoutId !== prevState.selectedLayoutId ||
@@ -665,6 +786,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           const view: any = this.state.jimuMapView && this.state.jimuMapView.view
           if (!vis) {
             this.clearPreview()
+            this.clearSeriesPreview()
             this.stopPreviewWatch()
           } else if (this.state.previewOn && view) {
             this.startPreviewWatch(view)
@@ -685,7 +807,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   componentWillUnmount (): void {
     if (this.visObserver) { try { this.visObserver.disconnect() } catch (e) { /* noop */ } this.visObserver = null }
-    this.clearPreview(); this.stopPreviewWatch()
+    this.clearPreview(); this.clearSeriesPreview(); this.stopPreviewWatch()
     this.stopLegendWatch()
     this.revokeResultUrls(this.state.results)
   }
@@ -698,7 +820,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   private queueEstimate = (): void => {
     if (this.legendWatchTimer) clearTimeout(this.legendWatchTimer)
-    this.legendWatchTimer = setTimeout(() => { void this.estimatePanel() }, 400)
+    this.legendWatchTimer = setTimeout(() => { void this.estimatePanel(); this.updateSeriesPreview() }, 400)
   }
 
   private stopLegendWatch = (): void => {
@@ -725,6 +847,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       }
       if (view && view.map && view.map.allLayers && typeof view.map.allLayers.on === 'function') {
         this.legendWatchHandles.push(view.map.allLayers.on('change', () => { bindLayers(); this.queueEstimate() }))
+      }
+      if (view && typeof view.watch === 'function') {
+        // series preview follows pan and zoom through the same debounce
+        this.legendWatchHandles.push(view.watch('extent', this.queueEstimate))
       }
       bindLayers()
     } catch (e) { /* watcher is best-effort */ }
@@ -899,7 +1025,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (!jimuMapView || !jimuMapView.view) return
     const url = this.serviceUrl()
     if (!url) { this.setState({ error: (defaultMessages as any).svcNoUrl }); return }
-    this.setState({ busy: true, error: null, lastResult: null, status: (defaultMessages as any).svcSubmitting })
+    this.beginBusyClock(); this.setState({ busy: true, error: null, lastResult: null, status: (defaultMessages as any).svcSubmitting })
     try {
       const fmt = this.state.format === 'aix' ? 'aix' : this.state.format
       const template = new PrintTemplate({
@@ -938,11 +1064,14 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   onExport = async (): Promise<void> => {
     if (this.printSource() === 'service') { return this.runServicePrint() }
+    if (this.state.seriesOpen && this.ctrl('series') && this.state.format === 'pdf') {
+      return this.onExportSeries()
+    }
     const { jimuMapView } = this.state
     const layout = this.getSelectedLayout()
     if (!jimuMapView || !jimuMapView.view || !layout) return
 
-    this.setState({ busy: true, error: null, lastResult: null, status: 'Preparing…' })
+    this.beginBusyClock(); this.setState({ busy: true, error: null, lastResult: null, status: 'Preparing…' })
     try {
       const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0 // 0 = auto (GPU-detected)
       const effLayout = this.state.dpi
@@ -1030,6 +1159,78 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
   }
 
+  /** Center-preserving envelope scale: uniform, so the frame-enforced
+   *  aspect survives any grid size the user picks. */
+  seriesScaleEnv = (env: { xmin: number, ymin: number, xmax: number, ymax: number }): { xmin: number, ymin: number, xmax: number, ymax: number } => {
+    const f = Math.max(25, Math.min(100, parseInt(this.state.seriesSizePct, 10) || 100)) / 100
+    if (f >= 0.999) return env
+    const cx = (env.xmin + env.xmax) / 2; const cy = (env.ymin + env.ymax) / 2
+    const hw = (env.xmax - env.xmin) / 2 * f; const hh = (env.ymax - env.ymin) / 2 * f
+    return { xmin: cx - hw, xmax: cx + hw, ymin: cy - hh, ymax: cy + hh }
+  }
+
+  seriesPageCount = (): number => {
+    const r = Math.max(1, Math.min(8, parseInt(this.state.seriesRows, 10) || 1))
+    const c = Math.max(1, Math.min(8, parseInt(this.state.seriesCols, 10) || 1))
+    return r * c + 1
+  }
+
+  onExportSeries = async (): Promise<void> => {
+    const { jimuMapView } = this.state
+    const layout = this.getSelectedLayout()
+    const view: any = jimuMapView && jimuMapView.view
+    if (!view || !layout) return
+    if (this.seriesPageCount() > 31) return
+    this.beginBusyClock(); this.setState({ busy: true, error: null, status: 'Preparing series\u2026' })
+    try {
+      const mfEl: any = (layout.elements || []).find((e: any) => e.type === 'mapFrame')
+      const ext = view.extent
+      const rows = Math.max(1, Math.min(8, parseInt(this.state.seriesRows, 10) || 1))
+      const cols = Math.max(1, Math.min(8, parseInt(this.state.seriesCols, 10) || 1))
+      const env = this.seriesScaleEnv(envelopeForFrame(
+        { xmin: ext.xmin, ymin: ext.ymin, xmax: ext.xmax, ymax: ext.ymax },
+        rows, cols, mfEl.wIn, mfEl.hIn, 0.1))
+      const tiles = gridTilesByCount(env, rows, cols, mfEl.wIn, mfEl.hIn, 0.1)
+      const mpu = metersPerMapUnit(view.scale, view.resolution)
+      const tileW = tiles[0].xmax - tiles[0].xmin
+      const scaleDenom = Math.ceil((tileW * mpu) / (mfEl.wIn * 0.0254))
+      const options: RenderOptions = {}
+      if (this.state.author) options.author = this.state.author
+      if (this.state.copyright) options.copyright = this.state.copyright
+      const cfgLogo = (this.props.config as any)?.defaultLogo
+      if (cfgLogo) options.defaultLogo = cfgLogo
+      options.includeLegend = this.state.includeLegend
+      options.showOverview = false
+      options.showGrid = this.state.showGrid
+      if ((this.cfg() as any).legendWidgetId) options.legendWidgetId = String((this.cfg() as any).legendWidgetId)
+      if ((this.props.config as any)?.includeAttribution !== false) {
+        options.attribution = this.captureAttribution(view)
+      }
+      const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0
+      const name = (this.buildFileName(layout) || 'map-series').replace(/\.pdf$/i, '') + '-series.pdf'
+      const result = await renderSeries(
+        view, layout, this.state.title || layout.name || 'Map', name, maxImagePx,
+        { tiles, scaleDenom }, options,
+        (msg: string) => {
+          this.setState({ status: msg })
+          const pm = /page (\d+) of (\d+)/i.exec(msg || '')
+          if (pm) this.highlightSeriesTile(tiles, parseInt(pm[1], 10))
+        }
+      )
+      this.setState({
+        busy: false,
+        status: '',
+        results: this.pushResult({
+          name: result.fileName,
+          url: result.url,
+          meta: result.pages + ' pages \u00b7 ' + result.sizeKb + ' KB' + (result.warning ? ' \u00b7 ' + result.warning : '')
+        })
+      }, () => this.updateSeriesPreview())
+    } catch (err: any) {
+      this.setState({ busy: false, status: '', error: (err && err.message) || 'Series export failed.' }, () => this.updateSeriesPreview())
+    }
+  }
+
   describeLayout = (layout: PrintLayout): string => {
     return layout.pageWidthIn + ' × ' + layout.pageHeightIn + ' in · ' + layout.dpi + ' DPI · ' +
       (layout.preserve === 'scale' ? 'keeps map zoom level' : 'prints what you see')
@@ -1041,7 +1242,15 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    .pd-scroll { flex: 1 1 auto; overflow: auto; padding: 12px; min-height: 0; }
+    .pd-scroll { flex: 1 1 auto; overflow: auto; padding: 12px; min-height: 0; position: relative; }
+    .pd-veil { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 5;
+      background: rgba(255, 255, 255, 0.72); }
+    .pd-veil-inner { position: sticky; top: 32%; display: flex; justify-content: center; }
+    .pd-veil-card { background: var(--sys-color-surface-paper, #fff); border: 1px solid var(--ref-palette-neutral-500, #d5d5d5);
+      border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14); padding: 16px 20px; text-align: center; max-width: 250px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .pd-veil-title { font-size: 13px; font-weight: 700; color: var(--ref-palette-neutral-1100, #2b2b2b); }
+    .pd-veil-status { font-size: 11px; color: var(--sys-color-primary-dark, #0a5dc2); font-weight: 600; }
     .pd-dock {
       flex: 0 0 auto;
       padding: 10px 12px;
@@ -1062,6 +1271,13 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .pd-q-pill { flex: 0 0 auto; font-size: 9px; font-weight: 700; letter-spacing: 0.03em; color: var(--sys-color-primary-dark, #0a5dc2); background: var(--sys-color-primary-light, #e8f1fd); border-radius: 3px; padding: 1px 5px; }
     .pd-q-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pd-q-meta { flex: 0 0 auto; color: var(--ref-palette-neutral-1000, #6a6a6a); white-space: nowrap; font-size: 10px; }
+    .pd-q-busy { display: block; }
+    .pd-q-busyline { display: flex; align-items: center; gap: 7px; }
+    .pd-q-barwrap { margin: 5px 2px 2px; height: 5px; border-radius: 3px; background: var(--ref-palette-neutral-400, #e2e2e2); overflow: hidden; }
+    .pd-q-bar { height: 100%; background: var(--sys-color-primary-main, #076fe5); border-radius: 3px; transition: width 0.5s ease; }
+    .pd-q-slow { margin-top: 4px; font-size: 10px; color: var(--ref-palette-neutral-1000, #6a6a6a); font-style: italic; }
+    .pd-busy-banner { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--sys-color-primary-dark, #0a5dc2); }
+    .pd-range { flex: 1 1 auto; min-width: 90px; accent-color: var(--sys-color-primary-main, #076fe5); }
     .pd-thumb { margin: 6px 0 2px; display: flex; align-items: flex-end; gap: 8px; }
     .pd-thumb svg { display: block; border-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
     .pd-thumb-badge { font-size: 10px; color: var(--sys-color-primary-dark, #0a5dc2); background: var(--sys-color-primary-light, #e8f1fd); border-radius: 3px; padding: 1px 6px; }
@@ -1155,14 +1371,22 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             type='primary'
             aria-busy={this.state.busy}
             aria-describedby={!this.state.jimuMapView ? this.uid('export-desc') : undefined}
-            disabled={this.state.busy || !this.state.jimuMapView}
+            disabled={this.state.busy || !this.state.jimuMapView ||
+              (this.state.seriesOpen && this.state.format === 'pdf' && this.seriesPageCount() > 31)}
             onClick={this.onExport}
           >
-            {this.state.busy ? messages.exporting : messages.exportButton}
+            {this.state.busy
+              ? messages.exporting
+              : (this.state.seriesOpen && this.state.format === 'pdf'
+                  ? messages.exportSeriesN.replace('{n}', String(this.seriesPageCount()))
+                  : messages.exportButton)}
           </Button>
         </Tooltip>
         {!this.state.jimuMapView && (
           <span id={this.uid('export-desc')} className='pd-sr-only'>{messages.exportNoMap}</span>
+        )}
+        {this.state.busy && !!this.state.status && (
+          <div className='pd-busy-banner' role='status' aria-live='polite'>{this.state.status}</div>
         )}
         <div role='alert' aria-live='assertive'>
           {this.state.error && (
@@ -1186,13 +1410,29 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               )}
             </div>
             <ul className='pd-q-list'>
-              {this.state.busy && (
-                <li className='pd-q-row pd-q-active'>
-                  <Loading type={LoadingType.Donut} width={14} height={14} />
-                  <span className='pd-q-name'>{messages.exporting}</span>
-                  <span className='pd-q-meta'>{this.state.status}</span>
-                </li>
-              )}
+              {this.state.busy && (() => {
+                const elapsed = Math.max(0, Math.round((Date.now() - this.busyStart) / 1000))
+                const mm = Math.floor(elapsed / 60); const ss = String(elapsed % 60).padStart(2, '0')
+                const m = /page (\d+) of (\d+)/i.exec(this.state.status || '')
+                const frac = m ? Math.min(0.97, (parseInt(m[1], 10) - 1) / (parseInt(m[2], 10) + 1)) : -1
+                return (
+                  <li className='pd-q-row pd-q-active pd-q-busy'>
+                    <div className='pd-q-busyline'>
+                      <Loading type={LoadingType.Donut} width={14} height={14} />
+                      <span className='pd-q-name'>{this.state.status || messages.exporting}</span>
+                      <span className='pd-q-meta'>{mm}:{ss}</span>
+                    </div>
+                    {frac >= 0 && (
+                      <div className='pd-q-barwrap' aria-hidden='true'>
+                        <div className='pd-q-bar' style={{ width: Math.round(frac * 100) + '%' }} />
+                      </div>
+                    )}
+                    {elapsed > 20 && (
+                      <div className='pd-q-slow'>{messages.exportSlowNotice}</div>
+                    )}
+                  </li>
+                )
+              })()}
               {this.state.results.map((r, i) => (
                 <li key={r.url + r.name} className={'pd-q-row' + (i === 0 && !this.state.busy ? ' pd-q-new' : '')}>
                   <span className='pd-q-pill' aria-hidden='true'>{this.resultKind(r.name)}</span>
@@ -1227,7 +1467,18 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           onActiveViewChange={this.onActiveViewChange}
         />
 
-        <div className='pd-scroll'>
+        <div className='pd-scroll' aria-busy={this.state.busy}>
+        {this.state.busy && (
+          <div className='pd-veil' role='status' aria-live='polite'>
+            <div className='pd-veil-inner'>
+              <div className='pd-veil-card'>
+                <Loading type={LoadingType.Donut} width={26} height={26} />
+                <div className='pd-veil-title'>{messages.exportWaitTitle}</div>
+                {!!this.state.status && <div className='pd-veil-status'>{this.state.status}</div>}
+              </div>
+            </div>
+          </div>
+        )}
 
         {this.printSource() === 'service' && (
           <React.Fragment>
@@ -1546,6 +1797,44 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 </div>
                 )}
               </React.Fragment>
+            )}
+
+            {this.ctrl('series') && this.state.format === 'pdf' && (
+            <React.Fragment>
+              <div className='pd-row'>
+                <Button size='sm' type={this.state.seriesOpen ? 'primary' : 'secondary'}
+                  aria-expanded={this.state.seriesOpen}
+                  onClick={() => this.setState({ seriesOpen: !this.state.seriesOpen })}>
+                  {this.state.seriesOpen ? messages.seriesHide : messages.seriesSection}
+                </Button>
+              </div>
+              {this.state.seriesOpen && (
+              <React.Fragment>
+              <div className='pd-desc'>{messages.seriesHint}</div>
+              <div className='pd-row pd-inline'>
+                <Label className='pd-label' id={this.uid('srows') + '-lbl'}>{messages.seriesRows}</Label>
+                <TextInput id={this.uid('srows')} aria-labelledby={this.uid('srows') + '-lbl'} size='sm' style={{ width: 64 }}
+                  value={this.state.seriesRows} onChange={(e) => this.setState({ seriesRows: e.target.value })} />
+                <Label className='pd-label' id={this.uid('scols') + '-lbl'}>{messages.seriesCols}</Label>
+                <TextInput id={this.uid('scols')} aria-labelledby={this.uid('scols') + '-lbl'} size='sm' style={{ width: 64 }}
+                  value={this.state.seriesCols} onChange={(e) => this.setState({ seriesCols: e.target.value })} />
+              </div>
+              <div className='pd-row pd-inline'>
+                <Label className='pd-label' id={this.uid('ssize') + '-lbl'}>{messages.seriesSize}</Label>
+                <input type='range' className='pd-range' min={25} max={100} step={5}
+                  aria-labelledby={this.uid('ssize') + '-lbl'}
+                  value={Math.max(25, Math.min(100, parseInt(this.state.seriesSizePct, 10) || 100))}
+                  onChange={(e: any) => this.setState({ seriesSizePct: e.target.value })} />
+                <span className='pd-desc' style={{ minWidth: 34 }}>{(parseInt(this.state.seriesSizePct, 10) || 100)}%</span>
+              </div>
+              <div className='pd-desc'>
+                {this.seriesPageCount() > 31
+                  ? messages.seriesTooMany
+                  : messages.seriesEstimate.replace('{n}', String(this.seriesPageCount()))}
+              </div>
+              </React.Fragment>
+              )}
+            </React.Fragment>
             )}
 
             <div className='pd-row pd-inline'>

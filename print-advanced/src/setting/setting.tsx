@@ -1481,6 +1481,18 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             ))}
                         </Select>
                     </SettingRow>
+                    <SettingRow tag='label' label={messages.defLegendOn}>
+                        <Switch checked={((this.props.config as any)?.runtimeDefaults?.includeLegend) !== false}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'includeLegend', e.target.checked ? undefined : false)} />
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.defOverviewOn}>
+                        <Switch checked={((this.props.config as any)?.runtimeDefaults?.showOverview) !== false}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'showOverview', e.target.checked ? undefined : false)} />
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.defGridOn}>
+                        <Switch checked={((this.props.config as any)?.runtimeDefaults?.showGrid) !== false}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'showGrid', e.target.checked ? undefined : false)} />
+                    </SettingRow>
                     <SettingRow flow='wrap' label={messages.defDpi} truncateLabel>
                         <Select size='sm' className='w-100'
                             value={((this.props.config as any)?.runtimeDefaults?.dpi) || ''}
