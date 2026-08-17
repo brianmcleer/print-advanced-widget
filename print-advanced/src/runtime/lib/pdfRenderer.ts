@@ -255,6 +255,173 @@ export function gpuMaxCapturePx (): number {
     return max
 }
 
+/* ------------------------------------------------------------------ */
+/* QR code (byte mode, ECC M, versions 1-10, mask 0) - self-contained  */
+/* ------------------------------------------------------------------ */
+const QR_V = [
+    // [dataCodewords, ecPerBlock, blocks1, size1, blocks2, size2, align...]
+    null,
+    { data: 16, ec: 10, b: [[1, 16]], align: [] },
+    { data: 28, ec: 16, b: [[1, 28]], align: [6, 18] },
+    { data: 44, ec: 26, b: [[1, 44]], align: [6, 22] },
+    { data: 64, ec: 18, b: [[2, 32]], align: [6, 26] },
+    { data: 86, ec: 24, b: [[2, 43]], align: [6, 30] },
+    { data: 108, ec: 16, b: [[4, 27]], align: [6, 34] },
+    { data: 124, ec: 18, b: [[4, 31]], align: [6, 22, 38] },
+    { data: 154, ec: 22, b: [[2, 38], [2, 39]], align: [6, 24, 42] },
+    { data: 182, ec: 22, b: [[3, 36], [2, 37]], align: [6, 26, 46] },
+    { data: 216, ec: 26, b: [[4, 43], [1, 44]], align: [6, 28, 50] }
+] as any[]
+const QR_FMT_M0 = [1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0]
+const QR_VERINFO: Record<number, string> = {
+    7: '000111110010010100', 8: '001000010110111100', 9: '001001101010011001', 10: '001010010011010011'
+}
+function qrGf (): { exp: number[], log: number[] } {
+    const exp = new Array(512).fill(0); const log = new Array(256).fill(0)
+    let x = 1
+    for (let i = 0; i < 255; i++) {
+        exp[i] = x; log[x] = i
+        x <<= 1; if (x & 0x100) x ^= 0x11d
+    }
+    for (let i = 255; i < 512; i++) exp[i] = exp[i - 255]
+    return { exp, log }
+}
+/** Build QR modules for a UTF-8 string. Returns null if too long. */
+export function qrModules (text: string): { size: number, get: (r: number, c: number) => boolean } | null {
+    const bytes: number[] = []
+    for (const ch of unescape(encodeURIComponent(text))) bytes.push(ch.charCodeAt(0))
+    let ver = 0
+    for (let v = 1; v <= 10; v++) {
+        const cap = QR_V[v].data - (v <= 9 ? 2 : 3)
+        if (bytes.length <= cap) { ver = v; break }
+    }
+    if (!ver) return null
+    const V = QR_V[ver]
+    // bitstream: mode 0100, count (8 bits v1-9, 16 bits v10), data, terminator, pad
+    const bits: number[] = []
+    const push = (val: number, n: number): void => { for (let i = n - 1; i >= 0; i--) bits.push((val >> i) & 1) }
+    push(4, 4)
+    push(bytes.length, ver <= 9 ? 8 : 16)
+    for (const b of bytes) push(b, 8)
+    const capBits = V.data * 8
+    push(0, Math.min(4, capBits - bits.length))
+    while (bits.length % 8 !== 0) bits.push(0)
+    const pads = [0xec, 0x11]
+    let pi = 0
+    while (bits.length < capBits) { push(pads[pi % 2], 8); pi++ }
+    const cw: number[] = []
+    for (let i = 0; i < bits.length; i += 8) {
+        let v2 = 0
+        for (let j = 0; j < 8; j++) v2 = (v2 << 1) | bits[i + j]
+        cw.push(v2)
+    }
+    // split into blocks, compute EC, interleave
+    const gf = qrGf()
+    const blocks: number[][] = []
+    let off = 0
+    for (const [count, size] of V.b) {
+        for (let k = 0; k < count; k++) { blocks.push(cw.slice(off, off + size)); off += size }
+    }
+    const rsFor = (data: number[]): number[] => {
+        // polynomial long division over GF(256)
+        // generator polynomial, leading coefficient first (gen[0] = 1)
+        let gen = [1]
+        for (let i = 0; i < V.ec; i++) {
+            const next = new Array(gen.length + 1).fill(0)
+            for (let j = 0; j < gen.length; j++) {
+                next[j] ^= gen[j] // x * gen
+                next[j + 1] ^= gen[j] === 0 ? 0 : gf.exp[(gf.log[gen[j]] + i) % 255] // a^i * gen
+            }
+            gen = next
+        }
+        const rem = new Array(V.ec).fill(0)
+        for (const d of data) {
+            const factor = d ^ rem[0]
+            rem.shift(); rem.push(0)
+            if (factor !== 0) {
+                const lf = gf.log[factor]
+                for (let j = 0; j < V.ec; j++) {
+                    const g = gen[j + 1]
+                    if (g !== 0) rem[j] ^= gf.exp[(lf + gf.log[g]) % 255]
+                }
+            }
+        }
+        return rem
+    }
+    const ecs = blocks.map(b => rsFor(b))
+    const inter: number[] = []
+    const maxLen = Math.max(...blocks.map(b => b.length))
+    for (let i = 0; i < maxLen; i++) for (const b of blocks) if (i < b.length) inter.push(b[i])
+    for (let i = 0; i < V.ec; i++) for (const e of ecs) inter.push(e[i])
+    // module matrix
+    const size = ver * 4 + 17
+    const m: Array<Array<number>> = Array.from({ length: size }, () => new Array(size).fill(-1))
+    const setF = (r: number, c: number, v: number): void => { if (r >= 0 && r < size && c >= 0 && c < size) m[r][c] = v }
+    const finder = (r: number, c: number): void => {
+        for (let dr = -1; dr <= 7; dr++) for (let dc = -1; dc <= 7; dc++) {
+            const rr = r + dr; const cc = c + dc
+            if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue
+            const on = (dr >= 0 && dr <= 6 && (dc === 0 || dc === 6)) || (dc >= 0 && dc <= 6 && (dr === 0 || dr === 6)) ||
+                (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4)
+            m[rr][cc] = on ? 1 : 0
+        }
+    }
+    finder(0, 0); finder(0, size - 7); finder(size - 7, 0)
+    for (const ar of V.align) for (const ac of V.align) {
+        if (m[ar][ac] !== -1) continue
+        for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+            const on = Math.max(Math.abs(dr), Math.abs(dc)) !== 1
+            setF(ar + dr, ac + dc, on ? 1 : 0)
+        }
+    }
+    for (let i = 8; i < size - 8; i++) {
+        if (m[6][i] === -1) m[6][i] = i % 2 === 0 ? 1 : 0
+        if (m[i][6] === -1) m[i][6] = i % 2 === 0 ? 1 : 0
+    }
+    setF(size - 8, 8, 1) // dark module
+    // reserve format areas
+    for (let i = 0; i < 9; i++) { if (m[8][i] === -1) m[8][i] = 0; if (m[i][8] === -1) m[i][8] = 0 }
+    for (let i = 0; i < 8; i++) { if (m[8][size - 1 - i] === -1) m[8][size - 1 - i] = 0; if (m[size - 1 - i][8] === -1) m[size - 1 - i][8] = 0 }
+    if (ver >= 7) {
+        const vi = QR_VERINFO[ver]
+        let k = 0
+        for (let c = 0; c < 6; c++) for (let r = 0; r < 3; r++) {
+            const bit = Number(vi[17 - k]); k++
+            m[size - 11 + r][c] = bit
+            m[c][size - 11 + r] = bit
+        }
+    }
+    // place data (zigzag), mask 0: (r+c)%2===0
+    let bi = 0
+    const totalBits = inter.length * 8
+    const bitAt = (i: number): number => (inter[i >> 3] >> (7 - (i & 7))) & 1
+    let col = size - 1
+    let up = true
+    while (col > 0) {
+        if (col === 6) col--
+        for (let i = 0; i < size; i++) {
+            const r = up ? size - 1 - i : i
+            for (const cc of [col, col - 1]) {
+                if (m[r][cc] !== -1) continue
+                let bit = bi < totalBits ? bitAt(bi) : 0
+                bi++
+                if ((r + cc) % 2 === 0) bit ^= 1
+                m[r][cc] = bit
+            }
+        }
+        up = !up
+        col -= 2
+    }
+    // format bits (ECC M, mask 0) in both locations
+    const f = QR_FMT_M0
+    for (let i = 0; i < 6; i++) m[8][i] = f[i]
+    m[8][7] = f[6]; m[8][8] = f[7]; m[7][8] = f[8]
+    for (let i = 9; i < 15; i++) m[14 - i][8] = f[i]
+    for (let i = 0; i < 7; i++) m[size - 1 - i][8] = f[i]
+    for (let i = 7; i < 15; i++) m[8][size - 15 + i] = f[i]
+    return { size, get: (r, c) => m[r][c] === 1 }
+}
+
 /** True on devices where WebKit/OS hard-caps canvas + WebGL memory and
  *  kills the tab past it: every iOS browser (Safari, Chrome/CriOS,
  *  Firefox/FxiOS are all WebKit there, iPadOS reports as Mac with touch),
@@ -786,10 +953,17 @@ export async function buildLegendRows(view: MapView, maxItems: number, onProgres
         try {
             const services: any[] = []
             const svcLayers = (view.map.allLayers || ({ toArray: () => [] } as any))
-                .filter((l: any) => l.visible !== false && (l.type === 'map-image' || l.type === 'tile') && typeof l.url === 'string')
+                .filter((l: any) => l.visible !== false && typeof l.url === 'string' &&
+                    (l.type === 'map-image' || l.type === 'tile' || l.type === 'feature'))
             const arr: any[] = svcLayers.toArray ? svcLayers.toArray() : svcLayers
-            await Promise.all(arr.map(async (l: any) => {
-                try { services.push(await fetchRestLegend(l.url)) } catch (e) { /* per-service best-effort */ }
+            const roots = new Set<string>()
+            for (const l of arr) {
+                // FeatureServer sublayer URLs end in /<id>; the legend endpoint
+                // lives at the service root and covers every sublayer at once
+                roots.add(String(l.url).replace(/\/\d+\/?$/, ''))
+            }
+            await Promise.all(Array.from(roots).map(async (u: string) => {
+                try { services.push(await fetchRestLegend(u)) } catch (e) { /* per-service best-effort */ }
             }))
             matchRestSwatches(rows, services)
         } catch (e) { /* enrichment is best-effort */ }
@@ -812,15 +986,35 @@ export async function buildLegendRows(view: MapView, maxItems: number, onProgres
             }
         }
     } catch (e) { /* fall through */ }
-    // 2) headless Legend model (+ REST swatch repair): wins when its swatch
-    //    coverage beats the DOM harvest's
+    // 2) headless Legend model (+ REST swatch repair): must actually carry
+    //    swatches to win; a swatchless source never beats the next rung
+    let modelRows: LegendRow[] | null = null
+    let modelCov = 0
     try {
         const rows = await buildRowsFromLegendModel(view)
-        if (rows.length && coverageOf(rows) >= domCov) return rows.slice(0, MAX_LEGEND_ROWS)
+        if (rows.length) {
+            await restUpgrade(rows)
+            modelRows = rows
+            modelCov = coverageOf(rows)
+            if (modelCov >= 0.5 && modelCov >= domCov) return rows.slice(0, MAX_LEGEND_ROWS)
+        }
     } catch (e) { /* fall through to renderer walk */ }
-    if (domRows && domRows.length) return domRows.slice(0, MAX_LEGEND_ROWS)
-    // 3) renderer walk
-    return buildRowsFromRenderers(view, Math.max(maxItems, 200))
+    // 3) renderer walk builds swatches straight from layer renderers
+    let walkRows: LegendRow[] = []
+    let walkCov = 0
+    try {
+        walkRows = await buildRowsFromRenderers(view, Math.max(maxItems, 200))
+        await restUpgrade(walkRows)
+        walkCov = coverageOf(walkRows)
+    } catch (e) { /* keep going with whatever we have */ }
+    // best coverage wins; labels-only is the true last resort
+    const cands: Array<{ rows: LegendRow[], cov: number }> = []
+    if (domRows && domRows.length) cands.push({ rows: domRows, cov: domCov })
+    if (modelRows && modelRows.length) cands.push({ rows: modelRows, cov: modelCov })
+    if (walkRows.length) cands.push({ rows: walkRows, cov: walkCov })
+    if (!cands.length) return []
+    cands.sort((a, b) => b.cov - a.cov)
+    return cands[0].rows.slice(0, MAX_LEGEND_ROWS)
 }
 
 /** Map a service /legend?f=json response for one sublayer into rows.
@@ -2697,6 +2891,39 @@ export async function composePage(
                 if (miss > 0) (opts as any)._legendTruncated = Math.max(Number((opts as any)._legendTruncated) || 0, miss)
             }
         } catch (e) { /* legend is best-effort */ }
+    }
+
+    // QR code: printed maps become a door back to the live interactive map
+    if (!(opts as any).mapOnly && (opts as any).qrUrl) {
+        try {
+            const q = qrModules(String((opts as any).qrUrl))
+            if (q) {
+                const mfq = getMapFrame(layout)
+                const qrSide = 0.62 * PT_PER_IN
+                const mod = qrSide / q.size
+                // quiet zone: the spec requires 4 clear modules on every side;
+                // anything inside it (borders, captions) breaks scanners
+                const qz = Math.max(6, mod * 4)
+                const capText = String((opts as any).qrCaption || 'Scan for interactive map')
+                d.setFont('normal', 5.5)
+                const capW2 = Math.min(d.textWidth(capText), qrSide + qz * 2)
+                const boxW2 = Math.max(qrSide, capW2) + qz * 2
+                const boxH2 = qz + qrSide + qz + 8
+                const bx = (mfq.xIn + mfq.wIn) * PT_PER_IN - boxW2 - 6
+                const by = (mfq.yIn + mfq.hIn) * PT_PER_IN - boxH2 - 6
+                d.setFill(255, 255, 255)
+                d.rect(bx, by, boxW2, boxH2, 'F')
+                const qx = bx + (boxW2 - qrSide) / 2
+                d.setFill(0, 0, 0)
+                for (let r = 0; r < q.size; r++) {
+                    for (let c = 0; c < q.size; c++) {
+                        if (q.get(r, c)) d.rect(qx + c * mod, by + qz + r * mod, mod + 0.05, mod + 0.05, 'F')
+                    }
+                }
+                d.setTextColor(70, 70, 70)
+                d.text(capText, bx + boxW2 / 2, by + qz + qrSide + qz + 4, 'center')
+            }
+        } catch (e) { /* QR is best-effort */ }
     }
 
     // Credits fallback: author/copyright always print when populated, even

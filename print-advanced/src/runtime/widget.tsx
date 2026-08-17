@@ -19,7 +19,7 @@ import SpatialReference from 'esri/geometry/SpatialReference'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
 import { metersPerMapUnit, printExtent, extentRings, extentFitScale, resolvePrintedScale } from './lib/scaleMath'
 import defaultMessages from './translations/default'
-import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend } from './lib/pdfRenderer'
+import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner } from './lib/pdfRenderer'
 
 const printIcon = require('./assets/icons/icon.svg')
 
@@ -55,6 +55,7 @@ interface State {
   legendHint: { level: 'tight' | 'cramped', count: number, missed: number, fontPt: number } | null
   legendHintDismissed: boolean
   legendPosUserSet: boolean
+  qrOn: boolean
   legendAutoPaged: boolean
   mapOnly: boolean
   mapOnlyW: string
@@ -105,6 +106,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       legendHint: null,
       legendHintDismissed: false,
       legendPosUserSet: false,
+      qrOn: false,
       legendAutoPaged: false,
       mapOnly: false,
       mapOnlyW: '',
@@ -632,6 +634,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         (s.legendPosUserSet || s.legendAutoPaged)) {
       this.setState({ legendPosUserSet: false, legendAutoPaged: false, legendPositionOv: '' })
     }
+    if ((Widget as any).PREF_KEYS.some((k: string) => (s as any)[k] !== (prevState as any)[k])) {
+      this.savePrefsSoon()
+    }
     // a new context deserves a fresh suggestion
     if (s.legendHintDismissed && (
       s.selectedLayoutId !== prevState.selectedLayoutId ||
@@ -669,6 +674,13 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         this.visObserver.observe(this.rootRef.current)
       }
     } catch (e) { /* observer is best-effort; Closed-state handling remains */ }
+    // restore this person's saved choices over the seeded defaults
+    const saved = this.loadPrefs()
+    const patch: any = {}
+    for (const k of (Widget as any).PREF_KEYS) {
+      if ((typeof saved[k] === 'string' || typeof saved[k] === 'boolean') && saved[k] !== (this.state as any)[k]) patch[k] = saved[k]
+    }
+    if (Object.keys(patch).length) this.setState(patch)
   }
 
   componentWillUnmount (): void {
@@ -744,6 +756,35 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   defaults = (): any => this.cfg().runtimeDefaults || {}
 
+  /** Personal preference memory: city staff and residents should never
+   *  have to re-pick the same format, DPI, or styles on every visit.
+   *  Stored per browser + widget instance; admin runtime defaults still
+   *  seed first-time users, and saved picks win afterward. */
+  private static readonly PREF_KEYS = ['format', 'dpi', 'naStyle', 'sbStyle', 'sbUnits', 'sbUnits2', 'fontFamily', 'author', 'fileName', 'qrOn'] as const
+  private prefSaveTimer: any = null
+
+  prefStorageKey = (): string => 'print-advanced-prefs-' + String((this.props as any).id || 'w')
+
+  loadPrefs = (): any => {
+    try {
+      const raw = window.localStorage.getItem(this.prefStorageKey())
+      if (!raw) return {}
+      const v = JSON.parse(raw)
+      return (v && typeof v === 'object') ? v : {}
+    } catch (e) { return {} }
+  }
+
+  savePrefsSoon = (): void => {
+    if (this.prefSaveTimer) clearTimeout(this.prefSaveTimer)
+    this.prefSaveTimer = setTimeout(() => {
+      try {
+        const out: any = {}
+        for (const k of (Widget as any).PREF_KEYS) out[k] = (this.state as any)[k]
+        window.localStorage.setItem(this.prefStorageKey(), JSON.stringify(out))
+      } catch (e) { /* private mode etc.: preference memory is best-effort */ }
+    }, 400)
+  }
+
   enabledFormats = (): string[] | null => {
     const list = this.cfg().enabledFormats
     if (!list || !list.length) return null
@@ -795,17 +836,20 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const prev = layouts.find(l => l.id === this.state.selectedLayoutId) || null
     const next = layouts.find(l => l.id === id) || null
     const d: any = this.defaults()
+    const saved: any = this.loadPrefs()
+    const pick = (k: string, dflt: string): string =>
+      (typeof saved[k] === 'string' && saved[k] !== '') ? saved[k] : dflt
     // keep a user-typed title; refresh only if still the previous auto title
     const auto = this.state.title === '' || this.state.title === this.resolveTitle(prev)
     this.setState({
       selectedLayoutId: id,
       title: auto ? this.resolveTitle(next) : this.state.title,
-      dpi: d.dpi || '',
-      naStyle: d.northArrowStyle || '',
-      sbStyle: d.scaleBarStyle || '',
-      sbUnits: d.scaleBarUnits || '',
-      sbUnits2: d.scaleBarUnits2 || '',
-      fontFamily: '',
+      dpi: pick('dpi', d.dpi || ''),
+      naStyle: pick('naStyle', d.northArrowStyle || ''),
+      sbStyle: pick('sbStyle', d.scaleBarStyle || ''),
+      sbUnits: pick('sbUnits', d.scaleBarUnits || ''),
+      sbUnits2: pick('sbUnits2', d.scaleBarUnits2 || ''),
+      fontFamily: pick('fontFamily', ''),
       locked: false
     })
     this.lockedCenter = null; this.lockedScale = null
@@ -921,6 +965,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           if (this.state.scaleMode === 'fixed') options.fixedScale = Number(this.state.fixedScale) || undefined
         }
       }
+      if (this.state.qrOn) {
+        try {
+          (options as any).qrUrl = window.location.href;
+          (options as any).qrCaption = messagesQr()
+        } catch (e) { /* noop */ }
+      }
       if (this.state.author) options.author = this.state.author
       if (this.state.copyright) options.copyright = this.state.copyright
       if ((this.props.config as any)?.includeAttribution !== false) {
@@ -982,7 +1032,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   describeLayout = (layout: PrintLayout): string => {
     return layout.pageWidthIn + ' × ' + layout.pageHeightIn + ' in · ' + layout.dpi + ' DPI · ' +
-      (layout.preserve === 'scale' ? 'keeps map scale' : 'fits current extent')
+      (layout.preserve === 'scale' ? 'keeps map zoom level' : 'prints what you see')
   }
 
   getStyle = () => css`
@@ -1012,6 +1062,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .pd-q-pill { flex: 0 0 auto; font-size: 9px; font-weight: 700; letter-spacing: 0.03em; color: var(--sys-color-primary-dark, #0a5dc2); background: var(--sys-color-primary-light, #e8f1fd); border-radius: 3px; padding: 1px 5px; }
     .pd-q-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pd-q-meta { flex: 0 0 auto; color: var(--ref-palette-neutral-1000, #6a6a6a); white-space: nowrap; font-size: 10px; }
+    .pd-thumb { margin: 6px 0 2px; display: flex; align-items: flex-end; gap: 8px; }
+    .pd-thumb svg { display: block; border-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+    .pd-thumb-badge { font-size: 10px; color: var(--sys-color-primary-dark, #0a5dc2); background: var(--sys-color-primary-light, #e8f1fd); border-radius: 3px; padding: 1px 6px; }
     .pd-row { margin-bottom: 10px; }
     .pd-label { font-size: 12px; font-weight: 600; margin-bottom: 3px; display: block; }
     .pd-desc { font-size: 11px; color: var(--ref-palette-neutral-1100, #595959); margin-top: 3px; }
@@ -1494,6 +1547,13 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 )}
               </React.Fragment>
             )}
+
+            <div className='pd-row pd-inline'>
+              <Label className='pd-label' id={this.uid('qr') + '-lbl'}>{messages.qrToggleLabel}</Label>
+              <Switch aria-labelledby={this.uid('qr') + '-lbl'} checked={this.state.qrOn}
+                onChange={(e: any) => this.setState({ qrOn: !!(e.target && e.target.checked) })} />
+            </div>
+            <div className='pd-desc'>{messages.qrToggleDesc}</div>
 
             {this.ctrl('author') && (
             <div className='pd-row'>
