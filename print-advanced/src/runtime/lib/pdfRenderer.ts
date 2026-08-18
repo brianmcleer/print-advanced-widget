@@ -312,38 +312,41 @@ export function drawSeriesAdjacency (
     d.setFont('bold', size)
     // edge TABS (Pro atlas style): white boxed labels flush to each edge,
     // with arrows, readable over any imagery
-    // tabs live OUTSIDE the map frame (ArcMap dynamic-text convention):
-    // top/bottom in the adjacent bands, left/right rotated to fit the
-    // narrow page margins; never covering map content
-    const gap = 1.5
+    // labels live OUTSIDE the map frame: plain black text with a white
+    // halo, horizontal above and below, rotated along the sides
+    const gap = 3
     const tab = (label: string, edge: 'top' | 'bottom' | 'left' | 'right'): void => {
         d.setFont('bold', size)
         const tw = d.textWidth(label)
-        const padX = 5; const padY = 3
-        d.setFill(45, 45, 48)
-        d.setStroke(255, 255, 255)
-        d.setLineWidth(0.8)
-        d.setTextColor(255, 255, 255)
         if (edge === 'top' || edge === 'bottom') {
-            const bw = tw + padX * 2
-            const bh = size + padY * 2
-            const x = fx + fw / 2 - bw / 2
-            const y = edge === 'top' ? fy - bh - gap : fy + fh + gap
-            d.rect(x, y, bw, bh, 'FD')
-            d.text(label, x + bw / 2, y + padY + size * 0.86, 'center')
-        } else {
-            // vertical tab: slim box outside the edge, rotated text
-            const bw = size + padY * 2
-            const bh = tw + padX * 2
-            const x = edge === 'left' ? fx - bw - gap : fx + fw + gap
-            const y = fy + fh / 2 - bh / 2
-            d.rect(x, y, bw, bh, 'FD')
-            const doc: any = (d as any).doc
-            if (doc && typeof doc.text === 'function') {
-                // reading bottom-to-top on the left, top-to-bottom mirrored on the right
-                doc.text(label, x + padY + size * 0.86, y + bh - padX, { angle: 90 })
+            // right-aligned to the frame edge, clear of centered titles and
+            // authored furniture; bottom sits in the page margin strip,
+            // mirroring the author/copyright credits on the left
+            const y = edge === 'top'
+                ? fy - gap - 1.5
+                : layout.pageHeightIn * PT_PER_IN - 4
+            if (typeof (d as any).haloText === 'function') {
+                d.setTextColor(20, 20, 20)
+                ;(d as any).haloText(label, fx + fw / 2, y, 'center', [255, 255, 255], 1.6)
             } else {
-                d.text(label, x + bw / 2, y + bh / 2, 'center')
+                d.setTextColor(20, 20, 20)
+                d.text(label, fx + fw / 2, y, 'center')
+            }
+        } else {
+            const doc: any = (d as any).doc
+            const x = edge === 'left' ? fx - gap - 1.5 : fx + fw + gap + size * 0.86
+            const y = fy + fh / 2 + tw / 2
+            if (doc && typeof doc.text === 'function') {
+                // manual halo for rotated text: white ring then black center
+                doc.setTextColor(255, 255, 255)
+                for (const [ox, oy] of [[-1.2, 0], [1.2, 0], [0, -1.2], [0, 1.2], [-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9]]) {
+                    doc.text(label, x + ox, y + oy, { angle: 90 })
+                }
+                doc.setTextColor(20, 20, 20)
+                doc.text(label, x, y, { angle: 90 })
+            } else {
+                d.setTextColor(20, 20, 20)
+                d.text(label, x, y, 'center')
             }
         }
     }
@@ -352,10 +355,10 @@ export function drawSeriesAdjacency (
     const down = n(tile.row + 1, tile.col)
     const left = n(tile.row, tile.col - 1)
     const right = n(tile.row, tile.col + 1)
-    if (up !== undefined) tab('^ Page ' + up, 'top')
-    if (down !== undefined) tab('v Page ' + down, 'bottom')
-    if (left !== undefined) tab('< Page ' + left, 'left')
-    if (right !== undefined) tab('Page ' + right + ' >', 'right')
+    if (up !== undefined) tab('Page ' + up, 'top')
+    if (down !== undefined) tab('Page ' + down, 'bottom')
+    if (left !== undefined) tab('Page ' + left, 'left')
+    if (right !== undefined) tab('Page ' + right, 'right')
 }
 
 /** True when a capture is essentially a blank white image: the telltale
@@ -421,11 +424,55 @@ export function drawSeriesKeymap (
         const h = (t.ymax - t.ymin) * scale
         d.setLineWidth(0.5)
         d.setStroke(120, 120, 120)
-        if (t.page === currentPage) {
+        const current = t.page === currentPage
+        if (current) {
             d.setFill(225, 110, 20)
             d.rect(x, y, w, h, 'FD')
         } else {
             d.rect(x, y, w, h, 'D')
+        }
+        // page numbers in every cell: the active page in focus (bold white
+        // on orange), the rest muted gray, so the key map reads even
+        // without imagery
+        const fs = Math.max(3.5, Math.min(9, Math.min(w, h) * 0.55))
+        d.setFont(current ? 'bold' : 'normal', fs)
+        d.setTextColor(current ? 255 : 150, current ? 255 : 150, current ? 255 : 150)
+        d.text(String(t.page), x + w / 2, y + h / 2 + fs * 0.34, 'center')
+    }
+}
+
+/** Current-page indicator for series pages: "Page i of n" in the lower
+ *  right page margin, mirroring the author/copyright credit line on the
+ *  left. Same baseline convention as the credits; falls back to a haloed
+ *  label inside the frame corner when the margin strip is occupied. */
+export function drawSeriesPageNumber (
+    d: Drawer,
+    layout: PrintLayout,
+    pageIdx: number,
+    pageCount: number
+): void {
+    const label = 'Page ' + pageIdx + ' of ' + pageCount
+    const size = 7
+    const mf = getMapFrame(layout)
+    const rightPt = (mf.xIn + mf.wIn) * PT_PER_IN
+    const boxes = ((layout.elements || []) as any[])
+        .filter(e => e.type !== 'line' && typeof e.yIn === 'number' && e.hIn > 0)
+    const bottomMost = boxes.length ? Math.max(...boxes.map(e => e.yIn + e.hIn)) : 0
+    d.setFont('bold', size)
+    d.setTextColor(70, 70, 70)
+    if (layout.pageHeightIn - bottomMost >= 0.12) {
+        const stripTop = Math.max(bottomMost, layout.pageHeightIn - 0.3)
+        const yPt = Math.min(
+            (stripTop + (layout.pageHeightIn - stripTop) / 2) * PT_PER_IN + size * 0.34,
+            layout.pageHeightIn * PT_PER_IN - 3)
+        d.text(label, rightPt, yPt, 'right')
+    } else {
+        const tx = rightPt - 4
+        const ty = (mf.yIn + mf.hIn) * PT_PER_IN - 4
+        if (typeof (d as any).haloText === 'function') {
+            (d as any).haloText(label, tx, ty, 'right', [255, 255, 255], 1.2)
+        } else {
+            d.text(label, tx, ty, 'right')
         }
     }
 }
@@ -487,6 +534,7 @@ export async function renderSeries (
         await composePage(pd, layout, cap, i === 0 ? legendRows : [], pageTitle, tileOpts)
         drawSeriesAdjacency(pd, layout, t as any, tiles as any)
         drawSeriesKeymap(pd, layout, tiles as any, t.page)
+        drawSeriesPageNumber(pd, layout, i + 1, n)
     }
     // index page: the whole series envelope with tile outlines and numbers
     onProgress('Creating index page\u2026')

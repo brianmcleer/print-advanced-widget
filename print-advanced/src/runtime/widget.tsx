@@ -622,6 +622,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   updatePreview = (): void => {
     if (!this.uiVisible) return
+    // while the map series panel is open, the series grid IS the print
+    // area; the single-page rectangle contradicts it, so it yields
+    if (this.state.seriesOpen && this.ctrl('series') && this.state.format === 'pdf') {
+      this.clearPreview()
+      return
+    }
     try {
       const jmv = this.state.jimuMapView
       const view: any = jmv && jmv.view
@@ -751,6 +757,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
     if ((Widget as any).PREF_KEYS.some((k: string) => (s as any)[k] !== (prevState as any)[k])) {
       this.savePrefsSoon()
+    }
+    if (s.seriesOpen !== prevState.seriesOpen) {
+      this.updatePreview()
     }
     if (s.seriesOpen !== prevState.seriesOpen ||
         s.seriesSizePct !== prevState.seriesSizePct ||
@@ -1096,9 +1105,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       }
       if (this.state.qrOn) {
         try {
-          (options as any).qrUrl = window.location.href;
-          (options as any).qrCaption = messagesQr()
-        } catch (e) { /* noop */ }
+          const qu = this.qrSafeUrl()
+          if (qu) {
+            (options as any).qrUrl = qu;
+            (options as any).qrCaption = (defaultMessages as any).qrCaption || 'Scan for interactive map'
+          }
+        } catch (e) { /* QR is best-effort */ }
       }
       if (this.state.author) options.author = this.state.author
       if (this.state.copyright) options.copyright = this.state.copyright
@@ -1169,6 +1181,18 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     return { xmin: cx - hw, xmax: cx + hw, ymin: cy - hh, ymax: cy + hh }
   }
 
+  /** The URL a printed QR should carry: the durable app link, never the
+   *  session hash (viewpoint, draft state), which balloons past the QR
+   *  encoder's 213-byte capacity and is meaningless to a later scanner. */
+  private qrSafeUrl = (): string => {
+    try {
+      const L = window.location
+      let u = L.origin + L.pathname + (L.search || '')
+      if (u.length > 200) u = L.origin + L.pathname
+      return u.length <= 213 ? u : ''
+    } catch (e) { return '' }
+  }
+
   seriesPageCount = (): number => {
     const r = Math.max(1, Math.min(8, parseInt(this.state.seriesRows, 10) || 1))
     const c = Math.max(1, Math.min(8, parseInt(this.state.seriesCols, 10) || 1))
@@ -1195,6 +1219,15 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       const tileW = tiles[0].xmax - tiles[0].xmin
       const scaleDenom = Math.ceil((tileW * mpu) / (mfEl.wIn * 0.0254))
       const options: RenderOptions = {}
+      if (this.state.qrOn) {
+        try {
+          const qu = this.qrSafeUrl()
+          if (qu) {
+            (options as any).qrUrl = qu;
+            (options as any).qrCaption = (defaultMessages as any).qrCaption || 'Scan for interactive map'
+          }
+        } catch (e) { /* QR is best-effort */ }
+      }
       if (this.state.author) options.author = this.state.author
       if (this.state.copyright) options.copyright = this.state.copyright
       const cfgLogo = (this.props.config as any)?.defaultLogo
