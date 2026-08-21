@@ -204,7 +204,8 @@ export interface Config {
   /** Hard cap on the longest capture dimension (WebGL texture safety). */
   maxImagePx?: number
   /** Admin-set initial values for the runtime controls. Users can still
-   *  change any control that remains visible. */
+   *  change any control that remains visible. The boolean trio is stored
+   *  SPARSELY: absent = on (the default), false = off. */
   runtimeDefaults?: {
     format?: string
     dpi?: string
@@ -212,9 +213,13 @@ export interface Config {
     scaleBarStyle?: string
     scaleBarUnits?: string
     scaleBarUnits2?: string
+    includeLegend?: boolean
+    showOverview?: boolean
+    showGrid?: boolean
   }
   /** Per-control visibility in the runtime widget (default: all shown).
-   *  Hidden controls still apply their configured default values. */
+   *  Hidden controls still apply their configured default values. Stored
+   *  sparsely: absent = shown, false = hidden. */
   controls?: {
     title?: boolean
     format?: boolean
@@ -223,7 +228,16 @@ export interface Config {
     northArrow?: boolean
     scaleBar?: boolean
     fileName?: boolean
+    author?: boolean
+    copyright?: boolean
+    legend?: boolean
+    overview?: boolean
+    grid?: boolean
+    series?: boolean
   }
+  /** Bind the printed legend to a specific Legend widget id (''/absent =
+   *  automatic: first Legend widget found in the app). */
+  legendWidgetId?: string
   /** Restrict which export formats users may pick (default: all). The
    *  runtime default format must be in this list to take effect. */
   enabledFormats?: string[]

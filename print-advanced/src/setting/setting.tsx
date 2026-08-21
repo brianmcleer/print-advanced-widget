@@ -162,6 +162,21 @@ function xmlToConfig(xmlString: string): any {
 }
 
 export default class Setting extends React.PureComponent<AllWidgetSettingProps<IMConfig>, State> {
+    // Editor-only (EB 1.21 + pnpm): some Visual Studio TypeScript hosts fail
+    // to resolve the React base-class types for this file, which floods the
+    // Error List with "props/state/setState does not exist on type 'Setting'".
+    // These `declare` members emit NO JavaScript and change NO behavior; they
+    // restate exactly what React.PureComponent already provides so the
+    // editor's analysis is satisfied either way. Companion to
+    // src/exb-editor-shims.d.ts (see EB-1.21-TSCONFIG-HANDOFF).
+    // The intersection restates members VS can drop when it resolves
+    // AllWidgetSettingProps partially (id, useMapWidgetIds live on an
+    // intersected interface). With full types the intersection is a no-op.
+    declare readonly props: AllWidgetSettingProps<IMConfig> & { id: string, useMapWidgetIds?: any }
+    declare state: State
+    declare setState: (partial: any, callback?: () => void) => void
+    declare forceUpdate: (callback?: () => void) => void
+
     private fileInputRef = React.createRef<HTMLInputElement>()
     private pictureInputRef = React.createRef<HTMLInputElement>()
     private logoInputRef = React.createRef<HTMLInputElement>()
@@ -251,9 +266,22 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         }
     }
 
+    /** The export preview is a snapshot from the moment Export was clicked.
+     *  Keep it in sync with later setting changes, or Copy/Download after a
+     *  tweak would ship stale XML missing that tweak (the classic case:
+     *  toggle a runtime default like the grid or overview, then download). */
+    componentDidUpdate(prevProps: AllWidgetSettingProps<IMConfig>): void {
+        if (prevProps.config !== this.props.config && this.state.exportXml) {
+            try {
+                this.setState({ exportXml: configToXml(this.currentConfigPlain()) })
+            } catch (e) { /* preview refresh is best-effort; copy/download re-serialize anyway */ }
+        }
+    }
+
     copyConfig = (): void => {
         const m = defaultMessages as any
-        const xml = this.state.exportXml || configToXml(this.currentConfigPlain())
+        // ALWAYS serialize the live config; never trust the cached preview.
+        const xml = configToXml(this.currentConfigPlain())
         try {
             navigator.clipboard.writeText(xml)
             this.setState({ exportXml: xml, ieSuccess: m.ieCopied, ieError: null })
@@ -263,7 +291,8 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
     }
 
     downloadConfig = (): void => {
-        const xml = this.state.exportXml || configToXml(this.currentConfigPlain())
+        // ALWAYS serialize the live config; never trust the cached preview.
+        const xml = configToXml(this.currentConfigPlain())
         const blob = new Blob([xml], { type: 'application/xml' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -293,14 +322,43 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         try {
             const parsed = xmlToConfig(text)
             if (!parsed || typeof parsed !== 'object') throw new Error(m.ieBad)
+            // Defensive normalization: boolean-like STRINGS ('true'/'false')
+            // from hand-edited or foreign XML become real booleans, so the
+            // sparse "!== false" reads (runtime defaults, control visibility)
+            // can never mistake 'false' for on.
+            const coerceBools = (o: any): void => {
+                if (!o || typeof o !== 'object' || Array.isArray(o)) return
+                for (const k of Object.keys(o)) {
+                    if (o[k] === 'true') o[k] = true
+                    else if (o[k] === 'false') o[k] = false
+                }
+            }
+            coerceBools((parsed as any).runtimeDefaults)
+            coerceBools((parsed as any).controls)
             const next: any = Immutable(parsed)
             const layouts = (next.layouts && next.layouts.asMutable ? next.layouts.asMutable() : next.layouts) || []
             this.props.onSettingChange({ id: this.props.id, config: next })
+            // Visible receipt of what was applied: a stale or partial file
+            // is spotted AT IMPORT TIME, not three apps later at export.
+            const d: any = (parsed as any).runtimeDefaults || {}
+            const onOff = (v: any): string => (v !== false ? m.ieOn : m.ieOff)
+            const summary = String(m.ieSummary || '')
+                .replace('{n}', String(layouts.length))
+                .replace('{legend}', onOff(d.includeLegend))
+                .replace('{overview}', onOff(d.showOverview))
+                .replace('{grid}', onOff(d.showGrid))
+            // Ground-truth diagnostic (F12 console): which widget instance
+            // received the import, and exactly what runtime defaults landed.
+            try {
+                console.info('[print-advanced] import applied to widget "' + String(this.props.id) +
+                    '" runtimeDefaults=' + JSON.stringify((parsed as any).runtimeDefaults || {}) +
+                    ' layouts=' + layouts.length)
+            } catch (e) { /* logging only */ }
             this.setState({
                 editingId: layouts.length ? layouts[0].id : '',
                 importXml: '',
                 ieError: null,
-                ieSuccess: m.ieImported
+                ieSuccess: m.ieImported + ' ' + summary
             })
         } catch (e: any) {
             this.setState({ ieError: (e && e.message) || m.ieBad, ieSuccess: null })
@@ -640,7 +698,8 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
     }
 
     onPagxChosen = (e: React.ChangeEvent<HTMLInputElement>): void => {
-        const files = e.target.files ? Array.from(e.target.files) : []
+        // explicit File[] so degraded editor lib resolution cannot infer unknown[]
+        const files: File[] = e.target.files ? Array.from(e.target.files) : []
         e.target.value = '' // reset so re-choosing the same file(s) fires change again
         if (!files.length) return
 
@@ -1240,19 +1299,19 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                             {(!String((editing as any).legend?.position || 'rightPanel').endsWith('Panel') ||
                                                 ((editing as any).legend?.panelSizeMode) === 'fixed') &&
                                                 String((editing as any).legend?.position || '') !== 'secondPage' && (
-                                                <React.Fragment>
-                                                    <SettingRow flow='wrap' label={messages.overviewWidth} truncateLabel>
-                                                        <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
-                                                            value={Number((editing as any).legend?.widthIn) || 3}
-                                                            onChange={(v: number) => this.patchLegend({ widthIn: v })} />
-                                                    </SettingRow>
-                                                    <SettingRow flow='wrap' label={messages.overviewHeight} truncateLabel>
-                                                        <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
-                                                            value={Number((editing as any).legend?.heightIn) || 3.5}
-                                                            onChange={(v: number) => this.patchLegend({ heightIn: v })} />
-                                                    </SettingRow>
-                                                </React.Fragment>
-                                            )}
+                                                    <React.Fragment>
+                                                        <SettingRow flow='wrap' label={messages.overviewWidth} truncateLabel>
+                                                            <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
+                                                                value={Number((editing as any).legend?.widthIn) || 3}
+                                                                onChange={(v: number) => this.patchLegend({ widthIn: v })} />
+                                                        </SettingRow>
+                                                        <SettingRow flow='wrap' label={messages.overviewHeight} truncateLabel>
+                                                            <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
+                                                                value={Number((editing as any).legend?.heightIn) || 3.5}
+                                                                onChange={(v: number) => this.patchLegend({ heightIn: v })} />
+                                                        </SettingRow>
+                                                    </React.Fragment>
+                                                )}
                                         </React.Fragment>
                                     )}
                                     <SettingRow flow='wrap' label={messages.legendTitle} truncateLabel>
@@ -1702,7 +1761,8 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                         ['copyright', messages.ctrlCopyright],
                         ['legend', messages.ctrlLegend],
                         ['overview', messages.ctrlOverview],
-                        ['grid', messages.ctrlGrid]
+                        ['grid', messages.ctrlGrid],
+                        ['series', messages.ctrlSeries]
                     ] as Array<[string, string]>).map(([key, label]) => (
                         <SettingRow key={key} tag='label' label={label} truncateLabel>
                             <Switch
