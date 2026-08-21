@@ -366,13 +366,17 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       if (!active) return
       const mfEl: any = (layout.elements || []).find((e: any) => e.type === 'mapFrame')
       if (!mfEl) return
+      // the grid must mirror the EXPORT frame: shrunk when an adjacent
+      // legend panel is active, exactly like the single-map print-extent
+      // preview, so the series grid adjusts dynamically with the legend
+      const mf: any = this.effFrameOf() || mfEl
       const ext = view.extent
       const rows = Math.max(1, Math.min(8, parseInt(this.state.seriesRows, 10) || 1))
       const cols = Math.max(1, Math.min(8, parseInt(this.state.seriesCols, 10) || 1))
       const env = this.seriesScaleEnv(envelopeForFrame(
         { xmin: ext.xmin, ymin: ext.ymin, xmax: ext.xmax, ymax: ext.ymax },
-        rows, cols, mfEl.wIn, mfEl.hIn, 0.1))
-      const tiles = gridTilesByCount(env, rows, cols, mfEl.wIn, mfEl.hIn, 0.1)
+        rows, cols, mf.wIn, mf.hIn, 0.1))
+      const tiles = gridTilesByCount(env, rows, cols, mf.wIn, mf.hIn, 0.1)
       const sr = view.spatialReference
       const fontPx = Math.max(12, Math.min(28, 220 / Math.max(rows, cols)))
       for (const t of tiles) {
@@ -895,7 +899,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
    *  have to re-pick the same format, DPI, or styles on every visit.
    *  Stored per browser + widget instance; admin runtime defaults still
    *  seed first-time users, and saved picks win afterward. */
-  private static readonly PREF_KEYS = ['format', 'dpi', 'naStyle', 'sbStyle', 'sbUnits', 'sbUnits2', 'fontFamily', 'author', 'fileName', 'qrOn'] as const
+  private static readonly PREF_KEYS = ['format', 'dpi', 'naStyle', 'sbStyle', 'sbUnits', 'sbUnits2', 'fontFamily', 'author', 'fileName'] as const
   private prefSaveTimer: any = null
 
   prefStorageKey = (): string => 'print-advanced-prefs-' + String((this.props as any).id || 'w')
@@ -1211,13 +1215,23 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       const ext = view.extent
       const rows = Math.max(1, Math.min(8, parseInt(this.state.seriesRows, 10) || 1))
       const cols = Math.max(1, Math.min(8, parseInt(this.state.seriesCols, 10) || 1))
-      const env = this.seriesScaleEnv(envelopeForFrame(
-        { xmin: ext.xmin, ymin: ext.ymin, xmax: ext.xmax, ymax: ext.ymax },
-        rows, cols, mfEl.wIn, mfEl.hIn, 0.1))
-      const tiles = gridTilesByCount(env, rows, cols, mfEl.wIn, mfEl.hIn, 0.1)
       const mpu = metersPerMapUnit(view.scale, view.resolution)
-      const tileW = tiles[0].xmax - tiles[0].xmin
-      const scaleDenom = Math.ceil((tileW * mpu) / (mfEl.wIn * 0.0254))
+      // tiles for a given frame size: the export calls this back with the
+      // EXACT effective frame once the legend panel (if any) has shrunk it,
+      // so the printed grid always matches the frame it prints in
+      const tilesFor = (fw: number, fh: number) => {
+        const env2 = this.seriesScaleEnv(envelopeForFrame(
+          { xmin: ext.xmin, ymin: ext.ymin, xmax: ext.xmax, ymax: ext.ymax },
+          rows, cols, fw, fh, 0.1))
+        const t2 = gridTilesByCount(env2, rows, cols, fw, fh, 0.1)
+        return { tiles: t2, scaleDenom: Math.ceil(((t2[0].xmax - t2[0].xmin) * mpu) / (fw * 0.0254)) }
+      }
+      // initial estimate from the preview's effective frame; the export
+      // refines it through retile once the panel is computed exactly
+      const mfEst: any = this.effFrameOf() || mfEl
+      const first = tilesFor(mfEst.wIn, mfEst.hIn)
+      let tiles = first.tiles
+      const scaleDenom = first.scaleDenom
       const options: RenderOptions = {}
       if (this.state.qrOn) {
         try {
@@ -1235,15 +1249,39 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       options.includeLegend = this.state.includeLegend
       options.showOverview = false
       options.showGrid = this.state.showGrid
+      if (this.state.legendPositionOv) options.legendPositionOverride = this.state.legendPositionOv
       if ((this.cfg() as any).legendWidgetId) options.legendWidgetId = String((this.cfg() as any).legendWidgetId)
       if ((this.props.config as any)?.includeAttribution !== false) {
         options.attribution = this.captureAttribution(view)
       }
+      // the export reports the exact legend panel back, so the live series
+      // grid preview matches the shrunken frame precisely from then on
+      options.onPanelComputed = (panel) => { this.lastPanel = panel }
+      const family = this.state.fontFamily || (this.props.config as any)?.defaultFontFamily || ''
+      const customs = this.customFontList()
+      if (family.indexOf('custom:') === 0) {
+        const nm = family.slice('custom:'.length)
+        const f = customs.find(x => x.name === nm) || customs[0]
+        if (f) options.customFont = f
+      } else if (family === 'custom') {
+        if (customs[0]) options.customFont = customs[0]
+      } else if (family) {
+        options.fontFamily = family as any
+      }
+      const effLayout = this.state.dpi ? { ...layout, dpi: Number(this.state.dpi) } : layout
       const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0
       const name = (this.buildFileName(layout) || 'map-series').replace(/\.pdf$/i, '') + '-series.pdf'
       const result = await renderSeries(
-        view, layout, this.state.title || layout.name || 'Map', name, maxImagePx,
-        { tiles, scaleDenom }, options,
+        view, effLayout, this.state.title || layout.name || 'Map', name, maxImagePx,
+        {
+          tiles,
+          scaleDenom,
+          retile: (fw: number, fh: number) => {
+            const rt = tilesFor(fw, fh)
+            tiles = rt.tiles // progress highlight follows the final grid
+            return rt
+          }
+        }, options,
         (msg: string) => {
           this.setState({ status: msg })
           const pm = /page (\d+) of (\d+)/i.exec(msg || '')

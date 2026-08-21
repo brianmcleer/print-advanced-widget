@@ -301,7 +301,11 @@ export function drawSeriesAdjacency (
     d: Drawer,
     layout: PrintLayout,
     tile: { page: number, row: number, col: number },
-    tiles: Array<{ page: number, row: number, col: number }>
+    tiles: Array<{ page: number, row: number, col: number }>,
+    /** Boxes (page inches) occupying space beside the frame - e.g. an
+     *  adjacent legend panel. Side tabs that would land on one flip to
+     *  just INSIDE the frame edge instead. */
+    avoid?: Array<{ xIn: number, yIn: number, wIn: number, hIn: number }>
 ): void {
     const byRC = new Map<string, number>()
     for (const t of tiles) byRC.set(t.row + ':' + t.col, t.page)
@@ -315,6 +319,14 @@ export function drawSeriesAdjacency (
     // labels live OUTSIDE the map frame: plain black text with a white
     // halo, horizontal above and below, rotated along the sides
     const gap = 3
+    const sideBlocked = (edge: 'left' | 'right'): boolean => {
+        // anything occupying the strip immediately beside that frame edge
+        const stripX = edge === 'left' ? mf.xIn - 0.25 : mf.xIn + mf.wIn
+        return (avoid || []).some(b =>
+            b && b.wIn > 0 && b.hIn > 0 &&
+            b.xIn < stripX + 0.25 && b.xIn + b.wIn > stripX &&
+            b.yIn < mf.yIn + mf.hIn && b.yIn + b.hIn > mf.yIn)
+    }
     const tab = (label: string, edge: 'top' | 'bottom' | 'left' | 'right'): void => {
         d.setFont('bold', size)
         const tw = d.textWidth(label)
@@ -334,7 +346,10 @@ export function drawSeriesAdjacency (
             }
         } else {
             const doc: any = (d as any).doc
-            const x = edge === 'left' ? fx - gap - 1.5 : fx + fw + gap + size * 0.86
+            const inside = sideBlocked(edge)
+            const x = edge === 'left'
+                ? (inside ? fx + gap + 1.5 + size * 0.86 : fx - gap - 1.5)
+                : (inside ? fx + fw - gap - 1.5 : fx + fw + gap + size * 0.86)
             const y = fy + fh / 2 + tw / 2
             if (doc && typeof doc.text === 'function') {
                 // manual halo for rotated text: white ring then black center
@@ -449,12 +464,17 @@ export function drawSeriesPageNumber (
     d: Drawer,
     layout: PrintLayout,
     pageIdx: number,
-    pageCount: number
+    pageCount: number,
+    /** Original (pre-legend-panel) frame, so the label keeps its page
+     *  alignment when an adjacent panel has shrunk the map frame. */
+    outer?: { xIn: number, wIn: number }
 ): void {
     const label = 'Page ' + pageIdx + ' of ' + pageCount
     const size = 7
     const mf = getMapFrame(layout)
-    const rightPt = (mf.xIn + mf.wIn) * PT_PER_IN
+    const rightPt = Math.max(
+        (mf.xIn + mf.wIn),
+        outer && outer.wIn > 0 ? outer.xIn + outer.wIn : 0) * PT_PER_IN
     const boxes = ((layout.elements || []) as any[])
         .filter(e => e.type !== 'line' && typeof e.yIn === 'number' && e.hIn > 0)
     const bottomMost = boxes.length ? Math.max(...boxes.map(e => e.yIn + e.hIn)) : 0
@@ -467,7 +487,8 @@ export function drawSeriesPageNumber (
             layout.pageHeightIn * PT_PER_IN - 3)
         d.text(label, rightPt, yPt, 'right')
     } else {
-        const tx = rightPt - 4
+        // inside-frame fallback stays on the MAP, not on a legend panel
+        const tx = (mf.xIn + mf.wIn) * PT_PER_IN - 4
         const ty = (mf.yIn + mf.hIn) * PT_PER_IN - 4
         if (typeof (d as any).haloText === 'function') {
             (d as any).haloText(label, tx, ty, 'right', [255, 255, 255], 1.2)
@@ -480,22 +501,46 @@ export function drawSeriesPageNumber (
 /** Map series export: one PDF, a page per tile plus an index page.
  *  Captures run SEQUENTIALLY through the proven single-capture path so
  *  every safeguard (SR handling, iOS budgets, white background, honest
- *  warnings) applies per tile. Legend prints on page 1 only. */
+ *  warnings) applies per tile.
+ *
+ *  Legend placement matches the single-map export exactly: a panel
+ *  placement runs the SAME computeLegendPanel math, shrinks the map frame
+ *  to make room, and prints the panel on EVERY page (each sheet is a
+ *  complete standalone map). When the frame shrinks, series.retile
+ *  regenerates the tile grid against the effective frame so tiles keep
+ *  the frame aspect and the printed scale stays uniform. Corner-overlay
+ *  legends keep the previous behavior (page 1 only); 'secondPage'
+ *  appends dedicated legend pages after the index, as single map does. */
 export async function renderSeries (
     view: MapView,
     layout: PrintLayout,
     title: string,
     fileName: string,
     maxImagePx: number,
-    series: { tiles: Array<{ page: number, row: number, col: number, xmin: number, ymin: number, xmax: number, ymax: number, centerX: number, centerY: number }>, scaleDenom: number },
+    series: {
+        tiles: Array<{ page: number, row: number, col: number, xmin: number, ymin: number, xmax: number, ymax: number, centerX: number, centerY: number }>,
+        scaleDenom: number,
+        /** Regenerate tiles for the EFFECTIVE map frame (inches). Called
+         *  once the legend panel (if any) has resized the frame, so the
+         *  grid the pages print always matches the frame they print in. */
+        retile?: (frameWIn: number, frameHIn: number) => {
+            tiles: Array<{ page: number, row: number, col: number, xmin: number, ymin: number, xmax: number, ymax: number, centerX: number, centerY: number }>,
+            scaleDenom: number
+        }
+    },
     options: RenderOptions,
     onProgress: RenderProgress
 ): Promise<{ url: string, fileName: string, sizeKb: number, pages: number, warning?: string }> {
-    const tiles = series.tiles || []
+    let tiles = series.tiles || []
     if (!tiles.length) throw new Error('Map series has no pages. Adjust the area or scale.')
-    const mf0 = getMapFrame(layout)
-    const pageW = layout.pageWidthIn * PT_PER_IN
-    const pageH = layout.pageHeightIn * PT_PER_IN
+    let scaleDenom = series.scaleDenom
+    // per-export legend position override, exactly as renderLayout applies it
+    let useLayout: PrintLayout = layout
+    if (options.legendPositionOverride && useLayout.legend && useLayout.legend.enabled) {
+        useLayout = { ...useLayout, legend: { ...useLayout.legend, position: options.legendPositionOverride as any } }
+    }
+    const pageW = useLayout.pageWidthIn * PT_PER_IN
+    const pageH = useLayout.pageHeightIn * PT_PER_IN
     const doc = new jsPDF({
         orientation: pageW >= pageH ? 'landscape' : 'portrait',
         unit: 'pt',
@@ -508,35 +553,106 @@ export async function renderSeries (
         await registerPdfFont(doc, options.customFont.name, options.customFont.url, options.customFont.boldUrl)
         pd.setCustomFont(options.customFont.name)
     }
+    // Legend rows are built BEFORE any capture so an adjacent legend panel
+    // can shrink the map frame first - the same order renderLayout uses.
+    const legendCfg = useLayout.legend
+    const hasLegendEl = (useLayout.elements || []).some(e => (e as LayoutElement).type === 'legend')
+    const wantLegend = options.includeLegend !== false && (hasLegendEl || (legendCfg && legendCfg.enabled))
     let legendRows: LegendRow[] = []
-    if (options.includeLegend !== false && layout.legend && layout.legend.enabled) {
-        try { legendRows = await buildLegendRows(view as any, 200, (options as any).legendWidgetId) } catch (e) { legendRows = [] }
+    if (wantLegend) {
+        try {
+            legendRows = await buildLegendRows(view as any, 200, onProgress, (options as any).legendWidgetId)
+        } catch (e) { legendRows = [] }
+    }
+    const legendPosition = String((legendCfg && legendCfg.position) || '')
+    const panelPlacement = !hasLegendEl && legendCfg && legendCfg.enabled &&
+        options.includeLegend !== false && legendPosition.endsWith('Panel')
+    const legendSecondPage = !hasLegendEl && legendCfg && legendCfg.enabled &&
+        options.includeLegend !== false && legendPosition === 'secondPage'
+    if (panelPlacement && legendRows.length) {
+        // SAME panel math as the single-map export: the map frame shrinks
+        // to make room, so the legend prints in the same place whether or
+        // not the export is a series.
+        const mfFull = getMapFrame(useLayout)
+        const otherBoxes = (useLayout.elements || [])
+            .filter(e => (e as LayoutElement).type !== 'mapFrame' && (e as LayoutElement).type !== 'line')
+            .map(e => e as any)
+            .filter(e => typeof e.xIn === 'number' && e.wIn > 0 && e.hIn > 0)
+            .map(e => ({ xIn: e.xIn, yIn: e.yIn, wIn: e.wIn, hIn: e.hIn }))
+        const panel = computeLegendPanel(legendRows, mfFull, legendCfg, otherBoxes)
+        if (panel && panel.mapFrame.wIn > 1 && panel.mapFrame.hIn > 1 &&
+            panel.box.wIn > 0.9 && panel.box.hIn > 0.9) {
+            onProgress('Placing legend panel beside the map...')
+            const origFrame = { xIn: mfFull.xIn, yIn: mfFull.yIn, wIn: mfFull.wIn, hIn: mfFull.hIn }
+            const mfBorder = (useLayout.elements || []).find(e => (e as LayoutElement).type === 'mapFrame') as MapFrameEl
+            useLayout = {
+                ...useLayout,
+                elements: (useLayout.elements || []).map(e =>
+                    (e as LayoutElement).type === 'mapFrame'
+                        ? ({ ...(e as MapFrameEl), ...panel.mapFrame } as MapFrameEl)
+                        : e)
+            }
+            try {
+                if (typeof options.onPanelComputed === 'function') {
+                    options.onPanelComputed({ position: legendPosition, wIn: panel.box.wIn, hIn: panel.box.hIn })
+                }
+            } catch (e) { /* preview feedback is best-effort */ }
+            options = {
+                ...options,
+                legendBox: panel.box,
+                legendPanelOuter: {
+                    ...origFrame,
+                    color: mfBorder && mfBorder.borderColor ? mfBorder.borderColor : null,
+                    widthPt: mfBorder && mfBorder.borderWidthPt > 0 ? mfBorder.borderWidthPt : 0
+                }
+            }
+        }
+    }
+    // The tile grid must match the EFFECTIVE frame: regenerate it against
+    // the final frame dimensions (shrunken or not) so the grid adjusts
+    // dynamically exactly like the single-map print extent does.
+    const mf0 = getMapFrame(useLayout)
+    if (typeof series.retile === 'function') {
+        try {
+            const rt = series.retile(mf0.wIn, mf0.hIn)
+            if (rt && rt.tiles && rt.tiles.length && rt.scaleDenom > 0) {
+                tiles = rt.tiles
+                scaleDenom = rt.scaleDenom
+            }
+        } catch (e) { /* keep the provided tiles */ }
     }
     const warnings: string[] = []
     const n = tiles.length
+    // Panel and pagx-authored legends are page furniture: every sheet gets
+    // them, like ArcGIS Pro map series. Corner overlays cover map content,
+    // so they keep the page-1-only behavior.
+    const rowsForPage = (i: number): LegendRow[] =>
+        (panelPlacement || hasLegendEl) ? legendRows : (i === 0 && !legendSecondPage ? legendRows : [])
     for (let i = 0; i < n; i++) {
         const t = tiles[i]
         onProgress('Exporting page ' + (i + 1) + ' of ' + n + '\u2026')
         const tileOpts: RenderOptions = {
             ...options,
             scaleMode: 'fixed' as any,
-            fixedScale: series.scaleDenom,
+            fixedScale: scaleDenom,
             lockedCenter: { x: t.centerX, y: t.centerY } as any,
-            includeLegend: i === 0 ? options.includeLegend : false
+            includeLegend: rowsForPage(i).length ? options.includeLegend : false
         }
-        const cap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, layout, maxImagePx, tileOpts, onProgress)
+        const cap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, useLayout, maxImagePx, tileOpts, onProgress)
         if (cap.warning && warnings.indexOf(cap.warning) < 0) warnings.push(cap.warning)
         if (i > 0) doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
-        const pageTitle = (title || layout.name || 'Map')
+        const pageTitle = (title || useLayout.name || 'Map')
             .replace(/\{page\}/g, String(i + 1))
             .replace(/\{pages\}/g, String(n)) +
             (/\{page\}/.test(title || '') ? '' : '  (' + (i + 1) + ' of ' + n + ')')
-        await composePage(pd, layout, cap, i === 0 ? legendRows : [], pageTitle, tileOpts)
-        drawSeriesAdjacency(pd, layout, t as any, tiles as any)
-        drawSeriesKeymap(pd, layout, tiles as any, t.page)
-        drawSeriesPageNumber(pd, layout, i + 1, n)
+        await composePage(pd, useLayout, cap, rowsForPage(i), pageTitle, tileOpts)
+        drawSeriesAdjacency(pd, useLayout, t as any, tiles as any, options.legendBox ? [options.legendBox] : undefined)
+        drawSeriesKeymap(pd, useLayout, tiles as any, t.page)
+        drawSeriesPageNumber(pd, useLayout, i + 1, n, options.legendPanelOuter)
     }
-    // index page: the whole series envelope with tile outlines and numbers
+    // index page: the whole series envelope with tile outlines and numbers.
+    // It uses the same effective frame (and legend panel, when active) as
+    // every other page, so the document composes uniformly end to end.
     onProgress('Creating index page\u2026')
     let xmin = Infinity; let ymin = Infinity; let xmax = -Infinity; let ymax = -Infinity
     for (const t of tiles) { xmin = Math.min(xmin, t.xmin); ymin = Math.min(ymin, t.ymin); xmax = Math.max(xmax, t.xmax); ymax = Math.max(ymax, t.ymax) }
@@ -545,9 +661,10 @@ export async function renderSeries (
     const idxScale = Math.max(
         ((xmax - xmin + padX * 2) * mpu) / (mf0.wIn * 0.0254),
         ((ymax - ymin + padY * 2) * mpu) / (mf0.hIn * 0.0254))
+    const idxHasLegend = (panelPlacement || hasLegendEl) && legendRows.length > 0
     const idxOpts: RenderOptions = {
         ...options,
-        includeLegend: false,
+        includeLegend: idxHasLegend ? options.includeLegend : false,
         scaleMode: 'fixed' as any,
         fixedScale: Math.ceil(idxScale),
         lockedCenter: { x: (xmin + xmax) / 2, y: (ymin + ymax) / 2 } as any
@@ -556,24 +673,43 @@ export async function renderSeries (
     // give tiles a generous settle budget, and if the capture still comes
     // back blank white, wait for the basemap and try once more
     ;(idxOpts as any).maxWaitMs = Math.max(Number((idxOpts as any).maxWaitMs) || 0, 45000)
-    let idxCap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, layout, maxImagePx, idxOpts, onProgress)
+    let idxCap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, useLayout, maxImagePx, idxOpts, onProgress)
     try {
         if (await captureLooksBlank(idxCap.dataUrl)) {
             onProgress('Waiting for basemap tiles on the index page\u2026')
             await new Promise<void>((r) => setTimeout(r, 5000))
-            idxCap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, layout, maxImagePx, idxOpts, onProgress)
+            idxCap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, useLayout, maxImagePx, idxOpts, onProgress)
         }
     } catch (e) { /* retry is best-effort */ }
     doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
-    await composePage(pd, layout, idxCap, [], (title || layout.name || 'Map') + '  (Index)', idxOpts)
-    drawIndexOverlay(pd, layout, idxCap as any, tiles)
+    await composePage(pd, useLayout, idxCap, idxHasLegend ? legendRows : [], (title || useLayout.name || 'Map') + '  (Index)', idxOpts)
+    drawIndexOverlay(pd, useLayout, idxCap as any, tiles)
+    // 'secondPage' placement: dedicated legend pages after the index,
+    // exactly like the single-map PDF export
+    let legendPageCount = 0
+    if (legendSecondPage && legendRows.length) {
+        const margin = 0.5
+        const legendPages = paginateLegendRows(
+            legendRows,
+            Math.max(1, useLayout.pageWidthIn - margin * 2) * PT_PER_IN,
+            Math.max(1, useLayout.pageHeightIn - margin * 2) * PT_PER_IN,
+            legendCfg,
+            (t2, f2) => { pd.setFont('normal', f2); return pd.textWidth(t2) }
+        )
+        for (let pi = 0; pi < legendPages.length; pi++) {
+            onProgress('Composing legend page ' + (pi + 1) + ' of ' + legendPages.length + '\u2026')
+            doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
+            await drawLegendPage(pd, useLayout.pageWidthIn, useLayout.pageHeightIn, legendPages[pi], legendCfg)
+        }
+        legendPageCount = legendPages.length
+    }
     const blob: Blob = doc.output('blob')
     const url = downloadBlob(blob, fileName)
     return {
         url,
         fileName,
         sizeKb: Math.round(blob.size / 1024),
-        pages: n + 1,
+        pages: n + 1 + legendPageCount,
         warning: warnings.length ? warnings.join(' \u00b7 ') : undefined
     }
 }
@@ -1078,6 +1214,56 @@ export function matchRestSwatches (rows: LegendRow[], services: any[]): number {
     return upgraded
 }
 
+/** Multi-class repair: when a classed sublayer (unique values, class
+ *  breaks) collapsed to a single unlabeled item in the harvested rows but
+ *  the service's REST legend knows several classes, replace that lone item
+ *  with the full class list: server-rendered swatch plus label for each.
+ *  Single-symbol layers are untouched. */
+export function expandRestClasses (rows: LegendRow[], services: any[]): number {
+    const norm = (x: any): string => String(x || '').trim().toLowerCase()
+    const byLayer = new Map<string, Array<{ label: string, data: string, raw: string }>>()
+    for (const svc of services || []) {
+        for (const lyr of (svc && svc.layers) || []) {
+            const items = ((lyr && lyr.legend) || [])
+                .filter((it: any) => it && it.imageData)
+                .map((it: any) => ({
+                    label: norm(it.label),
+                    raw: String(it.label || ''),
+                    data: 'data:' + (it.contentType || 'image/png') + ';base64,' + it.imageData
+                }))
+            if (items.length >= 2) byLayer.set(norm(lyr.layerName), items)
+        }
+    }
+    if (!byLayer.size) return 0
+    let expanded = 0
+    for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]
+        if (r.kind !== 'layer' && r.kind !== 'heading') continue
+        const cls = byLayer.get(norm(r.label))
+        if (!cls) continue
+        // collect the item rows that belong to this heading (up to the next
+        // heading/layer row)
+        let j = i + 1
+        const items: number[] = []
+        while (j < rows.length && rows[j].kind === 'item') { items.push(j); j++ }
+        // only repair the collapse signature: fewer rows than classes and
+        // none of the class labels present
+        const labelsPresent = items.some(k => cls.some(c => c.label && c.label === norm(rows[k].label)))
+        if (items.length >= cls.length || labelsPresent) continue
+        const indent = (items.length ? (rows[items[0]].indent || 0) : ((r.indent || 0) + 1))
+        const fresh: LegendRow[] = cls.map(c => ({
+            kind: 'item' as const,
+            label: c.raw,
+            dataUrl: c.data,
+            indent
+        }))
+        rows.splice(items.length ? items[0] : i + 1, items.length, ...fresh)
+        expanded += cls.length
+        i += fresh.length
+    }
+    return expanded
+}
+
 /** Extract a swatch data URL from a legend symbol cell (canvas, img, or
  *  inline svg), normalizing anything that is not already a data URL. */
 async function swatchFromCell (cell: Element | null): Promise<string | null> {
@@ -1289,6 +1475,7 @@ export async function buildLegendRows(view: MapView, maxItems: number, onProgres
                 try { services.push(await fetchRestLegend(u)) } catch (e) { /* per-service best-effort */ }
             }))
             matchRestSwatches(rows, services)
+            expandRestClasses(rows, services)
         } catch (e) { /* enrichment is best-effort */ }
     }
     // 1) a live Legend widget's rendered DOM: exactly what the user sees.
