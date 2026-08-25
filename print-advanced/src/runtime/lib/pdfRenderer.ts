@@ -903,6 +903,47 @@ export function memoryConstrainedDevice(): boolean {
     } catch (e) { return false }
 }
 
+/** Layer types whose content is SCREEN-ANCHORED symbology (marker sizes,
+ *  line widths, text, halos) that must print at paper size, and which the
+ *  engine can re-render client-side at a higher pixel ratio. Raster-ish
+ *  types are excluded on purpose: they stay on the zoomed base pass,
+ *  which is what gives imagery its print sharpness. */
+const SYMBOL_LAYER_TYPES = new Set([
+    'feature', 'graphics', 'geojson', 'csv', 'wfs', 'ogc-feature', 'stream',
+    'map-notes', 'route', 'subtype-group', 'vector-tile', 'map-image', 'knowledge-graph'
+])
+
+/** Composite the opaque raster base and the transparent symbol overlay
+ *  onto one canvas. White underpaints everything (JPEG has no alpha). */
+async function compositeCapture(
+    baseUrl: string | null, overlayUrl: string, w: number, h: number, jpeg: boolean
+): Promise<string | null> {
+    const load = (src: string): Promise<HTMLImageElement | null> => new Promise((resolve) => {
+        const img = new Image()
+        img.onload = () => resolve(img)
+        img.onerror = () => resolve(null)
+        img.src = src
+    })
+    try {
+        const [base, over] = await Promise.all([
+            baseUrl ? load(baseUrl) : Promise.resolve<HTMLImageElement | null>(null),
+            load(overlayUrl)
+        ])
+        if (!over) return null
+        const c = document.createElement('canvas')
+        c.width = w; c.height = h
+        const ctx = c.getContext('2d')
+        if (!ctx) return null
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, w, h)
+        if (base) ctx.drawImage(base, 0, 0, w, h)
+        ctx.drawImage(over, 0, 0, w, h)
+        const out = jpeg ? c.toDataURL('image/jpeg', 0.95) : c.toDataURL('image/png')
+        c.width = 0; c.height = 0 // release WebKit canvas memory promptly
+        return out
+    } catch (e) { return null }
+}
+
 /** Draw a captured image onto a white-filled canvas and re-encode as
  *  JPEG: guarantees no transparent pixel can render black downstream. */
 async function flattenToWhiteJpeg(dataUrl: string, w: number, h: number): Promise<string> {
@@ -1045,9 +1086,95 @@ async function captureMapHiRes(
             throw new Error('Map capture returned no image at ' + capW + ' x ' + capH + ' px. ' +
                 'Lower the DPI, or set a smaller Max map capture in settings.')
         }
+
+        // ---- symbol-true second pass -------------------------------------
+        // The zoomed offscreen view keeps the extent and raster/tile detail
+        // right, but the engine draws symbology in CSS pixels, so markers,
+        // line widths, text and halos would print at 96/dpi of their real
+        // size (48% at 200 DPI, 32% at 300). Fix: re-render the symbol-
+        // bearing layers with the SAME view resized to natural CSS size at
+        // the TRUE printed scale, and let takeScreenshot supersample - its
+        // internal resolutionScale re-renders with pixelRatio = scale, which
+        // is exactly the parameter that sizes symbols (verified in
+        // @arcgis/core 5.x: Stage.takeScreenshot renders the requested
+        // layer containers with pixelRatio = resolutionScale, capped at
+        // min(4x, ~4096 px); ignoreBackground yields transparency). The
+        // transparent overlay then composites over the sharp raster base.
+        // Side benefit: scale-dependent visibility and labeling on these
+        // layers now evaluate at the true printed scale, like a print
+        // service. Trade-off: relative z-order between the raster group and
+        // the symbol group is flattened (symbols composite on top), which
+        // matches the overwhelmingly common basemap-under-features stack.
+        // Best-effort by design: any failure keeps the full capture above.
+        let symbolPassApplied = false
+        const symbolRatio = effectiveDpi / 96
+        // snapshot the extent BEFORE any second-pass resize: CSS rounding on
+        // the resized container would skew the readback by a sub-pixel
+        let extSnapshot: { xmin: number, ymin: number, xmax: number, ymax: number } | null = null
+        try {
+            const e0: any = (tmp as any).extent
+            if (e0 && isFinite(e0.xmin) && e0.xmax > e0.xmin) {
+                extSnapshot = { xmin: e0.xmin, ymin: e0.ymin, xmax: e0.xmax, ymax: e0.ymax }
+            }
+        } catch (e) { /* snapshot best-effort */ }
+        try {
+            const bigForDevice = memoryConstrainedDevice() && capW * capH > 8388608
+            if (symbolRatio > 1.05 && !bigForDevice) {
+                const leaves: any[] = []
+                try {
+                    const all: any = (tmp.map as any).allLayers
+                    const arrL: any[] = all && all.toArray ? all.toArray() : []
+                    for (const l of arrL) { if (l && l.type !== 'group') leaves.push(l) }
+                } catch (e) { /* classification best-effort */ }
+                const symbolLayers = leaves.filter(l => SYMBOL_LAYER_TYPES.has(String(l.type)))
+                const rasterLayers = leaves.filter(l => !SYMBOL_LAYER_TYPES.has(String(l.type)))
+                if (symbolLayers.length) {
+                    onProgress('Rendering symbols at print size…')
+                    // raster-only base first, while the view is still zoomed
+                    const baseShot = rasterLayers.length
+                        ? await tmp.takeScreenshot({ width: capW, height: capH, layers: rasterLayers, format: 'png' } as any)
+                        : null
+                    // resize the SAME view to its natural on-screen size at the
+                    // printed scale: identical ground extent, but one CSS pixel
+                    // now corresponds to 1/96 inch of paper
+                    const cssW = Math.max(2, Math.round(capW / symbolRatio))
+                    const cssH = Math.max(2, Math.round(capH / symbolRatio))
+                    container.style.width = cssW + 'px'
+                    container.style.height = cssH + 'px'
+                    await new Promise(r => setTimeout(r, 60))
+                        ; (tmp as any).scale = printedScale
+                    await Promise.race([
+                        reactiveUtils.whenOnce(() => !!tmp && !tmp.updating),
+                        new Promise(resolve => setTimeout(resolve, 20000))
+                    ])
+                    await new Promise(r => setTimeout(r, 400))
+                    const overlayShot = await tmp.takeScreenshot({
+                        width: capW,
+                        height: capH,
+                        layers: symbolLayers,
+                        ignoreBackground: true,
+                        format: 'png'
+                    } as any)
+                    if (overlayShot && overlayShot.dataUrl) {
+                        const merged = await compositeCapture(
+                            baseShot && baseShot.dataUrl ? baseShot.dataUrl : null,
+                            overlayShot.dataUrl, capW, capH,
+                            layout.imageFormat !== 'png')
+                        if (merged) {
+                            shot = { ...shot, dataUrl: merged }
+                            symbolPassApplied = true
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            onProgress('Symbol-size pass failed; using the standard capture.')
+        }
+
         // second guard for the same transparency issue: if the API ignored
         // the view background, flatten the capture onto white ourselves
-        if (layout.imageFormat !== 'png') {
+        // (the composited capture is already flattened onto white)
+        if (layout.imageFormat !== 'png' && !symbolPassApplied) {
             try {
                 shot = { ...shot, dataUrl: await flattenToWhiteJpeg(shot.dataUrl, capW, capH) }
             } catch (e) { /* flatten is best-effort; the background guard remains */ }
@@ -1061,7 +1188,8 @@ async function captureMapHiRes(
         // live-SR computation only when not reprojected.
         const capWkid = reprojected ? Number(opts.outputWkid) : liveWkid
         let ground: { xmin: number, ymin: number, xmax: number, ymax: number } | undefined
-        const tExt: any = (tmp as any).extent
+        // prefer the pre-resize snapshot; fall back to the live property
+        const tExt: any = extSnapshot || (tmp as any).extent
         if (tExt && isFinite(tExt.xmin) && tExt.xmax > tExt.xmin) {
             ground = { xmin: tExt.xmin, ymin: tExt.ymin, xmax: tExt.xmax, ymax: tExt.ymax }
         } else if ((tmp as any).center && (tmp as any).resolution) {
