@@ -23,7 +23,8 @@ import * as symbolUtils from 'esri/symbols/support/symbolUtils'
 import { jsPDF } from 'jspdf'
 import {
     PrintLayout, ScaleBarUnits, ScaleBarStyle, NorthArrowStyle, FontFamily, LayoutElement,
-    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig, LegendConfig } from '../../config'
+    TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig, LegendConfig, LegendPatchSize
+} from '../../config'
 import { Drawer, PdfDrawer, CanvasDrawer, SvgDrawer, splitText } from './drawing'
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -92,6 +93,9 @@ export interface RenderOptions {
     }
     /** Output coordinate system WKID; map is re-rendered in this SR client-side. */
     outputWkid?: number
+    /** Capture settle budget in ms (default 45000). Shorter for overview
+     *  insets, longer for series index pages at never-loaded zoom levels. */
+    maxWaitMs?: number
 }
 
 export interface RenderProgress { (message: string): void }
@@ -237,7 +241,7 @@ let _gpuMaxPx: number | null = null
 
 /** Longest canvas side the GPU can render (min of MAX_TEXTURE_SIZE and
  *  MAX_RENDERBUFFER_SIZE), probed once. Falls back to 8192. */
-export function gpuMaxCapturePx (): number {
+export function gpuMaxCapturePx(): number {
     if (_gpuMaxPx !== null) return _gpuMaxPx
     let max = 8192
     try {
@@ -257,7 +261,7 @@ export function gpuMaxCapturePx (): number {
 
 /** Draw series tile outlines and page numbers over an index-page capture.
  *  Ground-to-page via the capture's groundExtent, clipped to the frame. */
-export function drawIndexOverlay (
+export function drawIndexOverlay(
     d: Drawer,
     layout: PrintLayout,
     cap: { groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number } },
@@ -279,7 +283,9 @@ export function drawIndexOverlay (
         const x1 = Math.max(fx, gx(t.xmin)); const x2 = Math.min(fx + fw, gx(t.xmax))
         const y1 = Math.max(fy, gy(t.ymax)); const y2 = Math.min(fy + fh, gy(t.ymin))
         if (x2 - x1 < 2 || y2 - y1 < 2) continue
-        d.rect(x1, y1, x2 - x1, y2 - y1, 'D')
+        // 'S' (stroke), not jsPDF's 'D' alias: the canvas/SVG backends only
+        // implement the typed ShapeStyle set, where 'D' would draw nothing
+        d.rect(x1, y1, x2 - x1, y2 - y1, 'S')
         const label = String(t.page)
         const fs = Math.max(7, Math.min(14, (y2 - y1) * 0.25))
         d.setFont('bold', fs)
@@ -297,7 +303,7 @@ export function drawIndexOverlay (
 /** Adjacent-page labels on a series page's frame edges (ArcGIS Pro map
  *  series convention): the right edge names the page to the right, the
  *  bottom edge the page below, and so on. Grid adjacency from row/col. */
-export function drawSeriesAdjacency (
+export function drawSeriesAdjacency(
     d: Drawer,
     layout: PrintLayout,
     tile: { page: number, row: number, col: number },
@@ -339,7 +345,7 @@ export function drawSeriesAdjacency (
                 : layout.pageHeightIn * PT_PER_IN - 4
             if (typeof (d as any).haloText === 'function') {
                 d.setTextColor(20, 20, 20)
-                ;(d as any).haloText(label, fx + fw / 2, y, 'center', [255, 255, 255], 1.6)
+                    ; (d as any).haloText(label, fx + fw / 2, y, 'center', [255, 255, 255], 1.6)
             } else {
                 d.setTextColor(20, 20, 20)
                 d.text(label, fx + fw / 2, y, 'center')
@@ -379,7 +385,7 @@ export function drawSeriesAdjacency (
 /** True when a capture is essentially a blank white image: the telltale
  *  of screenshotting a zoom level whose basemap tiles have not painted
  *  yet. Samples a small downscale; best-effort (false on any error). */
-async function captureLooksBlank (dataUrl: string): Promise<boolean> {
+async function captureLooksBlank(dataUrl: string): Promise<boolean> {
     try {
         if (typeof document === 'undefined') return false
         return await new Promise<boolean>((resolve) => {
@@ -411,7 +417,7 @@ async function captureLooksBlank (dataUrl: string): Promise<boolean> {
  *  whole page grid in the frame's top-right corner with the CURRENT page
  *  filled, so every printed sheet answers "where am I in the atlas?".
  *  Pure vector from tile geometry; no extra capture. */
-export function drawSeriesKeymap (
+export function drawSeriesKeymap(
     d: Drawer,
     layout: PrintLayout,
     tiles: Array<{ page: number, xmin: number, ymin: number, xmax: number, ymax: number }>,
@@ -444,7 +450,7 @@ export function drawSeriesKeymap (
             d.setFill(225, 110, 20)
             d.rect(x, y, w, h, 'FD')
         } else {
-            d.rect(x, y, w, h, 'D')
+            d.rect(x, y, w, h, 'S')
         }
         // page numbers in every cell: the active page in focus (bold white
         // on orange), the rest muted gray, so the key map reads even
@@ -460,7 +466,7 @@ export function drawSeriesKeymap (
  *  right page margin, mirroring the author/copyright credit line on the
  *  left. Same baseline convention as the credits; falls back to a haloed
  *  label inside the frame corner when the margin strip is occupied. */
-export function drawSeriesPageNumber (
+export function drawSeriesPageNumber(
     d: Drawer,
     layout: PrintLayout,
     pageIdx: number,
@@ -511,7 +517,7 @@ export function drawSeriesPageNumber (
  *  the frame aspect and the printed scale stays uniform. Corner-overlay
  *  legends keep the previous behavior (page 1 only); 'secondPage'
  *  appends dedicated legend pages after the index, as single map does. */
-export async function renderSeries (
+export async function renderSeries(
     view: MapView,
     layout: PrintLayout,
     title: string,
@@ -669,10 +675,10 @@ export async function renderSeries (
         fixedScale: Math.ceil(idxScale),
         lockedCenter: { x: (xmin + xmax) / 2, y: (ymin + ymax) / 2 } as any
     }
-    // the index sits at a zoom level the session has likely never loaded:
-    // give tiles a generous settle budget, and if the capture still comes
-    // back blank white, wait for the basemap and try once more
-    ;(idxOpts as any).maxWaitMs = Math.max(Number((idxOpts as any).maxWaitMs) || 0, 45000)
+        // the index sits at a zoom level the session has likely never loaded:
+        // give tiles a generous settle budget, and if the capture still comes
+        // back blank white, wait for the basemap and try once more
+        ; (idxOpts as any).maxWaitMs = Math.max(Number((idxOpts as any).maxWaitMs) || 0, 45000)
     let idxCap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, useLayout, maxImagePx, idxOpts, onProgress)
     try {
         if (await captureLooksBlank(idxCap.dataUrl)) {
@@ -735,7 +741,7 @@ const QR_FMT_M0 = [1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0]
 const QR_VERINFO: Record<number, string> = {
     7: '000111110010010100', 8: '001000010110111100', 9: '001001101010011001', 10: '001010010011010011'
 }
-function qrGf (): { exp: number[], log: number[] } {
+function qrGf(): { exp: number[], log: number[] } {
     const exp = new Array(512).fill(0); const log = new Array(256).fill(0)
     let x = 1
     for (let i = 0; i < 255; i++) {
@@ -746,7 +752,7 @@ function qrGf (): { exp: number[], log: number[] } {
     return { exp, log }
 }
 /** Build QR modules for a UTF-8 string. Returns null if too long. */
-export function qrModules (text: string): { size: number, get: (r: number, c: number) => boolean } | null {
+export function qrModules(text: string): { size: number, get: (r: number, c: number) => boolean } | null {
     const bytes: number[] = []
     for (const ch of unescape(encodeURIComponent(text))) bytes.push(ch.charCodeAt(0))
     let ver = 0
@@ -885,7 +891,7 @@ export function qrModules (text: string): { size: number, get: (r: number, c: nu
  *  kills the tab past it: every iOS browser (Safari, Chrome/CriOS,
  *  Firefox/FxiOS are all WebKit there, iPadOS reports as Mac with touch),
  *  plus anything reporting very low device memory. */
-export function memoryConstrainedDevice (): boolean {
+export function memoryConstrainedDevice(): boolean {
     try {
         const nav: any = typeof navigator !== 'undefined' ? navigator : null
         if (!nav) return false
@@ -899,7 +905,7 @@ export function memoryConstrainedDevice (): boolean {
 
 /** Draw a captured image onto a white-filled canvas and re-encode as
  *  JPEG: guarantees no transparent pixel can render black downstream. */
-async function flattenToWhiteJpeg (dataUrl: string, w: number, h: number): Promise<string> {
+async function flattenToWhiteJpeg(dataUrl: string, w: number, h: number): Promise<string> {
     return await new Promise<string>((resolve, reject) => {
         const img = new Image()
         img.onload = () => {
@@ -1168,7 +1174,7 @@ const MAX_LEGEND_ROWS = 400
  *  Matching uses the row's label within the context of the most recent
  *  heading/layer names (map service sublayer names). Pure and exported
  *  for tests: services = [{ layers: [{ layerName, legend: [...] }] }]. */
-export function matchRestSwatches (rows: LegendRow[], services: any[]): number {
+export function matchRestSwatches(rows: LegendRow[], services: any[]): number {
     const norm = (x: any): string => String(x || '').trim().toLowerCase()
     interface Entry { layerName: string, items: Array<{ label: string, data: string }> }
     const entries: Entry[] = []
@@ -1219,7 +1225,7 @@ export function matchRestSwatches (rows: LegendRow[], services: any[]): number {
  *  the service's REST legend knows several classes, replace that lone item
  *  with the full class list: server-rendered swatch plus label for each.
  *  Single-symbol layers are untouched. */
-export function expandRestClasses (rows: LegendRow[], services: any[]): number {
+export function expandRestClasses(rows: LegendRow[], services: any[]): number {
     const norm = (x: any): string => String(x || '').trim().toLowerCase()
     const byLayer = new Map<string, Array<{ label: string, data: string, raw: string }>>()
     for (const svc of services || []) {
@@ -1266,7 +1272,7 @@ export function expandRestClasses (rows: LegendRow[], services: any[]): number {
 
 /** Extract a swatch data URL from a legend symbol cell (canvas, img, or
  *  inline svg), normalizing anything that is not already a data URL. */
-async function swatchFromCell (cell: Element | null): Promise<string | null> {
+async function swatchFromCell(cell: Element | null): Promise<string | null> {
     if (!cell) return null
     try {
         const canvas = (cell.querySelector('canvas') || deepQuery(cell, 'canvas')) as HTMLCanvasElement | null
@@ -1315,7 +1321,7 @@ async function swatchFromCell (cell: Element | null): Promise<string | null> {
 /** Harvest legend rows from a LIVE Legend widget's rendered DOM: exactly
  *  what the user sees, in the same order, swatches included. Returns []
  *  when the widget is not on screen (closed panel, different page). */
-export async function harvestLegendDom (root: Element, labelsOnly?: boolean): Promise<LegendRow[]> {
+export async function harvestLegendDom(root: Element, labelsOnly?: boolean): Promise<LegendRow[]> {
     const rows: LegendRow[] = []
     const pending: Array<{ row: LegendRow, cell: Element | null }> = []
     const nodes = root.querySelectorAll(
@@ -1375,7 +1381,7 @@ export async function harvestLegendDom (root: Element, labelsOnly?: boolean): Pr
  *  ArcGIS Maps SDK builds (EB 1.21+) render widgets as web components
  *  (e.g. <arcgis-legend>) whose internals live behind shadow DOM, which
  *  plain querySelector cannot see. Bounded traversal, best-effort. */
-export function deepQueryAll (root: any, selector: string, cap: number = 400): Element[] {
+export function deepQueryAll(root: any, selector: string, cap: number = 400): Element[] {
     const out: Element[] = []
     const stack: any[] = [root]
     const seen = new Set<any>()
@@ -1396,13 +1402,13 @@ export function deepQueryAll (root: any, selector: string, cap: number = 400): E
     return out
 }
 
-export function deepQuery (root: any, selector: string): Element | null {
+export function deepQuery(root: any, selector: string): Element | null {
     return deepQueryAll(root, selector, 1)[0] || null
 }
 
 /** Resolve a legend root from a holder: light-DOM .esri-legend first, then
  *  shadow-DOM .esri-legend, then the <arcgis-legend> component itself. */
-function legendRootIn (holder: any): Element | null {
+function legendRootIn(holder: any): Element | null {
     try {
         const light = holder.querySelector && holder.querySelector('.esri-legend')
         if (light) return light
@@ -1417,7 +1423,7 @@ function legendRootIn (holder: any): Element | null {
     return null
 }
 
-export function findLegendDom (widgetId?: string): Element | null {
+export function findLegendDom(widgetId?: string): Element | null {
     try {
         if (widgetId) {
             const esc = (window as any).CSS && (CSS as any).escape ? (CSS as any).escape(widgetId) : widgetId
@@ -1476,6 +1482,60 @@ export async function buildLegendRows(view: MapView, maxItems: number, onProgres
             }))
             matchRestSwatches(rows, services)
             expandRestClasses(rows, services)
+            // Group-of-unlabeled-sublayers repair (see repairServiceGroupItems):
+            // build each map service's group -> ordered leaves table from the
+            // layer's own sublayer tree, join swatches from the REST legend.
+            try {
+                const groups: Array<{ title: string, leaves: Array<{ title: string, legend: Array<{ label: string, data: string }> }> }> = []
+                for (const l of arr) {
+                    if (!(l.type === 'map-image' || l.type === 'tile')) continue
+                    let json: any = null
+                    try { json = await fetchRestLegend(String(l.url).replace(/\/\d+\/?$/, '')) } catch (e) { continue }
+                    const byId = new Map<number, Array<{ label: string, data: string }>>()
+                    for (const le of ((json && json.layers) || [])) {
+                        byId.set(Number(le.layerId), ((le.legend || []) as any[])
+                            .filter((it: any) => it && it.imageData)
+                            .map((it: any) => ({
+                                label: String(it.label || ''),
+                                data: 'data:' + (it.contentType || 'image/png') + ';base64,' + it.imageData
+                            })))
+                    }
+                    const kidsOf = (node: any): any[] => {
+                        const subs = node && node.sublayers
+                        if (!subs) return []
+                        return subs.toArray ? subs.toArray() : Array.from(subs)
+                    }
+                    const leavesOf = (node: any): Array<{ id: number, title: string }> => {
+                        const kids = kidsOf(node)
+                        if (!kids.length) {
+                            return (node && typeof node.id === 'number' && isFinite(node.id))
+                                ? [{ id: node.id, title: String(node.title || '') }]
+                                : []
+                        }
+                        const out: Array<{ id: number, title: string }> = []
+                        for (const k of kids) out.push(...leavesOf(k))
+                        // legend (and the Legend widget) list leaves in service
+                        // definition order = ascending id
+                        return out.sort((a, b) => a.id - b.id)
+                    }
+                    const addGroup = (title: any, node: any): void => {
+                        if (!kidsOf(node).length) return // leaves are not groups
+                        const leaves = leavesOf(node)
+                        if (!leaves.length) return
+                        groups.push({
+                            title: String(title || ''),
+                            leaves: leaves.map(lf => ({ title: lf.title, legend: byId.get(lf.id) || [] }))
+                        })
+                    }
+                    const walkGroups = (node: any): void => {
+                        addGroup(node && node.title, node)
+                        for (const k of kidsOf(node)) walkGroups(k)
+                    }
+                    addGroup(l.title, l) // the whole service can be the heading too
+                    for (const s of kidsOf(l)) walkGroups(s)
+                }
+                if (groups.length) repairServiceGroupItems(rows, groups)
+            } catch (e) { /* repair is best-effort */ }
         } catch (e) { /* enrichment is best-effort */ }
     }
     // 1) a live Legend widget's rendered DOM: exactly what the user sees.
@@ -1529,7 +1589,7 @@ export async function buildLegendRows(view: MapView, maxItems: number, onProgres
 
 /** Map a service /legend?f=json response for one sublayer into rows.
  *  Pure and exported for tests. */
-export function mapRestLegendToRows (json: any, sublayerId: number, indent: number): LegendRow[] {
+export function mapRestLegendToRows(json: any, sublayerId: number, indent: number): LegendRow[] {
     const rows: LegendRow[] = []
     const entry = (json && json.layers || []).find((l: any) => l.layerId === sublayerId)
     if (!entry) return rows
@@ -1542,13 +1602,57 @@ export function mapRestLegendToRows (json: any, sublayerId: number, indent: numb
     return rows
 }
 
-/** Only data: URLs can be embedded by every export backend. */
-export function isEmbeddableSwatch (src: string | null | undefined): boolean {
-    return !!src && String(src).startsWith('data:')
+/** Only data: IMAGE URLs can be embedded by every export backend. The
+ *  image/ check matters: ArcGIS Server returns errors as HTTP-200 JSON,
+ *  so a failed swatch fetch can round-trip into a data:application/json
+ *  URL that would count as coverage and then print as a gray box. */
+export function isEmbeddableSwatch(src: string | null | undefined): boolean {
+    return !!src && String(src).startsWith('data:image/')
+}
+
+/** Repair harvested rows for a map-service GROUP layer whose leaf
+ *  sublayers each carry a single UNLABELED symbol (picture markers on
+ *  crime/POI services are the classic case). Such layers harvest as a
+ *  heading followed by bare items: no names (the renderer label is
+ *  empty), no embeddable swatches. The map's own sublayer tree knows the
+ *  names and the service's REST legend knows the swatches; marry them
+ *  positionally when the item count matches the group's leaf count.
+ *  Pure and exported for tests. */
+export function repairServiceGroupItems(
+    rows: LegendRow[],
+    groups: Array<{ title: string, leaves: Array<{ title: string, legend: Array<{ label: string, data: string }> }> }>
+): number {
+    const norm = (x: any): string => String(x || '').trim().toLowerCase()
+    let repaired = 0
+    for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]
+        if (r.kind !== 'heading' && r.kind !== 'layer') continue
+        const g = groups.find(x => x.leaves.length > 0 && norm(x.title) === norm(r.label))
+        if (!g) continue
+        // the contiguous run of item rows belonging to this heading
+        let j = i + 1
+        const run: number[] = []
+        while (j < rows.length && rows[j].kind === 'item') { run.push(j); j++ }
+        if (run.length !== g.leaves.length) continue
+        // only repair runs that are actually broken (unlabeled or swatchless);
+        // a healthy legend is never rewritten
+        const broken = run.every(k => !rows[k].label || !isEmbeddableSwatch(rows[k].dataUrl))
+        if (!broken) continue
+        for (let k = 0; k < run.length; k++) {
+            const item = rows[run[k]]
+            const leaf = g.leaves[k]
+            if (!item.label && leaf.title) { item.label = leaf.title; repaired++ }
+            if (!isEmbeddableSwatch(item.dataUrl) && leaf.legend.length) {
+                item.dataUrl = leaf.legend[0].data
+                repaired++
+            }
+        }
+    }
+    return repaired
 }
 
 let _esriRequestP: Promise<any> | null = null
-function esriRequestModule (): Promise<any> {
+function esriRequestModule(): Promise<any> {
     if (!_esriRequestP) _esriRequestP = loadArcGISJSAPIModules(['esri/request']).then(m => m[0])
     return _esriRequestP
 }
@@ -1559,7 +1663,7 @@ const _swatchUrlCache = new Map<string, Promise<string | null>>()
  *  raster/SVG backends can embed it. Goes through esri/request so portal
  *  tokens apply to secured services. Cached per URL: repeated symbols
  *  cost one fetch, not one per legend row. */
-async function urlToDataUrl (src: string): Promise<string | null> {
+async function urlToDataUrl(src: string): Promise<string | null> {
     if (!src) return null
     if (src.startsWith('data:')) return src
     let p = _swatchUrlCache.get(src)
@@ -1570,6 +1674,9 @@ async function urlToDataUrl (src: string): Promise<string | null> {
                 const res = await esriRequest(src, { responseType: 'blob' })
                 const blob = res && res.data
                 if (!blob) return null
+                // ArcGIS Server reports failures as HTTP-200 JSON; an error
+                // body is not a swatch and must not be embedded as one
+                if (blob.type && !String(blob.type).startsWith('image/')) return null
                 return await new Promise<string | null>((resolve) => {
                     const fr = new FileReader()
                     fr.onload = () => resolve(String(fr.result))
@@ -1593,7 +1700,7 @@ const _restLegendCache = new Map<string, Promise<any>>()
 
 /** Fetch a map service's REST legend (server-rendered swatches), through
  *  esri/request so portal tokens and interceptors apply. Cached per URL. */
-async function fetchRestLegend (serviceUrl: string, dpi: number = LEGEND_SWATCH_DPI): Promise<any> {
+async function fetchRestLegend(serviceUrl: string, dpi: number = LEGEND_SWATCH_DPI): Promise<any> {
     const key = serviceUrl + '#' + dpi
     let p = _restLegendCache.get(key)
     if (!p) {
@@ -1612,7 +1719,7 @@ async function fetchRestLegend (serviceUrl: string, dpi: number = LEGEND_SWATCH_
 
 /** Service URL + sublayer id for an ActiveLayerInfo that wraps a map
  *  service sublayer; null for anything else. */
-function sublayerRestTarget (ali: any): { url: string, id: number } | null {
+function sublayerRestTarget(ali: any): { url: string, id: number } | null {
     const lyr = ali && ali.layer
     if (!lyr) return null
     const id = lyr.id
@@ -1738,6 +1845,11 @@ async function infoToRow(info: any, depth: number): Promise<LegendRow> {
     let dataUrl: string | null = null
     try {
         if (info && info.symbol) dataUrl = await symbolToDataUrl(info.symbol)
+        // map-service legend infos carry a server-rendered image URL in
+        // .src (no client symbol object exists for those)
+        if (!dataUrl && info && typeof info.src === 'string' && info.src) {
+            dataUrl = await urlToDataUrl(info.src)
+        }
         if (!dataUrl && info && info.preview && info.preview.querySelector) {
             const canvas = info.preview.querySelector('canvas')
             if (canvas) {
@@ -2326,7 +2438,7 @@ export interface LegendLayout {
     usedHeightPt: number
 }
 
-export function legendPatchPt (size: LegendPatchSize | undefined, fontPt: number): { w: number, h: number } {
+export function legendPatchPt(size: LegendPatchSize | undefined, fontPt: number): { w: number, h: number } {
     const base = size === 'small' ? 9 : size === 'large' ? 18 : 13
     // Patches shrink proportionally with the font (Pro's AdjustFontSize
     // behavior); otherwise a fixed patch height defeats the shrink pass.
@@ -2339,7 +2451,7 @@ export function legendPatchPt (size: LegendPatchSize | undefined, fontPt: number
  *  fitting strategies: try column counts (auto), then shrink the font,
  *  then truncate with an honest "+ N more" footer. Pure and testable:
  *  the measurement callback abstracts the Drawer. */
-export function layoutLegend (
+export function layoutLegend(
     rows: LegendRow[],
     boxWPt: number,
     boxHPt: number,
@@ -2550,7 +2662,7 @@ export function layoutLegend (
     return { columns: maxCols, colWidthPt: colW, fontPt: minFont, items, truncated, titleFontPt, usedHeightPt: boxHPt }
 }
 
-export function approxTextWidthPt (text: string, fontPt: number): number {
+export function approxTextWidthPt(text: string, fontPt: number): number {
     return (text || '').length * fontPt * 0.52
 }
 
@@ -2567,7 +2679,7 @@ export interface LegendPanelResult {
  *  (pictures, texts, scale bars authored over the frame corners). Trims
  *  from whichever end preserves more panel; vertical for side panels,
  *  horizontal for the bottom panel. */
-export function trimPanelBox (
+export function trimPanelBox(
     box: { xIn: number, yIn: number, wIn: number, hIn: number },
     others: Array<{ xIn: number, yIn: number, wIn: number, hIn: number }>,
     vertical: boolean
@@ -2603,7 +2715,7 @@ export function trimPanelBox (
     return b
 }
 
-export function computeLegendPanel (
+export function computeLegendPanel(
     rows: LegendRow[],
     mf: { xIn: number, yIn: number, wIn: number, hIn: number },
     cfg: LegendConfig,
@@ -2664,7 +2776,7 @@ export function computeLegendPanel (
  *  font (no shrinking, no truncation across the whole document). Blocks
  *  that split across pages repeat their heading with '(continued)'.
  *  Pure and exported for tests. */
-export function paginateLegendRows (
+export function paginateLegendRows(
     rows: LegendRow[],
     boxWPt: number,
     boxHPt: number,
@@ -2702,7 +2814,7 @@ export function paginateLegendRows (
 
 /** Compose a dedicated legend page: same sheet size and orientation as
  *  the map page, 0.5in margins, fitting engine given the whole sheet. */
-export async function drawLegendPage (d: Drawer, pageWIn: number, pageHIn: number, rows: LegendRow[], cfgIn?: LegendConfig): Promise<void> {
+export async function drawLegendPage(d: Drawer, pageWIn: number, pageHIn: number, rows: LegendRow[], cfgIn?: LegendConfig): Promise<void> {
     const margin = 0.5
     const el: LegendEl = {
         type: 'legend',
@@ -2716,7 +2828,7 @@ export async function drawLegendPage (d: Drawer, pageWIn: number, pageHIn: numbe
     await drawLegendEl(d, el, rows, cfgIn, true)
 }
 
-async function drawLegendEl (d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?: LegendConfig, isPanel?: boolean): Promise<number> {
+async function drawLegendEl(d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?: LegendConfig, isPanel?: boolean): Promise<number> {
     const cfg: LegendConfig = { ...LEGEND_DEFAULTS, ...(cfgIn || {}), enabled: true }
     const lx = el.xIn * PT_PER_IN
     const ly = el.yIn * PT_PER_IN
@@ -2770,7 +2882,7 @@ async function drawLegendEl (d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?:
             if (r.dataUrl) {
                 // contain fit: line swatches stay wide and thin, markers stay
                 // round; never stretch a symbol into the patch box
-                try { await d.image(r.dataUrl, 'PNG', x + 2, py, it.patchWPt, it.patchHPt, 'contain', 'left', 'middle') } catch (e) {
+                try { await d.image(r.dataUrl, 'PNG', x + 2, py, it.patchWPt, it.patchHPt, 'contain', 'left', 'center') } catch (e) {
                     d.setFill(210, 210, 210); d.rect(x + 2, py, it.patchWPt, it.patchHPt, 'F')
                 }
             } else if (r.color) {
@@ -2807,13 +2919,13 @@ async function drawLegendEl (d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?:
 
 const R_MERC = 6378137
 
-export function lonToMercX (lonDeg: number): number { return R_MERC * lonDeg * Math.PI / 180 }
-export function mercXToLon (x: number): number { return (x / R_MERC) * 180 / Math.PI }
-export function latToMercY (latDeg: number): number { return R_MERC * Math.asinh(Math.tan(latDeg * Math.PI / 180)) }
-export function mercYToLat (y: number): number { return Math.atan(Math.sinh(y / R_MERC)) * 180 / Math.PI }
+export function lonToMercX(lonDeg: number): number { return R_MERC * lonDeg * Math.PI / 180 }
+export function mercXToLon(x: number): number { return (x / R_MERC) * 180 / Math.PI }
+export function latToMercY(latDeg: number): number { return R_MERC * Math.asinh(Math.tan(latDeg * Math.PI / 180)) }
+export function mercYToLat(y: number): number { return Math.atan(Math.sinh(y / R_MERC)) * 180 / Math.PI }
 
 /** Clean 1 / 2 / 2.5 / 5 x 10^k interval targeting ~divisions lines. */
-export function niceGridInterval (span: number, divisions = 4): number {
+export function niceGridInterval(span: number, divisions = 4): number {
     const raw = span / Math.max(1, divisions)
     const pow = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-12))))
     let best = pow
@@ -2828,7 +2940,7 @@ const DEG_LADDER = [45, 30, 15, 10, 5, 2, 1,
     30 / 60, 15 / 60, 10 / 60, 5 / 60, 2 / 60, 1 / 60,
     30 / 3600, 15 / 3600, 10 / 3600, 5 / 3600, 2 / 3600, 1 / 3600]
 
-export function niceGraticuleInterval (spanDeg: number, divisions = 4): number {
+export function niceGraticuleInterval(spanDeg: number, divisions = 4): number {
     const raw = spanDeg / Math.max(1, divisions)
     for (const step of DEG_LADDER) {
         if (step <= raw) return step
@@ -2837,7 +2949,7 @@ export function niceGraticuleInterval (spanDeg: number, divisions = 4): number {
 }
 
 /** Degrees -> D°MM'SS" trimming units the interval never needs. */
-export function fmtDMS (deg: number, intervalDeg: number): string {
+export function fmtDMS(deg: number, intervalDeg: number): string {
     const sign = deg < 0 ? '-' : ''
     const a = Math.abs(deg)
     let d = Math.floor(a)
@@ -2854,7 +2966,7 @@ export function fmtDMS (deg: number, intervalDeg: number): string {
 }
 
 /** Clip a segment to a rectangle (Liang-Barsky). Returns null when fully outside. */
-export function clipSegToRect (
+export function clipSegToRect(
     x1: number, y1: number, x2: number, y2: number,
     rx: number, ry: number, rw: number, rh: number
 ): [number, number, number, number] | null {
@@ -2875,7 +2987,7 @@ export function clipSegToRect (
  *  find the lat/lon range (extremes can sit mid-edge in projected systems),
  *  then draws each meridian/parallel as a sampled polyline clipped to the
  *  frame, so curved graticules render correctly in any projection. */
-export function buildGraticuleGeometry (
+export function buildGraticuleGeometry(
     ext: { xmin: number, ymin: number, xmax: number, ymax: number },
     mf: { xIn: number, yIn: number, wIn: number, hIn: number },
     cfg: GridConfig,
@@ -2983,12 +3095,12 @@ export function buildGraticuleGeometry (
 
 /** Marks (ticks, crosses) scale with the map frame so they stay visible on
  *  large formats: 1x at letter size, ~4x on a 36x48 sheet. */
-export function gridMarkScale (mf: { wIn: number, hIn: number }): number {
+export function gridMarkScale(mf: { wIn: number, hIn: number }): number {
     return Math.max(1, Math.min(5, Math.min(mf.wIn, mf.hIn) / 6.5))
 }
 
 /** Cartographic geographic label: 108°30'W rather than -108°30'. */
-export function fmtGeoLabel (deg: number, intervalDeg: number, axis: 'lon' | 'lat'): string {
+export function fmtGeoLabel(deg: number, intervalDeg: number, axis: 'lon' | 'lat'): string {
     const base = fmtDMS(Math.abs(deg), intervalDeg)
     if (Math.abs(deg) < 1e-12) return base
     return base + (axis === 'lon' ? (deg < 0 ? 'W' : 'E') : (deg < 0 ? 'S' : 'N'))
@@ -3000,7 +3112,7 @@ export interface GridGeometry { lines: GridLine[], crosses: GridLine[], ticks: G
 
 /** Pure geometry builder for graticule / measured grids (rotation 0).
  *  Returns page-inch line work + edge label anchors; the caller styles it. */
-export function buildGridGeometry (
+export function buildGridGeometry(
     cap: { groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number }, projection?: string },
     mf: { xIn: number, yIn: number, wIn: number, hIn: number },
     cfg: GridConfig
@@ -3067,7 +3179,7 @@ export function buildGridGeometry (
 }
 
 /** Reference (alphanumeric index) grid: pure page-space. */
-export function buildReferenceGrid (
+export function buildReferenceGrid(
     mf: { xIn: number, yIn: number, wIn: number, hIn: number },
     cols: number, rows: number, labels: boolean
 ): GridGeometry {
@@ -3104,7 +3216,7 @@ export function buildReferenceGrid (
 }
 
 /** Draw a built grid over the map frame. */
-function drawGrid (d: Drawer, geom: GridGeometry, cfg: GridConfig): void {
+function drawGrid(d: Drawer, geom: GridGeometry, cfg: GridConfig): void {
     const lc = cfg.lineColor || [90, 90, 90]
     d.setStroke(lc[0], lc[1], lc[2])
     d.setLineWidth(cfg.lineWidthPt > 0 ? cfg.lineWidthPt : 0.5)
@@ -3151,10 +3263,10 @@ function drawGrid (d: Drawer, geom: GridGeometry, cfg: GridConfig): void {
  *  positioned in a corner of the main map frame and clamped inside it. */
 interface BoxIn { xIn: number, yIn: number, wIn: number, hIn: number }
 
-function boxesIntersect (a: BoxIn, b: BoxIn): boolean {
+function boxesIntersect(a: BoxIn, b: BoxIn): boolean {
     const eps = 0.01
     return !(a.xIn + a.wIn <= b.xIn + eps || b.xIn + b.wIn <= a.xIn + eps ||
-             a.yIn + a.hIn <= b.yIn + eps || b.yIn + b.hIn <= a.yIn + eps)
+        a.yIn + a.hIn <= b.yIn + eps || b.yIn + b.hIn <= a.yIn + eps)
 }
 
 /** Corner-overlay placement that avoids overlapping other content inside
@@ -3162,7 +3274,7 @@ function boxesIntersect (a: BoxIn, b: BoxIn): boolean {
  *  Strategy: keep the configured corner if free; otherwise slide within
  *  the corner column past the obstacles; otherwise try the other corners
  *  (same edge first). Pure and exported for tests. */
-export function resolveLegendCorner (
+export function resolveLegendCorner(
     mf: BoxIn,
     cfg: { position: string, widthIn: number, heightIn: number, marginIn: number },
     obstacles: BoxIn[]
@@ -3205,7 +3317,7 @@ export function resolveLegendCorner (
     return base
 }
 
-export function overviewBoxIn (
+export function overviewBoxIn(
     mf: { xIn: number, yIn: number, wIn: number, hIn: number },
     ov: OverviewConfig
 ): { xIn: number, yIn: number, wIn: number, hIn: number } {
@@ -3225,7 +3337,7 @@ export function overviewBoxIn (
 /** Extent indicator (page inches) inside the overview box. Both captures
  *  share center and rotation, so the printed map's footprint is a centered
  *  axis-aligned rectangle scaled by printedScale / overviewScale. */
-export function overviewIndicatorIn (
+export function overviewIndicatorIn(
     box: { xIn: number, yIn: number, wIn: number, hIn: number },
     mainWIn: number, mainHIn: number,
     printedScale: number, overviewScale: number
@@ -3246,7 +3358,7 @@ export function overviewIndicatorIn (
  *  export time via jimu-arcgis so a missing module can never break widget
  *  class load. Resolves to { project(point, outSR), Point } or null. */
 let _projector: { project: (pt: any, sr: any) => any, Point: any } | null | undefined
-async function getProjector (): Promise<{ project: (pt: any, sr: any) => any, Point: any } | null> {
+async function getProjector(): Promise<{ project: (pt: any, sr: any) => any, Point: any } | null> {
     if (_projector !== undefined) return _projector
     try {
         const [op, Pt] = await loadArcGISJSAPIModules(['esri/geometry/operators/projectOperator', 'esri/geometry/Point'])
@@ -3846,9 +3958,11 @@ export async function renderLayout(
                 const projector = await getProjector()
                 if (!projector) throw new Error('projection engine unavailable')
                 const PointCls: any = projector.Point
-                const capSR = new SpatialReference({ wkid: (options.outputWkid && options.outputWkid > 0)
-                    ? options.outputWkid
-                    : ((liveView.spatialReference as any)?.wkid || 4326) })
+                const capSR = new SpatialReference({
+                    wkid: (options.outputWkid && options.outputWkid > 0)
+                        ? options.outputWkid
+                        : ((liveView.spatialReference as any)?.wkid || 4326)
+                })
                 const wgs = new SpatialReference({ wkid: 4326 })
                 const toGeo = (x: number, y: number): [number, number] => {
                     const out: any = projector.project(new PointCls({ x, y, spatialReference: capSR }), wgs)
