@@ -944,6 +944,43 @@ async function compositeCapture(
     } catch (e) { return null }
 }
 
+/** Finest (smallest-denominator) tiled LOD scale the view can actually
+ *  serve, across the basemap and any tile / imagery / vector-tile layers.
+ *  Returns 0 when nothing tiled is found (all-dynamic map): callers then
+ *  keep the unclamped zoom. This is the floor past which zooming the
+ *  offscreen capture buys NO real imagery detail (no finer tiles exist)
+ *  and, for cached services with a hard finest level, throws the imagery
+ *  off-scale - so the raster pass must never render below it. */
+function finestTiledScale(view: MapView): number {
+    let finest = Infinity
+    const consider = (lods: any): void => {
+        try {
+            const arr: any[] = lods && lods.toArray ? lods.toArray() : (Array.isArray(lods) ? lods : [])
+            for (const lod of arr) {
+                const s = Number(lod && lod.scale)
+                if (isFinite(s) && s > 0) finest = Math.min(finest, s)
+            }
+        } catch (e) { /* ignore */ }
+    }
+    try {
+        // the view's own effective LODs (basemap/reference) are the truth
+        const c: any = (view as any).constraints
+        if (c) { consider(c.effectiveLODs); consider(c.lods) }
+    } catch (e) { /* ignore */ }
+    try {
+        const all: any = (view.map as any).allLayers
+        const arr: any[] = all && all.toArray ? all.toArray() : []
+        for (const l of arr) {
+            if (l && l.visible !== false && (l.type === 'tile' || l.type === 'vector-tile' ||
+                l.type === 'imagery-tile' || l.type === 'wmts' || l.type === 'base-tile')) {
+                const ti: any = l.tileInfo
+                if (ti && ti.lods) consider(ti.lods)
+            }
+        }
+    } catch (e) { /* ignore */ }
+    return isFinite(finest) ? finest : 0
+}
+
 /** Draw a captured image onto a white-filled canvas and re-encode as
  *  JPEG: guarantees no transparent pixel can render black downstream. */
 async function flattenToWhiteJpeg(dataUrl: string, w: number, h: number): Promise<string> {
@@ -1108,6 +1145,25 @@ async function captureMapHiRes(
         // Best-effort by design: any failure keeps the full capture above.
         let symbolPassApplied = false
         const symbolRatio = effectiveDpi / 96
+        // Imagery-scale guard: the initial view is zoomed to viewScale to pull
+        // finer basemap tiles, but for a cached aerial whose finest LOD is
+        // near the printed scale (e.g. printing 1:141 zooms to ~1:45), that
+        // pushes past the service's finest tiles and the imagery comes back
+        // off-scale. The raster pass must never render below the finest LOD.
+        const finestLod = finestTiledScale(liveView)
+        const rasterRenderScale = finestLod > 0 ? Math.max(viewScale, finestLod) : viewScale
+        // Only clamp when the DPI zoom actually over-zoomed (symbolRatio > 1);
+        // at 96 DPI there is no zoom, so imagery is already to-scale and a
+        // clamp pass would risk excluding symbols with no benefit.
+        const clampNeeded = symbolRatio > 1.05 && rasterRenderScale > viewScale * 1.02
+        // container CSS size (px) that keeps the print extent to-scale while a
+        // view renders at renderScale; takeScreenshot then supersamples to
+        // capW. At renderScale = viewScale this equals capW (no supersample,
+        // the original sharp path); at printedScale it is the natural size.
+        const cssFor = (renderScale: number): { w: number, h: number } => ({
+            w: Math.max(2, Math.round(frameWIn * printedScale * 96 / renderScale)),
+            h: Math.max(2, Math.round(frameHIn * printedScale * 96 / renderScale))
+        })
         // snapshot the extent BEFORE any second-pass resize: CSS rounding on
         // the resized container would skew the readback by a sub-pixel
         let extSnapshot: { xmin: number, ymin: number, xmax: number, ymax: number } | null = null
@@ -1117,58 +1173,67 @@ async function captureMapHiRes(
                 extSnapshot = { xmin: e0.xmin, ymin: e0.ymin, xmax: e0.xmax, ymax: e0.ymax }
             }
         } catch (e) { /* snapshot best-effort */ }
+        const renderAt = async (renderScale: number, shotOpts: any): Promise<any> => {
+            const css = cssFor(renderScale)
+            if (Math.abs(css.w - capW) > 1 || Math.abs(css.h - capH) > 1 ||
+                Math.abs(Number((tmp as any).scale) - renderScale) > renderScale * 0.001) {
+                container.style.width = css.w + 'px'
+                container.style.height = css.h + 'px'
+                await new Promise(r => setTimeout(r, 60))
+                    ; (tmp as any).scale = renderScale
+                await Promise.race([
+                    reactiveUtils.whenOnce(() => !!tmp && !tmp.updating),
+                    new Promise(resolve => setTimeout(resolve, 20000))
+                ])
+                await new Promise(r => setTimeout(r, 400))
+            }
+            return tmp.takeScreenshot({ width: capW, height: capH, ...shotOpts } as any)
+        }
         try {
             const bigForDevice = memoryConstrainedDevice() && capW * capH > 8388608
-            if (symbolRatio > 1.05 && !bigForDevice) {
-                const leaves: any[] = []
-                try {
-                    const all: any = (tmp.map as any).allLayers
-                    const arrL: any[] = all && all.toArray ? all.toArray() : []
-                    for (const l of arrL) { if (l && l.type !== 'group') leaves.push(l) }
-                } catch (e) { /* classification best-effort */ }
-                const symbolLayers = leaves.filter(l => SYMBOL_LAYER_TYPES.has(String(l.type)))
-                const rasterLayers = leaves.filter(l => !SYMBOL_LAYER_TYPES.has(String(l.type)))
-                if (symbolLayers.length) {
-                    onProgress('Rendering symbols at print size…')
-                    // raster-only base first, while the view is still zoomed
-                    const baseShot = rasterLayers.length
-                        ? await tmp.takeScreenshot({ width: capW, height: capH, layers: rasterLayers, format: 'png' } as any)
-                        : null
-                    // resize the SAME view to its natural on-screen size at the
-                    // printed scale: identical ground extent, but one CSS pixel
-                    // now corresponds to 1/96 inch of paper
-                    const cssW = Math.max(2, Math.round(capW / symbolRatio))
-                    const cssH = Math.max(2, Math.round(capH / symbolRatio))
-                    container.style.width = cssW + 'px'
-                    container.style.height = cssH + 'px'
-                    await new Promise(r => setTimeout(r, 60))
-                        ; (tmp as any).scale = printedScale
-                    await Promise.race([
-                        reactiveUtils.whenOnce(() => !!tmp && !tmp.updating),
-                        new Promise(resolve => setTimeout(resolve, 20000))
-                    ])
-                    await new Promise(r => setTimeout(r, 400))
-                    const overlayShot = await tmp.takeScreenshot({
-                        width: capW,
-                        height: capH,
-                        layers: symbolLayers,
-                        ignoreBackground: true,
-                        format: 'png'
-                    } as any)
-                    if (overlayShot && overlayShot.dataUrl) {
-                        const merged = await compositeCapture(
-                            baseShot && baseShot.dataUrl ? baseShot.dataUrl : null,
-                            overlayShot.dataUrl, capW, capH,
-                            layout.imageFormat !== 'png')
-                        if (merged) {
-                            shot = { ...shot, dataUrl: merged }
-                            symbolPassApplied = true
-                        }
-                    }
+            const leaves: any[] = []
+            try {
+                const all: any = (tmp.map as any).allLayers
+                const arrL: any[] = all && all.toArray ? all.toArray() : []
+                for (const l of arrL) { if (l && l.type !== 'group') leaves.push(l) }
+            } catch (e) { /* classification best-effort */ }
+            const symbolLayers = leaves.filter(l => SYMBOL_LAYER_TYPES.has(String(l.type)))
+            const rasterLayers = leaves.filter(l => !SYMBOL_LAYER_TYPES.has(String(l.type)))
+            // Run the enhanced capture when symbols need print-size rendering,
+            // OR when the imagery would be over-zoomed and must be clamped.
+            const needSymbolPass = symbolRatio > 1.05 && symbolLayers.length > 0 && !bigForDevice
+            const needClampPass = clampNeeded && !bigForDevice
+            if (needSymbolPass || needClampPass) {
+                onProgress(needClampPass ? 'Rendering imagery at print scale…' : 'Rendering symbols at print size…')
+                // raster/imagery base at the clamped render scale (never below
+                // the finest LOD). When no clamp is needed this renders at
+                // viewScale into a capW container - the original sharp path.
+                const baseShot = rasterLayers.length
+                    ? await renderAt(rasterRenderScale, { layers: rasterLayers, format: 'png' })
+                    : null
+                // symbols at the TRUE printed scale so marker/line/text sizes
+                // are correct; transparent so they composite over the base
+                let overlayShot: any = null
+                if (needSymbolPass) {
+                    overlayShot = await renderAt(printedScale, { layers: symbolLayers, ignoreBackground: true, format: 'png' })
+                }
+                let merged: string | null = null
+                if (overlayShot && overlayShot.dataUrl) {
+                    merged = await compositeCapture(
+                        baseShot && baseShot.dataUrl ? baseShot.dataUrl : null,
+                        overlayShot.dataUrl, capW, capH, layout.imageFormat !== 'png')
+                } else if (baseShot && baseShot.dataUrl) {
+                    // imagery-only clamp (no symbol layers): the corrected base
+                    // IS the result; flatten onto white for jpeg
+                    merged = await compositeCapture(null, baseShot.dataUrl, capW, capH, layout.imageFormat !== 'png')
+                }
+                if (merged) {
+                    shot = { ...shot, dataUrl: merged }
+                    symbolPassApplied = true
                 }
             }
         } catch (e) {
-            onProgress('Symbol-size pass failed; using the standard capture.')
+            onProgress('Print-scale pass failed; using the standard capture.')
         }
 
         // second guard for the same transparency issue: if the API ignored
@@ -2727,8 +2792,16 @@ export function layoutLegend(
         return flow(innerH)
     }
 
-    const prefCols = cfg.columns && cfg.columns > 0 ? Math.min(6, Math.round(cfg.columns)) : 0
-    const colsList = prefCols ? Array.from({ length: prefCols }, (_, i) => i + 1) : [1, 2, 3, 4]
+    const prefCols = cfg.columns && cfg.columns > 0 ? Math.min(8, Math.round(cfg.columns)) : 0
+    // Auto column search is width-aware: a wide box (a horizontal bottom
+    // legend) should be allowed more columns than the old fixed cap of 4,
+    // while a narrow panel still tops out low because wider counts fail the
+    // colW >= 50 guard in tryFit. Only ADDS candidates; the fitter still
+    // picks the largest clean font, so narrow legends are unaffected.
+    const autoMax = Math.max(4, Math.min(8, Math.floor((innerW + gutter) / (110 + gutter))))
+    const colsList = prefCols
+        ? Array.from({ length: prefCols }, (_, i) => i + 1)
+        : Array.from({ length: autoMax }, (_, i) => i + 1)
     const baseFont = Math.max(5, cfg.baseFontPt || 8)
     const noShrink = !!(cfg as any).noShrink
 
@@ -3597,7 +3670,23 @@ export async function composePage(
                 break
             case 'legend':
                 {
-                    const miss = await drawLegendEl(d, el as LegendEl, legendRows, layout.legend)
+                    // The .pagx legend element carries the author's column
+                    // count and title choice; let them fill in wherever the
+                    // settings legend config did not specify, so a horizontal
+                    // bottom legend flows into the authored columns and drops
+                    // a title the author disabled (both critical in a short
+                    // frame). Explicit settings still win when present.
+                    const le = el as LegendEl
+                    const elCfg: LegendConfig = { ...(layout.legend || ({} as any)) }
+                    if (typeof le.columns === 'number' && le.columns > 0 &&
+                        !(Number((layout.legend as any)?.columns) > 0)) {
+                        (elCfg as any).columns = le.columns
+                    }
+                    if (typeof le.showTitle === 'boolean' &&
+                        (layout.legend as any)?.showTitle === undefined) {
+                        (elCfg as any).showTitle = le.showTitle
+                    }
+                    const miss = await drawLegendEl(d, le, legendRows, elCfg)
                     if (miss > 0) (opts as any)._legendTruncated = Math.max(Number((opts as any)._legendTruncated) || 0, miss)
                 }
                 break

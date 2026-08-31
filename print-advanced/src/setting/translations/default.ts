@@ -102,6 +102,8 @@ export default {
     legendPanelAuto: 'Automatic (fit to legend content)',
     legendPanelFixed: 'Fixed',
     applyAllLayouts: 'Apply these settings to all layouts',
+    applyAllSettings: 'Apply ALL settings to every layout',
+    applyAllSettingsHint: 'Copies this layout’s DPI, format, extent, legend, grid and overview to all other layouts. Page size and imported .pagx elements stay per layout.',
     legendSourceLabel: 'Legend source',
     legendSourceAuto: 'Automatic (read the map legend directly)',
     legendSourceWidget: 'Legend widget',

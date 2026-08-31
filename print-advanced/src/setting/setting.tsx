@@ -643,20 +643,50 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         borderWidthPt: 0.5
     }
 
-    /** Copy the editing layout's feature config (overview/grid/legend) to
-     *  every layout, so admins do not have to re-enter it eight times. */
-    applyToAllLayouts = (key: 'overview' | 'grid' | 'legend' | 'output'): void => {
+    /** Copy the editing layout's feature config to every layout, so admins
+     *  do not have to re-enter it once per layout. 'all' copies EVERYTHING
+     *  configurable at once (the capture trio plus legend/grid/overview) -
+     *  the single "apply these settings to all layouts" action. The per-
+     *  feature keys copy just that one section. The page geometry and the
+     *  imported .pagx elements (map frame, texts, north arrow, scale bar,
+     *  pictures, the .pagx's own legend frame) are NEVER copied: those come
+     *  from each layout's own Pro template and define what the layout IS. */
+    applyToAllLayouts = (key: 'overview' | 'grid' | 'legend' | 'output' | 'all'): void => {
         const editing = this.getEditing()
         if (!editing) return
+        const e: any = editing
+        const clone = (v: any): any => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)))
+        if (key === 'all') {
+            // the full per-layout configuration: capture options + every
+            // settings-defined feature. Undefined features are propagated as
+            // "cleared" so all layouts end up identical to this one.
+            this.commitLayouts(this.getLayouts().map(l => {
+                const next: any = { ...l }
+                next.dpi = e.dpi
+                next.imageFormat = e.imageFormat
+                next.preserve = e.preserve
+                next.legend = e.legend ? clone(e.legend) : { enabled: false }
+                next.grid = e.grid ? clone(e.grid) : { enabled: false }
+                next.overview = e.overview ? clone(e.overview) : { enabled: false }
+                return next
+            }))
+            return
+        }
         if (key === 'output') {
             // the capture trio is scalar keys on the layout, not one object
-            const { dpi, imageFormat, preserve } = editing as any
+            const { dpi, imageFormat, preserve } = e
             this.commitLayouts(this.getLayouts().map(l => ({ ...l, dpi, imageFormat, preserve })))
             return
         }
-        if (!(editing as any)[key]) return
-        const cfg = JSON.parse(JSON.stringify((editing as any)[key]))
-        this.commitLayouts(this.getLayouts().map(l => ({ ...l, [key]: JSON.parse(JSON.stringify(cfg)) })))
+        // When the editing layout has no config for this feature at all, the
+        // intent of "apply to all" is to turn it OFF everywhere: propagate a
+        // disabled object so other layouts that DID enable it are cleared.
+        // (Previously this returned early, so the OFF state never transferred
+        // and the button was also hidden while disabled - the toggle could
+        // only ever be copied ON, never OFF.)
+        const src = e[key]
+        const cfg = src ? clone(src) : { enabled: false }
+        this.commitLayouts(this.getLayouts().map(l => ({ ...l, [key]: clone(cfg) })))
     }
 
     patchLegend = (partial: Partial<LegendConfig>): void => {
@@ -1023,6 +1053,25 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                     {editing.pageWidthIn} × {editing.pageHeightIn} in · {editing.elements.length} {messages.elements}
                                 </div>
                             </SettingRow>
+                            {/* One button that pushes THIS layout's whole
+                                configuration (DPI/format/extent + legend +
+                                grid + overview) to every other layout, so a
+                                layout tuned once does not have to be redone
+                                per layout. Page size and the imported .pagx
+                                elements stay each layout's own. */}
+                            {layouts.length > 1 && (
+                                <SettingRow>
+                                    <div className='w-100'>
+                                        <Button size='sm' type='primary' className='w-100'
+                                            onClick={() => this.applyToAllLayouts('all')}>
+                                            {messages.applyAllSettings}
+                                        </Button>
+                                        <div className='pd-hint' style={{ marginTop: 4 }}>
+                                            {messages.applyAllSettingsHint}
+                                        </div>
+                                    </div>
+                                </SettingRow>
+                            )}
                         </SettingSection>
 
                         <SettingSection title={messages.captureSection}>
@@ -1061,7 +1110,8 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                 <Switch checked={!!(editing as any).overview?.enabled}
                                     onChange={(e) => this.patchOverview({ enabled: e.target.checked })} />
                             </SettingRow>
-                            {(editing as any).overview?.enabled && (
+                            {/* Always available so on OR off transfers. */}
+                            {this.getLayouts().length > 1 && (
                                 <SettingRow>
                                     <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('overview')}>
                                         {messages.applyAllLayouts}
@@ -1147,7 +1197,8 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                 <Switch checked={!!(editing as any).grid?.enabled}
                                     onChange={(e) => this.patchGrid({ enabled: e.target.checked })} />
                             </SettingRow>
-                            {(editing as any).grid?.enabled && (
+                            {/* Always available so on OR off transfers. */}
+                            {this.getLayouts().length > 1 && (
                                 <SettingRow>
                                     <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('grid')}>
                                         {messages.applyAllLayouts}
@@ -1263,7 +1314,10 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                 <Switch checked={!!(editing as any).legend?.enabled}
                                     onChange={(e) => this.patchLegend({ enabled: e.target.checked })} />
                             </SettingRow>
-                            {(editing as any).legend?.enabled && (
+                            {/* Always available so the current on OR off state
+                                transfers; gating it on enabled meant a legend
+                                turned off could never be propagated. */}
+                            {this.getLayouts().length > 1 && (
                                 <SettingRow>
                                     <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('legend')}>
                                         {messages.applyAllLayouts}
