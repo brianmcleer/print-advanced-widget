@@ -31,6 +31,7 @@ import { Drawer, PdfDrawer, CanvasDrawer, SvgDrawer, splitText } from './drawing
 const UPNG = require('upng-js')
 const UTIF = require('utif')
 const gifenc = require('gifenc')
+const fflate = require('fflate')
 /* eslint-enable @typescript-eslint/no-var-requires */
 
 // Pure UI constants live in printConstants.ts so the settings panel can use
@@ -110,6 +111,25 @@ export interface RenderOptions {
     /** Internal: capture the map north-up (rotation 0) irrespective of the
      *  live view. Set for georeferenced map-only rasters. */
     forceNorthUp?: boolean
+    /** Wrap a MAP-ONLY raster in a Google Earth KMZ: the image is packaged
+     *  with a doc.kml GroundOverlay whose gx:LatLonQuad ties the four map
+     *  corners to WGS84 lon/lat, so it drapes correctly on the globe for ANY
+     *  source coordinate system (Web Mercator, geographic, or projected). */
+    googleEarthKmz?: boolean
+    /** Dynamic text context: ESRI WKT + SDK unit of the CAPTURE spatial
+     *  reference (output WKID's when set, else the map's), the web map's
+     *  title, and the signed-in user's display name. All best-effort. */
+    srWkt?: string
+    srUnit?: string
+    mapName?: string
+    user?: string
+    /** Internal: map series page context for {pageNumber}/{pageCount}. */
+    pageNumber?: number
+    pageCount?: number
+    pageName?: string
+    /** Drop legend entries for layers whose visible scale range excludes the
+     *  printed scale (default on). Title-matched; unmatched rows are kept. */
+    legendScaleFilter?: boolean
 }
 
 export interface RenderProgress { (message: string): void }
@@ -157,26 +177,331 @@ function fmtNumber(n: number, decimals = 0): string {
     return parts.join('.')
 }
 
-function today(): string {
-    // Pro renders <dyn type="date" format=""/> as the short date (7/1/2026).
-    return new Date().toLocaleDateString('en-US')
+/* ------------------------------------------------------------------ */
+/* dynamic text: runtime token context + resolver                       */
+/* ------------------------------------------------------------------ */
+
+/** Everything a page's dynamic text can refer to. Built by composePage
+ *  from the layout, the capture, and the export options. All fields but
+ *  title/printedScale are optional: a missing source resolves to '' so
+ *  Pro's emptyStr semantics apply (see replaceTokens). */
+export interface TextTokens {
+    title: string
+    printedScale: number
+    author?: string
+    copyright?: string
+    attribution?: string
+    /** Layout name (Pro: layout property="name"). */
+    layoutName?: string
+    /** Web map title (Pro: mapFrame property="name" / "mapName"). */
+    mapName?: string
+    /** Signed-in user's display name (Pro: type="user"). */
+    user?: string
+    pageWidthIn?: number
+    pageHeightIn?: number
+    /** Capture rotation in degrees (0 when north-up). */
+    rotation?: number
+    dpi?: number
+    /** Capture spatial reference: WKID, ESRI WKT (for names/params) and the
+     *  SDK unit string ('meters' | 'feet' | 'us-feet' | 'degrees' | ...). */
+    wkid?: number
+    srWkt?: string
+    srUnit?: string
+    /** Capture geometry in the capture SR (for coordinate tokens). */
+    center?: { x: number, y: number }
+    groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number }
+    projection?: 'webMercator' | 'geographic' | 'projected'
+    /** Synchronous projector to WGS84 lon/lat for the capture SR, prepared
+     *  by composePage (the SDK engine projects synchronously once loaded). */
+    toWgs84?: (x: number, y: number) => [number, number] | null
+    /** Map series page context (1/1 for a single page). */
+    pageNumber?: number
+    pageCount?: number
+    pageName?: string
+    /** Clock used for {date}/{time}; defaults to now (injectable for tests). */
+    now?: Date
 }
 
-/** Replace runtime tokens produced by the pagx importer. */
-interface TextTokens { title: string, printedScale: number, author?: string, copyright?: string, attribution?: string }
+/* ---- ESRI WKT (well-known text, OGC WKT1 dialect) parsing ---- */
 
-function replaceTokens(tpl: string, tk: TextTokens): string {
-    return (tpl || '')
-        .replace(/\{title\}/g, tk.title || '')
-        .replace(/\{author\}/g, tk.author || '')
-        .replace(/\{copyright\}/g, tk.copyright || '')
-        .replace(/\{attribution\}/g, tk.attribution || '')
-        .replace(/\{date\}/g, today())
-        .replace(/\{scale\}/g, fmtNumber(tk.printedScale))
-        .replace(/\{scaleRatio:(\w+):(\d+)\}/g, (_m, unit: string, dp: string) => {
+export interface WktNode { name: string, args: Array<string | number | WktNode> }
+
+/** Minimal recursive-descent parser for ESRI/OGC WKT1:
+ *  NAME["str", 1.5, CHILD[...], ...]. Pure/exported for tests. */
+export function parseWkt (wkt: string): WktNode | null {
+    const s = (wkt || '').trim()
+    if (!s) return null
+    let i = 0
+    const skipWs = (): void => { while (i < s.length && /\s/.test(s[i])) i++ }
+    const parseNode = (): WktNode | null => {
+        skipWs()
+        const m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(s.slice(i))
+        if (!m) return null
+        const name = m[0]
+        i += name.length
+        skipWs()
+        if (s[i] !== '[' && s[i] !== '(') return { name, args: [] }
+        i++ // [
+        const args: Array<string | number | WktNode> = []
+        for (;;) {
+            skipWs()
+            if (i >= s.length) break
+            const ch = s[i]
+            if (ch === ']' || ch === ')') { i++; break }
+            if (ch === ',') { i++; continue }
+            if (ch === '"') {
+                let j = i + 1
+                let str = ''
+                while (j < s.length) {
+                    if (s[j] === '"') {
+                        if (s[j + 1] === '"') { str += '"'; j += 2; continue }
+                        break
+                    }
+                    str += s[j]; j++
+                }
+                i = j + 1
+                args.push(str)
+                continue
+            }
+            const num = /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/.exec(s.slice(i))
+            if (num) { args.push(parseFloat(num[0])); i += num[0].length; continue }
+            const child = parseNode()
+            if (!child) { i++; continue } // skip garbage
+            args.push(child)
+        }
+        return { name, args }
+    }
+    try { return parseNode() } catch (e) { return null }
+}
+
+export interface SrInfo {
+    /** Display name: PCS name, else GCS name (underscores -> spaces). */
+    name: string
+    pcs: string
+    gcs: string
+    datum: string
+    projection: string
+    unit: string
+    authority: string
+    wkid: number
+    /** PROJECTION parameters keyed by lower-case, space-separated name,
+     *  e.g. 'central meridian', 'false easting', 'standard parallel 1'. */
+    params: Record<string, number>
+}
+
+const pretty = (s: string): string => String(s || '').replace(/_/g, ' ').trim()
+
+/** Extract the Pro dynamic-text spatial-reference properties from ESRI WKT.
+ *  Missing WKT yields a WKID-only record. Pure/exported for tests. */
+export function srInfoFromWkt (wkt: string | undefined, wkid: number, unitFallback?: string): SrInfo {
+    const info: SrInfo = { name: '', pcs: '', gcs: '', datum: '', projection: '', unit: '', authority: '', wkid: wkid || 0, params: {} }
+    const root = wkt ? parseWkt(wkt) : null
+    const find = (n: WktNode | null, name: string): WktNode | null => {
+        if (!n) return null
+        if (n.name.toUpperCase() === name) return n
+        for (const a of n.args) {
+            if (typeof a === 'object') {
+                const r = find(a, name)
+                if (r) return r
+            }
+        }
+        return null
+    }
+    if (root) {
+        const up = root.name.toUpperCase()
+        if (up === 'PROJCS') info.pcs = pretty(String(root.args[0] || ''))
+        const geog = find(root, 'GEOGCS')
+        if (geog) info.gcs = pretty(String(geog.args[0] || ''))
+        const datum = find(root, 'DATUM')
+        if (datum) info.datum = pretty(String(datum.args[0] || ''))
+        const proj = find(root, 'PROJECTION')
+        if (proj) info.projection = pretty(String(proj.args[0] || ''))
+        // the root's own UNIT (linear for PROJCS, angular for GEOGCS)
+        for (const a of root.args) {
+            if (typeof a === 'object' && a.name.toUpperCase() === 'UNIT') info.unit = pretty(String(a.args[0] || ''))
+            if (typeof a === 'object' && a.name.toUpperCase() === 'PARAMETER') {
+                const k = pretty(String(a.args[0] || '')).toLowerCase()
+                const v = Number(a.args[1])
+                if (k && isFinite(v)) info.params[k] = v
+            }
+            if (typeof a === 'object' && a.name.toUpperCase() === 'AUTHORITY') {
+                info.authority = String(a.args[0] || '')
+                const code = Number(a.args[1])
+                if (!info.wkid && isFinite(code)) info.wkid = code
+            }
+        }
+        info.name = info.pcs || info.gcs
+    }
+    if (!info.unit && unitFallback) {
+        const u = String(unitFallback).toLowerCase()
+        info.unit = u === 'us-feet' ? 'Foot US'
+            : u === 'feet' ? 'Foot'
+                : u === 'meters' ? 'Meter'
+                    : u === 'degrees' ? 'Degree'
+                        : u.charAt(0).toUpperCase() + u.slice(1)
+    }
+    if (!info.name && info.wkid) info.name = 'WKID ' + info.wkid
+    if (!info.authority && info.wkid) info.authority = info.wkid >= 100000 ? 'Esri' : 'EPSG'
+    return info
+}
+
+/* ---- coordinate formatting (Pro units: dd | dms | ddm | map units) ---- */
+
+const DEG = '°'
+
+/** Format one geographic axis value per Pro's units attribute. */
+export function fmtDegrees (value: number, axis: 'lon' | 'lat', units: string, dp: number): string {
+    const hemi = axis === 'lat' ? (value < 0 ? 'S' : 'N') : (value < 0 ? 'W' : 'E')
+    const a = Math.abs(value)
+    const u = (units || 'dd').toLowerCase()
+    if (u === 'dms') {
+        let d = Math.floor(a)
+        let mFloat = (a - d) * 60
+        let m = Math.floor(mFloat)
+        let sec = (mFloat - m) * 60
+        const secR = parseFloat(sec.toFixed(dp))
+        if (secR >= 60) { sec = 0; m += 1 } else sec = secR
+        if (m >= 60) { m = 0; d += 1 }
+        return d + DEG + String(m).padStart(2, '0') + "'" + sec.toFixed(dp).padStart(dp > 0 ? 3 + dp : 2, '0') + '"' + hemi
+    }
+    if (u === 'ddm') {
+        let d = Math.floor(a)
+        let m = (a - d) * 60
+        const mR = parseFloat(m.toFixed(dp))
+        if (mR >= 60) { m = 0; d += 1 } else m = mR
+        return d + DEG + m.toFixed(dp).padStart(dp > 0 ? 3 + dp : 2, '0') + "'" + hemi
+    }
+    // dd (also the fallback for mgrs/usng which are not supported here)
+    return a.toFixed(dp) + DEG + hemi
+}
+
+/** Resolve a mapFrame coordinate property (center, center.x, lowerLeft, ...)
+ *  to the (x, y) in the capture SR, from the extent/center context. */
+function coordPoint (prop: string, tk: TextTokens): { x: number, y: number } | null {
+    const e = tk.groundExtent
+    const c = tk.center || (e ? { x: (e.xmin + e.xmax) / 2, y: (e.ymin + e.ymax) / 2 } : null)
+    const p = prop.toLowerCase()
+    if (p === 'center' || p === 'center.x' || p === 'center.y' || p === 'camera.x' || p === 'camera.y') return c
+    if (!e) return null
+    switch (p) {
+        case 'lowerleft': return { x: e.xmin, y: e.ymin }
+        case 'lowermid': return { x: (e.xmin + e.xmax) / 2, y: e.ymin }
+        case 'lowerright': return { x: e.xmax, y: e.ymin }
+        case 'midleft': return { x: e.xmin, y: (e.ymin + e.ymax) / 2 }
+        case 'midright': return { x: e.xmax, y: (e.ymin + e.ymax) / 2 }
+        case 'upperleft': return { x: e.xmin, y: e.ymax }
+        case 'uppermid': return { x: (e.xmin + e.xmax) / 2, y: e.ymax }
+        case 'upperright': return { x: e.xmax, y: e.ymax }
+        default: return null
+    }
+}
+
+/** Format a {coord:<prop>:<units>:<dp>} token. Geographic units (dd/dms/ddm)
+ *  project the point to WGS84; an empty units attribute prints map units. */
+export function fmtCoordToken (prop: string, units: string, dp: number, tk: TextTokens): string {
+    const pt = coordPoint(prop, tk)
+    if (!pt) return ''
+    const p = prop.toLowerCase()
+    const onlyX = p.endsWith('.x')
+    const onlyY = p.endsWith('.y')
+    const u = (units || '').toLowerCase()
+    const geographic = u === 'dd' || u === 'dms' || u === 'ddm' || u === 'mgrs' || u === 'usng'
+    if (geographic) {
+        let ll: [number, number] | null = null
+        if (tk.projection === 'geographic') ll = [pt.x, pt.y]
+        else if (tk.projection === 'webMercator') ll = [mercXToLon(pt.x), mercYToLat(pt.y)]
+        else if (tk.toWgs84) ll = tk.toWgs84(pt.x, pt.y)
+        if (!ll || !isFinite(ll[0]) || !isFinite(ll[1])) return ''
+        const lon = fmtDegrees(ll[0], 'lon', u, dp)
+        const lat = fmtDegrees(ll[1], 'lat', u, dp)
+        return onlyX ? lon : onlyY ? lat : lon + ' ' + lat
+    }
+    // map units (Pro default when no units attribute): x y
+    const fx = fmtNumber(pt.x, dp)
+    const fy = fmtNumber(pt.y, dp)
+    return onlyX ? fx : onlyY ? fy : fx + ' ' + fy
+}
+
+/* ---- date / time formatting (Pro uses .NET-style patterns) ---- */
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/** Format a Date with a .NET-style custom pattern (yyyy MM dd HH mm ss tt,
+ *  MMMM/MMM/dddd/ddd, quoted literals). Pure/exported for tests. */
+export function formatDotNet (d: Date, pattern: string): string {
+    const pad = (n: number, w = 2): string => String(n).padStart(w, '0')
+    const h12 = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12
+    return (pattern || '').replace(/yyyy|yy|MMMM|MMM|MM|M|dddd|ddd|dd|d|HH|H|hh|h|mm|m|ss|s|tt|t|'[^']*'/g, (m) => {
+        switch (m) {
+            case 'yyyy': return String(d.getFullYear())
+            case 'yy': return pad(d.getFullYear() % 100)
+            case 'MMMM': return MONTHS[d.getMonth()]
+            case 'MMM': return MONTHS[d.getMonth()].slice(0, 3)
+            case 'MM': return pad(d.getMonth() + 1)
+            case 'M': return String(d.getMonth() + 1)
+            case 'dddd': return DAYS[d.getDay()]
+            case 'ddd': return DAYS[d.getDay()].slice(0, 3)
+            case 'dd': return pad(d.getDate())
+            case 'd': return String(d.getDate())
+            case 'HH': return pad(d.getHours())
+            case 'H': return String(d.getHours())
+            case 'hh': return pad(h12)
+            case 'h': return String(h12)
+            case 'mm': return pad(d.getMinutes())
+            case 'm': return String(d.getMinutes())
+            case 'ss': return pad(d.getSeconds())
+            case 's': return String(d.getSeconds())
+            case 'tt': return d.getHours() < 12 ? 'AM' : 'PM'
+            case 't': return d.getHours() < 12 ? 'A' : 'P'
+            default: return m.slice(1, -1) // quoted literal
+        }
+    })
+}
+
+/** {date} / {date:<fmt>}: '' or 'short' = 9/2/2026, 'long' = Wednesday,
+ *  September 2, 2026, anything else = a .NET custom pattern. */
+export function fmtDateToken (d: Date, fmt: string): string {
+    const f = (fmt || '').trim()
+    if (!f || f.toLowerCase() === 'short') return d.toLocaleDateString('en-US')
+    if (f.toLowerCase() === 'long') return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    return formatDotNet(d, f)
+}
+
+/** {time} / {time:<fmt>}: '' or 'short' = 3:42 PM, 'long' = 3:42:07 PM,
+ *  anything else = a .NET custom pattern. */
+export function fmtTimeToken (d: Date, fmt: string): string {
+    const f = (fmt || '').trim()
+    if (!f || f.toLowerCase() === 'short') return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    if (f.toLowerCase() === 'long') return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+    return formatDotNet(d, f)
+}
+
+/* ---- the resolver ---- */
+
+/** Resolve one bare token name (without braces) against the context.
+ *  Returns null for an unknown token so the literal text is preserved. */
+export function resolveToken (name: string, tk: TextTokens): string | null {
+    const now = tk.now || new Date()
+    const parts = name.split(':')
+    const head = parts[0]
+    switch (head) {
+        case 'title': return tk.title || ''
+        case 'author': return tk.author || ''
+        case 'copyright': return tk.copyright || ''
+        case 'attribution': return tk.attribution || ''
+        case 'user': return tk.user || ''
+        case 'computer': return ''
+        case 'layoutName': return tk.layoutName || ''
+        case 'mapName': return tk.mapName || ''
+        case 'date': return fmtDateToken(now, parts.slice(1).join(':'))
+        case 'time': return fmtTimeToken(now, parts.slice(1).join(':'))
+        case 'scale': return fmtNumber(tk.printedScale)
+        case 'scaleRatio': {
+            const unit = parts[1] || 'ft'
             const per = INCHES_PER_UNIT[unit] || 12
             const v = tk.printedScale / per
-            let decimals = parseInt(dp, 10) || 0
+            let decimals = parseInt(parts[2] || '0', 10) || 0
             // Pro prints "1 inch equals 0 miles" when decimalPlaces rounds a
             // nonzero value to 0 (common at city scales with mapUnits="mi").
             // Escalate to two significant digits instead of printing 0.
@@ -186,7 +511,84 @@ function replaceTokens(tpl: string, tk: TextTokens): string {
                 decimals = (trimmed.split('.')[1] || '').length
             }
             return fmtNumber(v, decimals)
-        })
+        }
+        case 'rotation': {
+            const r = Number(tk.rotation) || 0
+            return String(Math.round(r * 100) / 100)
+        }
+        case 'dpi': return tk.dpi ? String(Math.round(tk.dpi)) : ''
+        case 'pageWidth': return tk.pageWidthIn ? String(Math.round(tk.pageWidthIn * 100) / 100) : ''
+        case 'pageHeight': return tk.pageHeightIn ? String(Math.round(tk.pageHeightIn * 100) / 100) : ''
+        case 'pageUnits': return tk.pageWidthIn ? 'Inches' : ''
+        case 'pageNumber': return String(tk.pageNumber || 1)
+        case 'pageCount': return String(tk.pageCount || 1)
+        case 'pageName': return tk.pageName || String(tk.pageNumber || 1)
+        case 'pageIndex': return String((tk.pageNumber || 1) - 1)
+        case 'wkid': return tk.wkid ? String(tk.wkid) : ''
+        case 'mapUnits': return srInfoFromWkt(tk.srWkt, tk.wkid || 0, tk.srUnit).unit
+        case 'sr': {
+            const info = srInfoFromWkt(tk.srWkt, tk.wkid || 0, tk.srUnit)
+            const prop = parts.slice(1).join(':').replace(/_/g, ' ').trim().toLowerCase()
+            switch (prop) {
+                case 'name': return info.name
+                case 'pcs': return info.pcs
+                case 'gcs': return info.gcs
+                case 'datum': return info.datum
+                case 'projection': return info.projection
+                case 'units': return info.unit
+                case 'authority': return info.authority
+                case 'wkid': return info.wkid ? String(info.wkid) : ''
+                case 'remarks': return ''
+                default: {
+                    // PROJECTION parameter (central meridian, false easting, ...)
+                    const v = info.params[prop]
+                    return isFinite(v) ? String(v) : ''
+                }
+            }
+        }
+        case 'coord': {
+            const prop = parts[1] || 'center'
+            const units = parts[2] || ''
+            const dp = parseInt(parts[3] || '', 10)
+            return fmtCoordToken(prop, units, isFinite(dp) ? dp : (units ? (units === 'dd' ? 4 : 0) : 2), tk)
+        }
+        default: return null
+    }
+}
+
+/** Decode the pre/post/empty wrapper values (only '|', '{', '}' are encoded). */
+const decodeWrap = (s: string): string => (s || '').replace(/%7C/gi, '|').replace(/%7B/gi, '{').replace(/%7D/gi, '}')
+
+/** Replace runtime tokens produced by the pagx importer (or typed by hand).
+ *  Two forms:
+ *    {name}                                bare token
+ *    {name|pre=..|post=..|empty=..}        Pro preStr/postStr/emptyStr: pre and
+ *                                          post print only when the value is
+ *                                          non-empty; otherwise empty prints.
+ *  Unknown token names are left untouched. */
+export function replaceTokens(tpl: string, tk: TextTokens): string {
+    let out = (tpl || '')
+    // wrapped form first (its inner name may itself contain ':' segments)
+    out = out.replace(/\{([A-Za-z][\w.]*(?::[^|{}]*)?)((?:\|(?:pre|post|empty)=[^|{}]*)+)\}/g, (m, name: string, mods: string) => {
+        const v = resolveToken(name, tk)
+        if (v === null) return m
+        let pre = '', post = '', empty = ''
+        for (const seg of mods.split('|')) {
+            if (!seg) continue
+            const eq = seg.indexOf('=')
+            const k = seg.slice(0, eq), val = decodeWrap(seg.slice(eq + 1))
+            if (k === 'pre') pre = val
+            else if (k === 'post') post = val
+            else if (k === 'empty') empty = val
+        }
+        return v ? pre + v + post : empty
+    })
+    // bare form
+    out = out.replace(/\{([A-Za-z][\w.]*(?::[^{}|]*)?)\}/g, (m, name: string) => {
+        const v = resolveToken(name, tk)
+        return v === null ? m : v
+    })
+    return out
 }
 
 function niceBarDistance(printedScale: number, units: ScaleBarUnits, maxIn: number): { dist: number, barIn: number } {
@@ -220,7 +622,7 @@ function downloadBlob(blob: Blob, fileName: string): string {
 /** World-file extension for a raster format (ESRI convention: first + last
  *  letter of the extension + 'w'; jpeg/jpg -> jgw, tif -> tfw, png -> pgw,
  *  gif -> gfw). Returns null for formats that cannot carry a world file. */
-export function worldFileExt(format: string): string | null {
+export function worldFileExt (format: string): string | null {
     switch (format) {
         case 'png32': case 'png8': return 'pgw'
         case 'jpg': return 'jgw'
@@ -235,7 +637,7 @@ export function worldFileExt(format: string): string | null {
  *  Lines are A, D, B, E, C, F where A/E are pixel size (E negative, north
  *  down), D/B are rotation (0), and C/F are the map coordinates of the
  *  CENTRE of the top-left pixel. Pure and exported for tests. */
-export function worldFileCoeffs(
+export function worldFileCoeffs (
     W: number, H: number,
     ext: { xmin: number, ymin: number, xmax: number, ymax: number }
 ): { A: number, D: number, B: number, E: number, C: number, F: number } {
@@ -249,7 +651,7 @@ export function worldFileCoeffs(
 }
 
 /** Format the world file text (6 lines, high precision). */
-export function worldFileText(
+export function worldFileText (
     W: number, H: number,
     ext: { xmin: number, ymin: number, xmax: number, ymax: number }
 ): string {
@@ -265,7 +667,7 @@ export function worldFileText(
 /** Write the world file (and, when WKT is known, a .prj) beside a raster
  *  export. Best-effort: any failure is swallowed so the raster still
  *  downloads. Returns the world-file name written, or null. */
-function emitGeoSidecars(
+function emitGeoSidecars (
     baseName: string, format: string,
     W: number, H: number,
     ext: { xmin: number, ymin: number, xmax: number, ymax: number },
@@ -282,6 +684,102 @@ function emitGeoSidecars(
         }
         return stem + '.' + ext3
     } catch (e) { return null }
+}
+
+/* ------------------------------------------------------------------ */
+/* Google Earth (KMZ) packaging                                         */
+/* ------------------------------------------------------------------ */
+
+/** Four map-frame corners in WGS84 lon/lat, in gx:LatLonQuad winding order
+ *  (lower-left, lower-right, upper-right, upper-left). */
+export interface LatLonQuad {
+    ll: [number, number]
+    lr: [number, number]
+    ur: [number, number]
+    ul: [number, number]
+}
+
+/** Project the four corners of a NORTH-UP capture's ground extent to WGS84
+ *  lon/lat for a Google Earth GroundOverlay. Web Mercator and geographic use
+ *  a closed-form inverse (exact, no async); any other projected CRS goes
+ *  through the JSAPI projection engine. Returns null when the corners cannot
+ *  be resolved (no extent, or projection engine unavailable for a projected
+ *  CRS). A gx:LatLonQuad carries all four corners independently, so a
+ *  projected extent that maps to a slightly non-rectangular geographic quad
+ *  drapes without stretch or shear. */
+export async function extentCornersToWgs84 (
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number } | undefined,
+    projection: 'webMercator' | 'geographic' | 'projected' | undefined,
+    capWkid: number
+): Promise<LatLonQuad | null> {
+    if (!ext || !(ext.xmax > ext.xmin) || !(ext.ymax > ext.ymin)) return null
+    if (projection === 'geographic') {
+        return {
+            ll: [ext.xmin, ext.ymin], lr: [ext.xmax, ext.ymin],
+            ur: [ext.xmax, ext.ymax], ul: [ext.xmin, ext.ymax]
+        }
+    }
+    if (projection === 'webMercator') {
+        const lon = (x: number): number => mercXToLon(x)
+        const lat = (y: number): number => mercYToLat(y)
+        return {
+            ll: [lon(ext.xmin), lat(ext.ymin)], lr: [lon(ext.xmax), lat(ext.ymin)],
+            ur: [lon(ext.xmax), lat(ext.ymax)], ul: [lon(ext.xmin), lat(ext.ymax)]
+        }
+    }
+    // Arbitrary projected CRS: use the client-side projection engine.
+    if (!(capWkid > 0)) return null
+    const projector = await getProjector()
+    if (!projector) return null
+    const PointCls: any = projector.Point
+    const capSR = new SpatialReference({ wkid: capWkid })
+    const wgs = new SpatialReference({ wkid: 4326 })
+    const P = (x: number, y: number): [number, number] | null => {
+        const out: any = projector.project(new PointCls({ x, y, spatialReference: capSR }), wgs)
+        return out && isFinite(out.x) && isFinite(out.y) ? [out.x, out.y] : null
+    }
+    const ll = P(ext.xmin, ext.ymin), lr = P(ext.xmax, ext.ymin)
+    const ur = P(ext.xmax, ext.ymax), ul = P(ext.xmin, ext.ymax)
+    if (!ll || !lr || !ur || !ul) return null
+    return { ll, lr, ur, ul }
+}
+
+/** XML-escape text for KML element content. */
+function kmlEscape (s: string): string {
+    return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/** Build the doc.kml GroundOverlay that ties an overlay image to a quad.
+ *  Pure/exported so the coordinate winding can be unit-tested. */
+export function buildGroundOverlayKml (imgName: string, quad: LatLonQuad, title: string): string {
+    const f = (n: number): string => n.toFixed(10)
+    // gx:LatLonQuad winding: LL, LR, UR, UL (counter-clockwise from lower-left).
+    const coords = [quad.ll, quad.lr, quad.ur, quad.ul]
+        .map(c => f(c[0]) + ',' + f(c[1])).join(' ')
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n' +
+        '  <GroundOverlay>\n' +
+        '    <name>' + kmlEscape(title || 'Map') + '</name>\n' +
+        '    <Icon><href>' + kmlEscape(imgName) + '</href></Icon>\n' +
+        '    <gx:LatLonQuad><coordinates>' + coords + '</coordinates></gx:LatLonQuad>\n' +
+        '  </GroundOverlay>\n' +
+        '</kml>\n'
+}
+
+/** Zip a doc.kml + overlay image into a KMZ. The image is already compressed
+ *  (PNG/JPG) so it is stored (level 0); doc.kml deflates. doc.kml is written
+ *  first, as KMZ readers expect the root KML as the archive's first entry. */
+function buildKmzBlob (imgBytes: Uint8Array, imgName: string, quad: LatLonQuad, title: string): Blob {
+    const kml = buildGroundOverlayKml(imgName, quad, title)
+    const files: Record<string, any> = {}
+    files['doc.kml'] = fflate.strToU8(kml)
+    files[imgName] = [imgBytes, { level: 0 }]
+    const zipped: Uint8Array = fflate.zipSync(files, { level: 6 })
+    // Copy into a fresh ArrayBuffer-backed view so Blob accepts it regardless
+    // of how @types/fflate widens the return (Uint8Array<ArrayBufferLike>).
+    const safe = new Uint8Array(zipped.length)
+    safe.set(zipped)
+    return new Blob([safe], { type: 'application/vnd.google-earth.kmz' })
 }
 
 // No explicit return annotation: TS 5.7 widens a declared `Uint8Array` to
@@ -316,6 +814,11 @@ interface CaptureResult {
     /** True when an output WKID reprojected the capture away from the
      *  live map's SR (ground extent no longer applies). */
     reprojected?: boolean
+    /** WKID of the capture spatial reference (output WKID when reprojected,
+     *  else the live map's). Feeds dynamic text {wkid} / {sr:*} tokens. */
+    wkid?: number
+    /** Capture center in the capture SR (dynamic text {coord:center...}). */
+    center?: { x: number, y: number }
 }
 
 /* ------------------------------------------------------------------ */
@@ -653,6 +1156,13 @@ export async function renderSeries(
     if (wantLegend) {
         try {
             legendRows = await buildLegendRows(view as any, 200, onProgress, (options as any).legendWidgetId)
+            // every series page prints at one uniform scale: drop layers
+            // that do not draw at it (they would be legend-only ghosts)
+            if (options.legendScaleFilter !== false && scaleDenom > 0) {
+                const before = legendRows.length
+                legendRows = filterLegendRowsByScale(legendRows, collectLayerScaleRanges(view as any), scaleDenom)
+                if (legendRows.length < before) onProgress('Legend: hid ' + (before - legendRows.length) + ' row(s) not drawn at 1:' + Math.round(scaleDenom).toLocaleString() + '.')
+            }
         } catch (e) { legendRows = [] }
     }
     const legendPosition = String((legendCfg && legendCfg.position) || '')
@@ -727,7 +1237,11 @@ export async function renderSeries(
             scaleMode: 'fixed' as any,
             fixedScale: scaleDenom,
             lockedCenter: { x: t.centerX, y: t.centerY } as any,
-            includeLegend: rowsForPage(i).length ? options.includeLegend : false
+            includeLegend: rowsForPage(i).length ? options.includeLegend : false,
+            // Pro map-series page tokens: {pageNumber} {pageCount} {pageName}
+            pageNumber: i + 1,
+            pageCount: n,
+            pageName: String((t as any).page || (i + 1))
         }
         const cap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, useLayout, maxImagePx, tileOpts, onProgress)
         if (cap.warning && warnings.indexOf(cap.warning) < 0) warnings.push(cap.warning)
@@ -1036,7 +1550,7 @@ async function compositeCapture(
  *  offscreen capture buys NO real imagery detail (no finer tiles exist)
  *  and, for cached services with a hard finest level, throws the imagery
  *  off-scale - so the raster pass must never render below it. */
-function finestTiledScale(view: MapView): number {
+function finestTiledScale (view: MapView): number {
     let finest = Infinity
     const consider = (lods: any): void => {
         try {
@@ -1270,7 +1784,7 @@ async function captureMapHiRes(
                 container.style.width = css.w + 'px'
                 container.style.height = css.h + 'px'
                 await new Promise(r => setTimeout(r, 60))
-                    ; (tmp as any).scale = renderScale
+                ;(tmp as any).scale = renderScale
                 await Promise.race([
                     reactiveUtils.whenOnce(() => !!tmp && !tmp.updating),
                     new Promise(resolve => setTimeout(resolve, 20000))
@@ -1375,7 +1889,13 @@ async function captureMapHiRes(
             projection: (capWkid === 3857 || capWkid === 102100 || capWkid === 102113)
                 ? 'webMercator'
                 : (capWkid === 4326 ? 'geographic' : 'projected'),
-            reprojected
+            reprojected,
+            wkid: capWkid || undefined,
+            center: ground
+                ? { x: (ground.xmin + ground.xmax) / 2, y: (ground.ymin + ground.ymax) / 2 }
+                : (((tmp as any).center && isFinite((tmp as any).center.x))
+                    ? { x: (tmp as any).center.x, y: (tmp as any).center.y }
+                    : (reprojected ? undefined : { x: center.x, y: center.y }))
         }
     } finally {
         // CRITICAL: temp view shares the live WebMap - detach before destroy.
@@ -1739,6 +2259,119 @@ export function findLegendDom(widgetId?: string): Element | null {
  *  Legend widget shows: layer visibility, legendEnabled, scale ranges,
  *  group layers, map-service sublayers, and every renderer type the API
  *  supports. Falls back to a renderer walk when the module is missing. */
+/* ------------------------------------------------------------------ */
+/* legend: scale-dependent filtering                                    */
+/* ------------------------------------------------------------------ */
+
+export interface LayerScaleRange { title: string, minScale: number, maxScale: number }
+
+/** SDK visibility rule: a layer draws at `scale` when minScale is 0 or
+ *  scale <= minScale (not zoomed out past it) AND maxScale is 0 or
+ *  scale >= maxScale (not zoomed in past it). Pure/exported. */
+export function visibleAtScale (r: { minScale: number, maxScale: number }, scale: number): boolean {
+    const mn = Number(r.minScale) || 0
+    const mx = Number(r.maxScale) || 0
+    if (!(scale > 0)) return true
+    if (mn > 0 && scale > mn) return false
+    if (mx > 0 && scale < mx) return false
+    return true
+}
+
+/** Collect {title, minScale, maxScale} for every layer and map-service
+ *  sublayer in the view. Duplicate titles merge to the most permissive
+ *  range so a shared name can never hide a layer that does draw. */
+export function collectLayerScaleRanges (view: MapView): LayerScaleRange[] {
+    const out = new Map<string, LayerScaleRange>()
+    const add = (title: any, minScale: any, maxScale: any): void => {
+        const t = String(title || '').trim()
+        if (!t) return
+        const mn = Number(minScale) || 0
+        const mx = Number(maxScale) || 0
+        const prev = out.get(t)
+        if (!prev) { out.set(t, { title: t, minScale: mn, maxScale: mx }); return }
+        // union of ranges: 0 means unbounded on that side
+        prev.minScale = (prev.minScale === 0 || mn === 0) ? 0 : Math.max(prev.minScale, mn)
+        prev.maxScale = (prev.maxScale === 0 || mx === 0) ? 0 : Math.min(prev.maxScale, mx)
+    }
+    const walkSub = (node: any): void => {
+        if (!node) return
+        add(node.title, node.minScale, node.maxScale)
+        const subs = node.sublayers
+        const arr: any[] = subs ? (subs.toArray ? subs.toArray() : Array.from(subs)) : []
+        for (const s of arr) walkSub(s)
+    }
+    try {
+        const all: any = (view.map as any).allLayers
+        const layers: any[] = all ? (all.toArray ? all.toArray() : Array.from(all)) : []
+        for (const l of layers) {
+            add(l.title, l.minScale, l.maxScale)
+            if (l.sublayers) {
+                const subs: any[] = l.sublayers.toArray ? l.sublayers.toArray() : Array.from(l.sublayers)
+                for (const s of subs) walkSub(s)
+            }
+        }
+    } catch (e) { /* best-effort */ }
+    return Array.from(out.values())
+}
+
+/** Drop legend rows for layers not drawn at the printed scale. A 'layer'
+ *  or 'heading' row whose label matches a known layer title outside its
+ *  scale range is removed together with its nested rows (items, notes and
+ *  deeper-indented layers) up to the next row at the same or shallower
+ *  indent. Rows with no matching title are never touched. Pure/exported. */
+export function filterLegendRowsByScale (rows: LegendRow[], ranges: LayerScaleRange[], scale: number): LegendRow[] {
+    if (!rows.length || !ranges.length || !(scale > 0)) return rows
+    const byTitle = new Map<string, LayerScaleRange>()
+    for (const r of ranges) byTitle.set(r.title.toLowerCase(), r)
+    const out: LegendRow[] = []
+    let i = 0
+    while (i < rows.length) {
+        const row = rows[i]
+        const isHead = row.kind === 'layer' || row.kind === 'heading'
+        const rng = isHead ? byTitle.get(String(row.label || '').trim().toLowerCase()) : undefined
+        if (rng && !visibleAtScale(rng, scale)) {
+            const depth = Number(row.indent) || 0
+            i++
+            while (i < rows.length) {
+                const nx = rows[i]
+                const nxHead = nx.kind === 'layer' || nx.kind === 'heading'
+                if (nxHead && (Number(nx.indent) || 0) <= depth) break
+                i++
+            }
+            continue
+        }
+        out.push(row)
+        i++
+    }
+    // A group heading left with nothing under it is noise: drop it. Layer
+    // rows are kept even when childless (single-symbol layers carry their
+    // swatch on the layer row itself).
+    const cleaned: LegendRow[] = []
+    for (let k = 0; k < out.length; k++) {
+        const r = out[k]
+        if (r.kind === 'heading') {
+            const depth = Number(r.indent) || 0
+            const nx = out[k + 1]
+            const nxHead = !!nx && (nx.kind === 'layer' || nx.kind === 'heading')
+            if (!nx || (nxHead && (Number(nx.indent) || 0) <= depth)) continue
+        }
+        cleaned.push(r)
+    }
+    return cleaned
+}
+
+/** Printed-scale estimate BEFORE capture (same rule captureMapHiRes uses;
+ *  aspect-only fit so frame inches stand in for capture pixels). */
+export function estimatePrintedScale (view: MapView, frameWIn: number, frameHIn: number, layout: PrintLayout, opts: RenderOptions): number {
+    try {
+        const mpu = metersPerMapUnit(view.scale, view.resolution)
+        const ext: any = view.extent
+        const fit = ext ? extentFitScale(ext.width, ext.height, mpu, frameWIn, frameHIn, frameWIn, frameHIn) : 0
+        const mode: PrintScaleMode = opts.scaleMode || (layout.preserve === 'extent' ? 'preserveExtent' : 'current')
+        return resolvePrintedScale(mode, view.scale, opts.fixedScale, fit)
+    } catch (e) { return view.scale }
+}
+
 export async function buildLegendRows(view: MapView, maxItems: number, onProgress: RenderProgress, legendWidgetId?: string): Promise<LegendRow[]> {
     onProgress('Building legend\u2026')
     const coverageOf = (rows: LegendRow[]): number => {
@@ -3693,9 +4326,37 @@ export async function composePage(
     title: string,
     opts: RenderOptions = {}
 ): Promise<void> {
+    // Coordinate tokens on a projected capture need the SDK projection
+    // engine; load it once here (async) so token resolution stays sync.
+    let toWgs84: TextTokens['toWgs84']
+    const needsProjector = cap.projection === 'projected' && (cap.wkid || 0) > 0 &&
+        (layout.elements || []).some(e => (e as LayoutElement).type === 'text' && /\{coord:/.test(String((e as TextEl).text || '')))
+    if (needsProjector) {
+        try {
+            const projector = await getProjector()
+            if (projector) {
+                const PointCls: any = projector.Point
+                const capSR = new SpatialReference({ wkid: cap.wkid })
+                const wgs = new SpatialReference({ wkid: 4326 })
+                toWgs84 = (x: number, y: number): [number, number] | null => {
+                    try {
+                        const out: any = projector.project(new PointCls({ x, y, spatialReference: capSR }), wgs)
+                        return out && isFinite(out.x) && isFinite(out.y) ? [out.x, out.y] : null
+                    } catch (e) { return null }
+                }
+            }
+        } catch (e) { /* coordinate tokens resolve to '' */ }
+    }
     const tokens: TextTokens = {
         title, printedScale: cap.printedScale,
-        author: opts.author, copyright: opts.copyright, attribution: opts.attribution
+        author: opts.author, copyright: opts.copyright, attribution: opts.attribution,
+        layoutName: layout.name, mapName: opts.mapName, user: opts.user,
+        pageWidthIn: layout.pageWidthIn, pageHeightIn: layout.pageHeightIn,
+        rotation: cap.rotation, dpi: cap.effectiveDpi,
+        wkid: cap.wkid, srWkt: opts.srWkt, srUnit: opts.srUnit,
+        center: cap.center, groundExtent: cap.groundExtent, projection: cap.projection,
+        toWgs84,
+        pageNumber: opts.pageNumber, pageCount: opts.pageCount, pageName: opts.pageName
     }
     for (const raw of (layout.elements || [])) {
         const el = raw as LayoutElement
@@ -3948,7 +4609,7 @@ function encodePng8(canvas: HTMLCanvasElement): Blob {
 /** GeoTIFF tag types are not in UTIF's default table; register them once so
  *  the encoder writes ModelPixelScale/ModelTiepoint (DOUBLE), GeoKeyDirectory
  *  (SHORT) and GeoAsciiParams (ASCII). Idempotent. */
-function ensureGeoTiffTagTypes(): void {
+function ensureGeoTiffTagTypes (): void {
     try {
         const tt = (UTIF as any).ttypes
         if (tt && tt[33550] == null) {
@@ -3964,7 +4625,7 @@ function ensureGeoTiffTagTypes(): void {
 /** GeoTIFF georeferencing metadata (embedded, north-up) for a raster of
  *  W x H covering ground extent, in the CRS identified by EPSG wkid. Returns
  *  a UTIF metadata IFD, or null when the wkid is unusable. Pure/exported. */
-export function geoTiffMeta(
+export function geoTiffMeta (
     W: number, H: number,
     ext: { xmin: number, ymin: number, xmax: number, ymax: number },
     wkid: number
@@ -4239,13 +4900,28 @@ export async function renderLayout(
     const hasLegendEl = (useLayout.elements || []).some(e => e.type === 'legend')
     const hasLegend = !options.mapOnly && options.includeLegend !== false &&
         (hasLegendEl || (legendCfg && legendCfg.enabled))
+    // Scale-dependent legend: layers that do not draw at the PRINTED scale
+    // (which differs from the screen scale in fixed / fit-extent modes) are
+    // dropped so the legend never lists a symbol the map does not show.
+    // Filtered here with the pre-capture estimate (so panel sizing sees the
+    // final row count) and again after capture with the exact scale.
+    const scaleFilterOn = options.legendScaleFilter !== false
+    const applyScaleFilter = (rows: LegendRow[], scale: number): LegendRow[] => {
+        if (!scaleFilterOn || !rows.length || !(scale > 0)) return rows
+        try {
+            const before = rows.length
+            const out = filterLegendRowsByScale(rows, collectLayerScaleRanges(liveView), scale)
+            if (out.length < before) onProgress('Legend: hid ' + (before - out.length) + ' row(s) not drawn at 1:' + Math.round(scale).toLocaleString() + '.')
+            return out
+        } catch (e) { return rows }
+    }
     const legendRowsPromise: Promise<LegendRow[]> = hasLegend
         ? buildLegendRows(
             liveView,
             Math.max(1, ((useLayout.elements.find(e => e.type === 'legend') as LegendEl)?.maxItems) || 30),
             onProgress,
             options.legendWidgetId
-        )
+        ).then(rows => applyScaleFilter(rows, estimatePrintedScale(liveView, mf.wIn, mf.hIn, useLayout, options)))
         : Promise.resolve([])
     // Second-page legends need a multi-page format: PDF keeps it; raster
     // and SVG formats fall back to a right panel with a note.
@@ -4302,13 +4978,19 @@ export async function renderLayout(
         }
     }
 
-    // A georeferenced map-only raster is captured north-up so the world file
-    // / GeoTIFF stays valid regardless of any (often accidental) view rotation.
-    if (options.georeference && options.mapOnly) {
+    // A georeferenced map-only raster (world file / GeoTIFF) OR a Google Earth
+    // KMZ is captured north-up: the world file, the GeoTIFF tiepoint, and the
+    // KMZ corner quad are all axis-aligned, so any (often accidental) view
+    // rotation must be ignored for these captures.
+    if ((options.georeference || options.googleEarthKmz) && options.mapOnly) {
         options = { ...options, forceNorthUp: true }
     }
     const cap = await captureMapHiRes(liveView, mf.wIn, mf.hIn, useLayout, maxImagePx, options, onProgress)
     if (!panelPlacement) legendRows = await legendRowsPromise
+    // exact printed scale is known now: re-apply (idempotent when unchanged)
+    if (legendRows.length && Math.abs(cap.printedScale - estimatePrintedScale(liveView, mf.wIn, mf.hIn, useLayout, options)) > 1) {
+        legendRows = applyScaleFilter(legendRows, cap.printedScale)
+    }
 
     // A grid cannot be drawn correctly on a rotated capture or when an
     // output WKID reprojected the map; say so on the result instead of
@@ -4483,6 +5165,39 @@ export async function renderLayout(
                 break
             case 'eps': blob = encodeEps(drawer.canvas, pageW, pageH); break
             default: throw new Error('Unsupported format: ' + format)
+        }
+        // Google Earth (KMZ): package the MAP-ONLY raster with a doc.kml
+        // GroundOverlay instead of downloading the bare image. The four map
+        // corners are tied to WGS84 lon/lat via gx:LatLonQuad, so the overlay
+        // drapes on the globe for ANY source coordinate system. Requires a
+        // north-up capture with a known ground extent (forced above).
+        if (options.googleEarthKmz && options.mapOnly && cap.rotation === 0 && cap.groundExtent) {
+            onProgress('Georeferencing for Google Earth…')
+            const liveWkid = Number((liveView.spatialReference as any)?.wkid) || 0
+            const capWkid = (options.outputWkid && options.outputWkid > 0) ? Number(options.outputWkid) : liveWkid
+            const quad = await extentCornersToWgs84(cap.groundExtent, cap.projection, capWkid)
+            if (quad) {
+                const imgBytes = new Uint8Array(await blob.arrayBuffer())
+                const imgName = 'overlay.' + (format === 'jpg' ? 'jpg' : 'png')
+                const kmz = buildKmzBlob(imgBytes, imgName, quad, title)
+                const kmzName = outName.replace(/\.[^.]+$/, '') + '.kmz'
+                onProgress('Packaging KMZ…')
+                lastUrl = downloadBlob(kmz, kmzName); lastSize = kmz.size
+                onProgress('Wrote KMZ for Google Earth (' + Math.round(kmz.size / 1024) + ' KB).')
+                return {
+                    fileName: kmzName,
+                    effectiveDpi: Math.round(cap.effectiveDpi),
+                    warning: cap.warning || undefined,
+                    printedScale: Math.round(cap.printedScale),
+                    url: lastUrl || undefined,
+                    sizeKb: lastSize ? Math.round(lastSize / 1024) : undefined
+                }
+            }
+            // Corner projection unavailable: fall through to a plain raster
+            // download with a note rather than failing the export outright.
+            cap.warning = (cap.warning ? cap.warning + ' ' : '') +
+                'Could not build the Google Earth KMZ (the coordinate system could not be projected to lat/long); exported the plain image instead.'
+            onProgress('KMZ unavailable: exported the plain image.')
         }
         lastUrl = downloadBlob(blob, outName); lastSize = blob.size
         // Georeference a MAP-ONLY raster: the image is the map edge to edge,
