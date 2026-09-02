@@ -3029,10 +3029,10 @@ export async function drawLegendPage(d: Drawer, pageWIn: number, pageHIn: number
     await drawLegendEl(d, el, rows, cfgIn, true)
 }
 
-async function drawLegendEl(d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?: LegendConfig, isPanel?: boolean): Promise<number> {
+async function drawLegendEl(d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?: LegendConfig, isPanel?: boolean, bottomAnchor?: boolean): Promise<number> {
     const cfg: LegendConfig = { ...LEGEND_DEFAULTS, ...(cfgIn || {}), enabled: true }
     const lx = el.xIn * PT_PER_IN
-    const ly = el.yIn * PT_PER_IN
+    let ly = el.yIn * PT_PER_IN
     const lw = el.wIn * PT_PER_IN
     const lh = el.hIn * PT_PER_IN
 
@@ -3040,6 +3040,13 @@ async function drawLegendEl(d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?: 
     // Panels sit beside the map inside the composition frame: no inner
     // border box, and the background covers the full panel strip.
     const boxH = isPanel ? lh : Math.min(lh, Math.max(layout.usedHeightPt, layout.titleFontPt + 20))
+    // Bottom-anchored corner overlay (bottomLeft/bottomRight): the reserved
+    // box spans the full configured height, but the drawn legend is only
+    // boxH tall and otherwise draws from the top - which floats a short
+    // legend up to the middle. Shift the whole thing down by the unused
+    // height so it sits flush with the bottom of its reserved box (i.e. the
+    // bottom of the map frame). Top positions keep the top origin.
+    if (bottomAnchor && !isPanel && lh > boxH) ly += (lh - boxH)
 
     if (cfg.background !== false) {
         const bg = cfg.bgColor || [255, 255, 255]
@@ -3726,7 +3733,12 @@ export async function composePage(
                 return resolveLegendCorner(mf, cornerCfg, obstacles)
             })()
             {
-                const miss = await drawLegendEl(d, { type: 'legend', name: 'settingsLegend', xIn: box.xIn, yIn: box.yIn, wIn: box.wIn, hIn: box.hIn, maxItems: 0 } as LegendEl, legendRows, lCfg, !!opts.legendBox)
+                // bottomLeft/bottomRight corner overlays anchor to the bottom
+                // of their reserved box; top corners keep the top origin.
+                // (Adjacent panels - opts.legendBox - fill their strip, so no
+                // anchoring is applied there.)
+                const bottomAnchor = !opts.legendBox && /^bottom/.test(String(lCfg.position || 'bottomLeft'))
+                const miss = await drawLegendEl(d, { type: 'legend', name: 'settingsLegend', xIn: box.xIn, yIn: box.yIn, wIn: box.wIn, hIn: box.hIn, maxItems: 0 } as LegendEl, legendRows, lCfg, !!opts.legendBox, bottomAnchor)
                 if (miss > 0) (opts as any)._legendTruncated = Math.max(Number((opts as any)._legendTruncated) || 0, miss)
             }
         } catch (e) { /* legend is best-effort */ }
