@@ -96,6 +96,20 @@ export interface RenderOptions {
     /** Capture settle budget in ms (default 45000). Shorter for overview
      *  insets, longer for series index pages at never-loaded zoom levels. */
     maxWaitMs?: number
+    /** Emit a world file (+ .prj) beside a MAP-ONLY raster export so it opens
+     *  georeferenced in Pro/QGIS. Ignored for full layouts (the map is only
+     *  a sub-region of the page) and rotated captures. */
+    georeference?: boolean
+    /** WKT of the output CRS for the .prj sidecar (map SR, or the output
+     *  WKID's SR when an output coordinate system is set). */
+    georefWkt?: string
+    /** EPSG/WKID of the output CRS. Lets a TIFF export embed a true GeoTIFF
+     *  (coordinate system inside the file - no sidecar, ArcGIS Pro reads it
+     *  natively). PNG/JPG/GIF still use the world file + .prj sidecars. */
+    georefWkid?: number
+    /** Internal: capture the map north-up (rotation 0) irrespective of the
+     *  live view. Set for georeferenced map-only rasters. */
+    forceNorthUp?: boolean
 }
 
 export interface RenderProgress { (message: string): void }
@@ -197,6 +211,77 @@ function downloadBlob(blob: Blob, fileName: string): string {
     a.remove()
     // URL kept alive for the session so the results list can re-download it.
     return url
+}
+
+/* ------------------------------------------------------------------ */
+/* georeferencing (world file + .prj sidecars)                          */
+/* ------------------------------------------------------------------ */
+
+/** World-file extension for a raster format (ESRI convention: first + last
+ *  letter of the extension + 'w'; jpeg/jpg -> jgw, tif -> tfw, png -> pgw,
+ *  gif -> gfw). Returns null for formats that cannot carry a world file. */
+export function worldFileExt(format: string): string | null {
+    switch (format) {
+        case 'png32': case 'png8': return 'pgw'
+        case 'jpg': return 'jgw'
+        case 'tiff': return 'tfw'
+        case 'gif': return 'gfw'
+        default: return null
+    }
+}
+
+/** The six ESRI world-file coefficients for a north-up (unrotated) raster
+ *  of W x H pixels that exactly covers ground extent [xmin..xmax, ymin..ymax].
+ *  Lines are A, D, B, E, C, F where A/E are pixel size (E negative, north
+ *  down), D/B are rotation (0), and C/F are the map coordinates of the
+ *  CENTRE of the top-left pixel. Pure and exported for tests. */
+export function worldFileCoeffs(
+    W: number, H: number,
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number }
+): { A: number, D: number, B: number, E: number, C: number, F: number } {
+    const A = (ext.xmax - ext.xmin) / W          // +x per pixel east
+    const E = -(ext.ymax - ext.ymin) / H         // -y per pixel south
+    return {
+        A, D: 0, B: 0, E,
+        C: ext.xmin + A / 2,                      // centre of pixel (0,0)
+        F: ext.ymax + E / 2
+    }
+}
+
+/** Format the world file text (6 lines, high precision). */
+export function worldFileText(
+    W: number, H: number,
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number }
+): string {
+    const c = worldFileCoeffs(W, H, ext)
+    const fmt = (n: number): string => {
+        // enough precision for projected metres/feet and for degrees
+        const s = n.toFixed(Math.abs(n) < 1 ? 12 : 8)
+        return s.replace(/0+$/, '').replace(/\.$/, '.0')
+    }
+    return [c.A, c.D, c.B, c.E, c.C, c.F].map(fmt).join('\n') + '\n'
+}
+
+/** Write the world file (and, when WKT is known, a .prj) beside a raster
+ *  export. Best-effort: any failure is swallowed so the raster still
+ *  downloads. Returns the world-file name written, or null. */
+function emitGeoSidecars(
+    baseName: string, format: string,
+    W: number, H: number,
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number },
+    wkt?: string
+): string | null {
+    try {
+        const ext3 = worldFileExt(format)
+        if (!ext3 || !(W > 0) || !(H > 0) || !(ext.xmax > ext.xmin) || !(ext.ymax > ext.ymin)) return null
+        const stem = baseName.replace(/\.[^.]+$/, '')
+        const wf = worldFileText(W, H, ext)
+        downloadBlob(new Blob([wf], { type: 'text/plain' }), stem + '.' + ext3)
+        if (wkt && wkt.trim()) {
+            downloadBlob(new Blob([wkt.trim() + '\n'], { type: 'text/plain' }), stem + '.prj')
+        }
+        return stem + '.' + ext3
+    } catch (e) { return null }
 }
 
 // No explicit return annotation: TS 5.7 widens a declared `Uint8Array` to
@@ -1071,13 +1156,18 @@ async function captureMapHiRes(
         const outSR = (opts.outputWkid && opts.outputWkid > 0)
             ? new SpatialReference({ wkid: opts.outputWkid })
             : liveView.spatialReference
+        // Georeferenced rasters must be NORTH-UP (world files and the GeoTIFF
+        // tiepoint I embed are axis-aligned), so ignore any live-view rotation
+        // for those captures - even a fraction of a degree otherwise blocks
+        // the embed and, worse, would misalign the pixels against the extent.
+        const capRotation = (opts as any).forceNorthUp ? 0 : liveView.rotation
         tmp = new MapView({
             container,
             map: liveView.map,
             spatialReference: outSR,
             center, // Point in the live view's SR; the view projects it on load
             scale: viewScale,
-            rotation: liveView.rotation,
+            rotation: capRotation,
             ui: { components: [] } as any,
             constraints: { snapToZoom: false, rotationEnabled: true } as any,
             popupEnabled: false,
@@ -1275,6 +1365,7 @@ async function captureMapHiRes(
             printedScale,
             effectiveDpi,
             rotation: (() => {
+                if ((opts as any).forceNorthUp) return 0 // georeferenced captures are north-up
                 const raw = liveView.rotation || 0
                 const norm = ((raw % 360) + 360) % 360
                 return (norm < 0.05 || norm > 359.95) ? 0 : raw
@@ -3854,9 +3945,57 @@ function encodePng8(canvas: HTMLCanvasElement): Blob {
     return new Blob([buf], { type: 'image/png' })
 }
 
-function encodeTiff(canvas: HTMLCanvasElement): Blob {
+/** GeoTIFF tag types are not in UTIF's default table; register them once so
+ *  the encoder writes ModelPixelScale/ModelTiepoint (DOUBLE), GeoKeyDirectory
+ *  (SHORT) and GeoAsciiParams (ASCII). Idempotent. */
+function ensureGeoTiffTagTypes(): void {
+    try {
+        const tt = (UTIF as any).ttypes
+        if (tt && tt[33550] == null) {
+            tt[33550] = 12 // ModelPixelScaleTag (DOUBLE)
+            tt[33922] = 12 // ModelTiepointTag (DOUBLE)
+            tt[34735] = 3  // GeoKeyDirectoryTag (SHORT)
+            tt[34736] = 12 // GeoDoubleParamsTag (DOUBLE)
+            tt[34737] = 2  // GeoAsciiParamsTag (ASCII)
+        }
+    } catch (e) { /* geo tags stay absent -> plain TIFF */ }
+}
+
+/** GeoTIFF georeferencing metadata (embedded, north-up) for a raster of
+ *  W x H covering ground extent, in the CRS identified by EPSG wkid. Returns
+ *  a UTIF metadata IFD, or null when the wkid is unusable. Pure/exported. */
+export function geoTiffMeta(
+    W: number, H: number,
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number },
+    wkid: number
+): Record<string, any> | null {
+    if (!(W > 0) || !(H > 0) || !(ext.xmax > ext.xmin) || !(ext.ymax > ext.ymin) || !(wkid > 0)) return null
+    const sx = (ext.xmax - ext.xmin) / W
+    const sy = (ext.ymax - ext.ymin) / H
+    const geographic = wkid === 4326 || wkid === 4269 || wkid === 4267
+    // GeoKeyDirectory: header [KeyDirVersion=1, KeyRev=1, MinorRev=0, NumKeys],
+    // then 4-short entries {KeyID, TIFFTagLocation=0 (value inline), Count=1, Value}
+    const dir = geographic
+        ? [1, 1, 0, 3, 1024, 0, 1, 2, 1025, 0, 1, 1, 2048, 0, 1, wkid]   // GTModelType=Geographic, GeographicTypeGeoKey
+        : [1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, wkid]   // GTModelType=Projected, ProjectedCSTypeGeoKey
+    return {
+        t33550: [sx, sy, 0],
+        t33922: [0, 0, 0, ext.xmin, ext.ymax, 0], // raster (0,0) -> ground top-left
+        t34735: dir,
+        t34737: ['GeoTIFF (Print Advanced)|']
+    }
+}
+
+function encodeTiff(canvas: HTMLCanvasElement, geo?: { ext: { xmin: number, ymin: number, xmax: number, ymax: number }, wkid: number } | null): Blob {
     const { data, w, h } = canvasRgba(canvas)
-    const buf: ArrayBuffer = UTIF.encodeImage(data.buffer, w, h)
+    let meta: Record<string, any> | undefined
+    if (geo && geo.wkid > 0) {
+        ensureGeoTiffTagTypes()
+        meta = geoTiffMeta(w, h, geo.ext, geo.wkid) || undefined
+    }
+    const buf: ArrayBuffer = meta
+        ? UTIF.encodeImage(data.buffer, w, h, meta)
+        : UTIF.encodeImage(data.buffer, w, h)
     return new Blob([buf], { type: 'image/tiff' })
 }
 
@@ -4163,6 +4302,11 @@ export async function renderLayout(
         }
     }
 
+    // A georeferenced map-only raster is captured north-up so the world file
+    // / GeoTIFF stays valid regardless of any (often accidental) view rotation.
+    if (options.georeference && options.mapOnly) {
+        options = { ...options, forceNorthUp: true }
+    }
     const cap = await captureMapHiRes(liveView, mf.wIn, mf.hIn, useLayout, maxImagePx, options, onProgress)
     if (!panelPlacement) legendRows = await legendRowsPromise
 
@@ -4332,11 +4476,31 @@ export async function renderLayout(
             case 'png8': blob = encodePng8(drawer.canvas); break
             case 'jpg': blob = new Blob([dataUrlToBytes(drawer.canvas.toDataURL('image/jpeg', 0.92))], { type: 'image/jpeg' }); break
             case 'gif': blob = encodeGif(drawer.canvas); break
-            case 'tiff': blob = encodeTiff(drawer.canvas); break
+            case 'tiff': blob = encodeTiff(drawer.canvas,
+                (options.georeference && options.mapOnly && cap.rotation === 0 && cap.groundExtent && (options.georefWkid || 0) > 0)
+                    ? { ext: cap.groundExtent, wkid: Number(options.georefWkid) }
+                    : null)
+                break
             case 'eps': blob = encodeEps(drawer.canvas, pageW, pageH); break
             default: throw new Error('Unsupported format: ' + format)
         }
         lastUrl = downloadBlob(blob, outName); lastSize = blob.size
+        // Georeference a MAP-ONLY raster: the image is the map edge to edge,
+        // so the capture's ground extent maps exactly onto the output pixels.
+        // Full layouts are skipped (the map is a sub-rectangle of the page)
+        // and rotated captures are skipped (world files are north-up only).
+        // TIFF carries a TRUE embedded GeoTIFF (handled above, no sidecar);
+        // PNG/JPG/GIF get the world file + .prj instead.
+        const embeddedGeoTiff = format === 'tiff' && options.georeference && options.mapOnly &&
+            cap.rotation === 0 && !!cap.groundExtent && (options.georefWkid || 0) > 0
+        if (embeddedGeoTiff) {
+            onProgress('Wrote GeoTIFF (coordinate system embedded, EPSG:' + options.georefWkid + ').')
+        } else if (options.georeference && options.mapOnly && cap.rotation === 0 &&
+            cap.groundExtent && worldFileExt(format)) {
+            const wf = emitGeoSidecars(outName, format, drawer.canvas.width, drawer.canvas.height,
+                cap.groundExtent, options.georefWkt)
+            if (wf) onProgress('Wrote world file ' + wf + (options.georefWkt ? ' + .prj' : '') + '.')
+        }
     }
 
     return {

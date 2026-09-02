@@ -347,13 +347,6 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                 .replace('{legend}', onOff(d.includeLegend))
                 .replace('{overview}', onOff(d.showOverview))
                 .replace('{grid}', onOff(d.showGrid))
-            // Ground-truth diagnostic (F12 console): which widget instance
-            // received the import, and exactly what runtime defaults landed.
-            try {
-                console.info('[print-advanced] import applied to widget "' + String(this.props.id) +
-                    '" runtimeDefaults=' + JSON.stringify((parsed as any).runtimeDefaults || {}) +
-                    ' layouts=' + layouts.length)
-            } catch (e) { /* logging only */ }
             this.setState({
                 editingId: layouts.length ? layouts[0].id : '',
                 importXml: '',

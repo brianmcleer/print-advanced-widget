@@ -65,6 +65,7 @@ interface State {
     mapOnly: boolean
     mapOnlyW: string
     mapOnlyH: string
+    georeference: boolean
     svcTemplate: string
     svcScalePreserved: boolean
     svcForceAttrs: boolean
@@ -135,6 +136,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             mapOnly: false,
             mapOnlyW: '',
             mapOnlyH: '',
+            georeference: false,
             svcTemplate: '',
             svcScalePreserved: false,
             svcForceAttrs: false,
@@ -443,6 +445,27 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
     meEnabled = (): boolean => !!this.mapExtentCfg().enabled
     meMapOnly = (): boolean => !!this.cfg().enableMapOnly
+    /** Formats that carry a world file (so georeferencing is offered). */
+    rasterFormat = (f: string): boolean => f === 'png32' || f === 'png8' || f === 'jpg' || f === 'tiff' || f === 'gif'
+
+    /** ESRI WKT for the CRS of a raster export's .prj sidecar. A world file
+     *  alone positions the image but carries NO coordinate system, so ArcGIS
+     *  Pro reports "unknown coordinate system"; the .prj supplies it. Most
+     *  ArcGIS maps expose a bare WKID with an empty .wkt, so resolve the
+     *  common ones here (verified against epsg.io ESRI WKT). Falls back to the
+     *  SR object's own .wkt for anything else. */
+    private static readonly WKID_WKT: Record<number, string> = {
+        3857: 'PROJCS["WGS_1984_Web_Mercator_Auxiliary_Sphere",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Mercator_Auxiliary_Sphere"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",0.0],PARAMETER["Standard_Parallel_1",0.0],PARAMETER["Auxiliary_Sphere_Type",0.0],UNIT["Meter",1.0]]',
+        4326: 'GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]',
+        2232: 'PROJCS["NAD_1983_StatePlane_Colorado_Central_FIPS_0502_Feet",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Lambert_Conformal_Conic"],PARAMETER["False_Easting",3000000.0],PARAMETER["False_Northing",1000000.0],PARAMETER["Central_Meridian",-105.5],PARAMETER["Standard_Parallel_1",39.75],PARAMETER["Standard_Parallel_2",38.45],PARAMETER["Latitude_Of_Origin",37.8333333333333],UNIT["US survey foot",0.304800609601219]]'
+    }
+
+    wkidToWkt = (wkid: number): string | null => {
+        const W = (Widget as any).WKID_WKT
+        // Web Mercator ships under several WKIDs that all map to the same WKT
+        if (wkid === 102100 || wkid === 102113) return W[3857]
+        return W[wkid] || null
+    }
     outSREnabled = (): boolean => !!this.cfg().enableOutputSR
 
     printSource = (): string => (this.cfg().printServiceUrl && this.cfg().printSource === 'service') ? 'service' : 'pagx'
@@ -1152,24 +1175,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             options.includeLegend = this.state.includeLegend
             options.showOverview = this.state.showOverview
             options.showGrid = this.state.showGrid
-            // Diagnostic (F12 console): exactly what the runtime reads for the
-            // selected layout's legend, so a "legend still off" can be pinned to
-            // one of: config not reaching runtime (legendEnabled/hasLegendEl both
-            // false though settings show on -> app not saved/republished), the
-            // toggle being off (includeLegend false), or the control hidden
-            // (ctrlLegend false). Remove once the legend flow is confirmed.
-            try {
-                console.info('[print-advanced] export legend check',
-                    JSON.stringify({
-                        layoutId: layout.id,
-                        layoutName: layout.name,
-                        hasLegendEl: !!(layout.elements && layout.elements.some((e: any) => e.type === 'legend')),
-                        legendEnabled: !!(layout as any).legend?.enabled,
-                        includeLegendState: this.state.includeLegend,
-                        ctrlLegend: this.ctrl('legend'),
-                        mapOnly: this.state.mapOnly
-                    }))
-            } catch (e) { /* logging only */ }
             if (this.state.legendPositionOv) options.legendPositionOverride = this.state.legendPositionOv
             if (this.state.gridTypeOv) options.gridTypeOverride = this.state.gridTypeOv
             if ((this.cfg() as any).legendWidgetId) options.legendWidgetId = String((this.cfg() as any).legendWidgetId)
@@ -1184,6 +1189,33 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 options.mapOnly = true
                 if (Number(this.state.mapOnlyW) > 0) options.mapOnlyWidth = Number(this.state.mapOnlyW)
                 if (Number(this.state.mapOnlyH) > 0) options.mapOnlyHeight = Number(this.state.mapOnlyH)
+                // Georeference: only meaningful for a map-only RASTER (the image is
+                // the map edge to edge). Passes the output CRS WKT for a .prj when
+                // the SR carries one (custom SRs do; a bare WKID may not).
+                if (this.state.georeference && this.rasterFormat(this.state.format)) {
+                    options.georeference = true
+                    try {
+                        const sr: any = jimuMapView.view.spatialReference
+                        const outWkid = this.outSREnabled() ? (parseInt(this.state.outWkid, 10) || 0) : 0
+                        // the CRS the exported pixels are actually in: the output WKID
+                        // when one is set, otherwise the live map's SR
+                        const effWkid = outWkid || (sr && (sr.wkid || sr.latestWkid)) || 0
+                        // prefer the SR object's own WKT (custom SRs carry it), then the
+                        // WKID table; without either, Pro still needs SOMETHING, so a bare
+                        // WebMercator map resolves via the table below
+                        let wkt: string | null = null
+                        if (!outWkid && sr && (sr.wkt || sr.wkt2)) wkt = String(sr.wkt || sr.wkt2)
+                        if (!wkt && effWkid) wkt = this.wkidToWkt(effWkid)
+                        if (!wkt && sr && (sr.isWebMercator || sr.wkid === 102100)) wkt = this.wkidToWkt(3857)
+                        if (wkt) options.georefWkt = wkt
+                        // EPSG code for a true embedded GeoTIFF (TIFF format): Pro reads
+                        // the CRS from inside the file, no sidecar. Web Mercator's several
+                        // WKIDs all normalize to 3857.
+                        let gw = effWkid
+                        if (gw === 102100 || gw === 102113) gw = 3857
+                        if (gw > 0) options.georefWkid = gw
+                    } catch (e) { /* .prj is optional; world file still georeferences */ }
+                }
             }
             const family = this.state.fontFamily || (this.props.config as any)?.defaultFontFamily || ''
             const customs = this.customFontList()
@@ -2123,6 +2155,17 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                                                 </Tooltip>
                                             </div>
                                             <div className='pd-desc'>{messages.mapOnlySizeHint}</div>
+                                        </div>
+                                    )}
+
+                                    {this.meMapOnly() && this.state.mapOnly && this.rasterFormat(this.state.format) && (
+                                        <div className='pd-row pd-pa-switch'>
+                                            <Label className='pd-label' id={this.uid('geo') + '-lbl'}>{messages.georefLabel}</Label>
+                                            <Tooltip title={messages.georefTip} placement='top'>
+                                                <Switch aria-labelledby={this.uid('geo') + '-lbl'} checked={this.state.georeference}
+                                                    onChange={(e) => this.setState({ georeference: e.target.checked })} />
+                                            </Tooltip>
+                                            <div className='pd-desc'>{messages.georefHint}</div>
                                         </div>
                                     )}
 
