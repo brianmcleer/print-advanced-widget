@@ -19,7 +19,7 @@ import SpatialReference from 'esri/geometry/SpatialReference'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
 import { metersPerMapUnit, printExtent, extentRings, extentFitScale, resolvePrintedScale } from './lib/scaleMath'
 import defaultMessages from './translations/default'
-import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner, renderSeries } from './lib/pdfRenderer'
+import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, lookupEsriWkt, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner, renderSeries } from './lib/pdfRenderer'
 import { gridTilesByCount, envelopeForFrame } from './lib/seriesMath'
 
 const printIcon = require('./assets/icons/icon.svg')
@@ -450,30 +450,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   /** Formats that carry a world file (so georeferencing is offered). */
   rasterFormat = (f: string): boolean => f === 'png32' || f === 'png8' || f === 'jpg' || f === 'tiff' || f === 'gif'
 
-  /** ESRI WKT for the CRS of a raster export's .prj sidecar. A world file
-   *  alone positions the image but carries NO coordinate system, so ArcGIS
-   *  Pro reports "unknown coordinate system"; the .prj supplies it. Most
-   *  ArcGIS maps expose a bare WKID with an empty .wkt, so resolve the
-   *  common ones here (verified against epsg.io ESRI WKT). Falls back to the
-   *  SR object's own .wkt for anything else. */
-  private static readonly WKID_WKT: Record<number, string> = {
-    3857: 'PROJCS["WGS_1984_Web_Mercator_Auxiliary_Sphere",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Mercator_Auxiliary_Sphere"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",0.0],PARAMETER["Standard_Parallel_1",0.0],PARAMETER["Auxiliary_Sphere_Type",0.0],UNIT["Meter",1.0]]',
-    4326: 'GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]',
-    4269: 'GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]',
-    2232: 'PROJCS["NAD_1983_StatePlane_Colorado_Central_FIPS_0502_Feet",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Lambert_Conformal_Conic"],PARAMETER["False_Easting",3000000.0],PARAMETER["False_Northing",1000000.0],PARAMETER["Central_Meridian",-105.5],PARAMETER["Standard_Parallel_1",39.75],PARAMETER["Standard_Parallel_2",38.45],PARAMETER["Latitude_Of_Origin",37.8333333333333],UNIT["US survey foot",0.304800609601219]]',
-    26954: 'PROJCS["NAD_1983_StatePlane_Colorado_Central_FIPS_0502",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Lambert_Conformal_Conic"],PARAMETER["False_Easting",914401.8289],PARAMETER["False_Northing",304800.6096],PARAMETER["Central_Meridian",-105.5],PARAMETER["Standard_Parallel_1",38.45],PARAMETER["Standard_Parallel_2",39.75],PARAMETER["Latitude_Of_Origin",37.8333333333333],UNIT["Meter",1.0]]',
-    32612: 'PROJCS["WGS_1984_UTM_Zone_12N",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-111.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]',
-    32613: 'PROJCS["WGS_1984_UTM_Zone_13N",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-105.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]',
-    26912: 'PROJCS["NAD_1983_UTM_Zone_12N",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-111.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]',
-    26913: 'PROJCS["NAD_1983_UTM_Zone_13N",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-105.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]'
-  }
-
-  wkidToWkt = (wkid: number): string | null => {
-    const W = (Widget as any).WKID_WKT
-    // Web Mercator ships under several WKIDs that all map to the same WKT
-    if (wkid === 102100 || wkid === 102113) return W[3857]
-    return W[wkid] || null
-  }
   outSREnabled = (): boolean => !!this.cfg().enableOutputSR
 
   printSource = (): string => (this.cfg().printServiceUrl && this.cfg().printSource === 'service') ? 'service' : 'pagx'
@@ -1134,6 +1110,29 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
   }
 
+  /** Dynamic text context (Pro <dyn> tags) for ANY map and ANY coordinate
+   *  system: the CAPTURE CRS's ESRI WKT + unit, the web map title, and the
+   *  signed-in user. WKT resolves universally (SR's own wkt -> offline seed
+   *  table -> EPSG registry), so {sr:name}/{sr:datum}/{mapUnits} work for a
+   *  user on any WKID, not just the ones shipped in the table. Best-effort:
+   *  anything unresolved leaves the token empty (Pro emptyStr semantics). */
+  applyTextContext = async (view: any, options: RenderOptions): Promise<void> => {
+    try {
+      const sr: any = view.spatialReference
+      const outWkid = options.outputWkid || 0
+      const capWkid = outWkid || (sr && (sr.wkid || sr.latestWkid)) || 0
+      const wkt = await lookupEsriWkt(capWkid || (sr && sr.isWebMercator ? 3857 : 0), outWkid ? undefined : sr)
+      if (wkt) options.srWkt = wkt
+      if (!outWkid && sr && sr.unit) options.srUnit = String(sr.unit)
+      const item: any = (view.map as any)?.portalItem
+      const mapTitle = (item && item.title) || (view.map as any)?.title
+      if (mapTitle) options.mapName = String(mapTitle)
+      const u: any = (getAppStore().getState() as any)?.user
+      const userName = u && (u.fullName || u.username)
+      if (userName) options.user = String(userName)
+    } catch (e) { /* tokens fall back to '' */ }
+  }
+
   onExport = async (): Promise<void> => {
     if (this.printSource() === 'service') { return this.runServicePrint() }
     if (this.state.seriesOpen && this.ctrl('series') && this.state.format === 'pdf') {
@@ -1193,26 +1192,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       if (this.outSREnabled() && parseInt(this.state.outWkid, 10) > 0) {
         options.outputWkid = parseInt(this.state.outWkid, 10)
       }
-      // Dynamic text context (Pro <dyn> tags): the CAPTURE coordinate
-      // system's WKT + unit, the web map title, and the signed-in user.
-      // All best-effort; a missing value resolves to '' (Pro emptyStr).
-      try {
-        const sr: any = jimuMapView.view.spatialReference
-        const outWkid = options.outputWkid || 0
-        const capWkid = outWkid || (sr && (sr.wkid || sr.latestWkid)) || 0
-        let wkt: string | null = null
-        if (!outWkid && sr && (sr.wkt || sr.wkt2)) wkt = String(sr.wkt || sr.wkt2)
-        if (!wkt && capWkid) wkt = this.wkidToWkt(capWkid)
-        if (!wkt && !outWkid && sr && sr.isWebMercator) wkt = this.wkidToWkt(3857)
-        if (wkt) options.srWkt = wkt
-        if (!outWkid && sr && sr.unit) options.srUnit = String(sr.unit)
-        const item: any = (jimuMapView.view.map as any)?.portalItem
-        const mapTitle = (item && item.title) || (jimuMapView.view.map as any)?.title
-        if (mapTitle) options.mapName = String(mapTitle)
-        const u: any = (getAppStore().getState() as any)?.user
-        const userName = u && (u.fullName || u.username)
-        if (userName) options.user = String(userName)
-      } catch (e) { /* tokens fall back to '' */ }
+      await this.applyTextContext(jimuMapView.view, options)
       if (this.meMapOnly() && this.state.mapOnly) {
         options.mapOnly = true
         if (Number(this.state.mapOnlyW) > 0) options.mapOnlyWidth = Number(this.state.mapOnlyW)
@@ -1231,11 +1211,15 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             // prefer the SR object's own WKT (custom SRs carry it), then the
             // WKID table; without either, Pro still needs SOMETHING, so a bare
             // WebMercator map resolves via the table below
-            let wkt: string | null = null
-            if (!outWkid && sr && (sr.wkt || sr.wkt2)) wkt = String(sr.wkt || sr.wkt2)
-            if (!wkt && effWkid) wkt = this.wkidToWkt(effWkid)
-            if (!wkt && sr && (sr.isWebMercator || sr.wkid === 102100)) wkt = this.wkidToWkt(3857)
+            const wkt = await lookupEsriWkt(effWkid || (sr && sr.isWebMercator ? 3857 : 0), outWkid ? undefined : sr)
             if (wkt) options.georefWkt = wkt
+            // geographic vs projected decides the GeoTIFF key; ask the SDK
+            // (works for any WKID it knows), else the renderer infers from WKT
+            try {
+              const geoSR: any = outWkid ? new SpatialReference({ wkid: outWkid }) : sr
+              if (geoSR && typeof geoSR.isGeographic === 'boolean') options.georefGeographic = geoSR.isGeographic
+              else if (geoSR && geoSR.unit) options.georefGeographic = String(geoSR.unit) === 'degrees'
+            } catch (e) { /* renderer infers */ }
             // EPSG code for a true embedded GeoTIFF (TIFF format): Pro reads
             // the CRS from inside the file, no sidecar. Web Mercator's several
             // WKIDs all normalize to 3857.
@@ -1387,6 +1371,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       } else if (family) {
         options.fontFamily = family as any
       }
+      await this.applyTextContext(view, options)
       const effLayout = this.state.dpi ? { ...layout, dpi: Number(this.state.dpi) } : layout
       const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0
       const name = (this.buildFileName(layout) || 'map-series').replace(/\.pdf$/i, '') + '-series.pdf'

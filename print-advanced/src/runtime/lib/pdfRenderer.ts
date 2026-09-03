@@ -108,6 +108,10 @@ export interface RenderOptions {
      *  (coordinate system inside the file - no sidecar, ArcGIS Pro reads it
      *  natively). PNG/JPG/GIF still use the world file + .prj sidecars. */
     georefWkid?: number
+    /** Whether the output CRS is geographic (lat/lon). Picks the GeoTIFF key
+     *  (GeographicTypeGeoKey vs ProjectedCSTypeGeoKey). When omitted the
+     *  renderer infers it from the WKT, then from the WKID/extent. */
+    georefGeographic?: boolean
     /** Internal: capture the map north-up (rotation 0) irrespective of the
      *  live view. Set for georeferenced map-only rasters. */
     forceNorthUp?: boolean
@@ -343,6 +347,80 @@ export function srInfoFromWkt (wkt: string | undefined, wkid: number, unitFallba
     if (!info.name && info.wkid) info.name = 'WKID ' + info.wkid
     if (!info.authority && info.wkid) info.authority = info.wkid >= 100000 ? 'Esri' : 'EPSG'
     return info
+}
+
+/* ---- universal ESRI WKT lookup (any WKID, any user) ---- */
+
+/** Offline seed: common definitions verified numerically identical to the
+ *  EPSG registry (pyproj/GDAL). Everything else resolves at export time via
+ *  lookupEsriWkt(), so no user is limited to this list. */
+export const KNOWN_ESRI_WKT: Record<number, string> = {
+    3857: 'PROJCS["WGS_1984_Web_Mercator_Auxiliary_Sphere",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Mercator_Auxiliary_Sphere"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",0.0],PARAMETER["Standard_Parallel_1",0.0],PARAMETER["Auxiliary_Sphere_Type",0.0],UNIT["Meter",1.0]]',
+    4326: 'GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]',
+    4269: 'GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]',
+    2232: 'PROJCS["NAD_1983_StatePlane_Colorado_Central_FIPS_0502_Feet",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Lambert_Conformal_Conic"],PARAMETER["False_Easting",3000000.0],PARAMETER["False_Northing",1000000.0],PARAMETER["Central_Meridian",-105.5],PARAMETER["Standard_Parallel_1",39.75],PARAMETER["Standard_Parallel_2",38.45],PARAMETER["Latitude_Of_Origin",37.8333333333333],UNIT["US survey foot",0.304800609601219]]',
+    26954: 'PROJCS["NAD_1983_StatePlane_Colorado_Central_FIPS_0502",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Lambert_Conformal_Conic"],PARAMETER["False_Easting",914401.8289],PARAMETER["False_Northing",304800.6096],PARAMETER["Central_Meridian",-105.5],PARAMETER["Standard_Parallel_1",38.45],PARAMETER["Standard_Parallel_2",39.75],PARAMETER["Latitude_Of_Origin",37.8333333333333],UNIT["Meter",1.0]]',
+    32612: 'PROJCS["WGS_1984_UTM_Zone_12N",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-111.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]',
+    32613: 'PROJCS["WGS_1984_UTM_Zone_13N",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-105.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]',
+    26912: 'PROJCS["NAD_1983_UTM_Zone_12N",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-111.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]',
+    26913: 'PROJCS["NAD_1983_UTM_Zone_13N",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-105.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]'
+}
+
+/** Web Mercator ships under several WKIDs that share one definition. */
+export function canonicalWkid (wkid: number): number {
+    return (wkid === 102100 || wkid === 102113) ? 3857 : (Number(wkid) || 0)
+}
+
+/** Accept only something that is actually a WKT coordinate system. */
+export function looksLikeWkt (s: string | null | undefined): boolean {
+    return !!s && /^\s*(PROJCS|GEOGCS|GEOCCS|COMPD_CS|VERTCS|PROJCRS|GEOGCRS)\s*\[/i.test(s)
+}
+
+const wktCache = new Map<number, string | null>()
+
+/** Resolve ESRI WKT for ANY spatial reference, in order: the SR object's own
+ *  wkt (custom SRs carry one), the offline seed table, then the EPSG registry
+ *  mirror at epsg.io (serves both EPSG and Esri-authority codes as ESRI WKT,
+ *  CORS-enabled). Network is best-effort with a short timeout and a session
+ *  cache; a miss resolves null and callers degrade (GeoTIFF never needs WKT,
+ *  a world file still positions the image, {sr:name} prints 'WKID n'). */
+export async function lookupEsriWkt (wkid: number, sr?: any, timeoutMs = 5000): Promise<string | null> {
+    try {
+        if (sr && (sr.wkt || sr.wkt2)) {
+            const own = String(sr.wkt || sr.wkt2)
+            if (looksLikeWkt(own)) return own
+        }
+    } catch (e) { /* fall through */ }
+    const code = canonicalWkid(wkid)
+    if (!(code > 0)) return null
+    if (KNOWN_ESRI_WKT[code]) return KNOWN_ESRI_WKT[code]
+    if (wktCache.has(code)) return wktCache.get(code) || null
+    if (typeof fetch !== 'function') return null
+    let result: string | null = null
+    try {
+        const ctl: any = (typeof AbortController === 'function') ? new AbortController() : null
+        const timer = ctl ? setTimeout(() => { try { ctl.abort() } catch (e) { /* noop */ } }, timeoutMs) : null
+        try {
+            const resp = await fetch('https://epsg.io/' + code + '.esriwkt', { mode: 'cors', signal: ctl ? ctl.signal : undefined })
+            if (resp.ok) {
+                const text = (await resp.text()).trim()
+                if (looksLikeWkt(text)) result = text
+            }
+        } finally { if (timer) clearTimeout(timer) }
+    } catch (e) { result = null }
+    wktCache.set(code, result)
+    return result
+}
+
+/** True when WKT describes a geographic (lat/lon) coordinate system. */
+export function isGeographicWkt (wkt: string | null | undefined): boolean | undefined {
+    if (!wkt) return undefined
+    const root = parseWkt(wkt)
+    if (!root) return undefined
+    const n = root.name.toUpperCase()
+    if (n === 'GEOGCS' || n === 'GEOGCRS') return true
+    if (n === 'PROJCS' || n === 'PROJCRS') return false
+    return undefined
 }
 
 /* ---- coordinate formatting (Pro units: dd | dms | ddm | map units) ---- */
@@ -4628,12 +4706,20 @@ function ensureGeoTiffTagTypes (): void {
 export function geoTiffMeta (
     W: number, H: number,
     ext: { xmin: number, ymin: number, xmax: number, ymax: number },
-    wkid: number
+    wkid: number,
+    geographicHint?: boolean
 ): Record<string, any> | null {
     if (!(W > 0) || !(H > 0) || !(ext.xmax > ext.xmin) || !(ext.ymax > ext.ymin) || !(wkid > 0)) return null
     const sx = (ext.xmax - ext.xmin) / W
     const sy = (ext.ymax - ext.ymin) / H
-    const geographic = wkid === 4326 || wkid === 4269 || wkid === 4267
+    // Geographic vs projected decides which GeoKey carries the code. Prefer
+    // the caller's knowledge (SR.isGeographic / WKT root), then a heuristic:
+    // EPSG geographic 2D codes live in 4000-4999 plus a few legacy ones, and
+    // a degree-sized extent with tiny pixel sizes is a strong tell.
+    const geographic = typeof geographicHint === 'boolean'
+        ? geographicHint
+        : ((wkid >= 4000 && wkid <= 4999) || wkid === 104199 || wkid === 104200 ||
+            (Math.abs(ext.xmin) <= 180 && Math.abs(ext.xmax) <= 180 && Math.abs(ext.ymin) <= 90 && Math.abs(ext.ymax) <= 90 && sx < 0.1))
     // GeoKeyDirectory: header [KeyDirVersion=1, KeyRev=1, MinorRev=0, NumKeys],
     // then 4-short entries {KeyID, TIFFTagLocation=0 (value inline), Count=1, Value}
     const dir = geographic
@@ -4647,12 +4733,12 @@ export function geoTiffMeta (
     }
 }
 
-function encodeTiff(canvas: HTMLCanvasElement, geo?: { ext: { xmin: number, ymin: number, xmax: number, ymax: number }, wkid: number } | null): Blob {
+function encodeTiff(canvas: HTMLCanvasElement, geo?: { ext: { xmin: number, ymin: number, xmax: number, ymax: number }, wkid: number, geographic?: boolean } | null): Blob {
     const { data, w, h } = canvasRgba(canvas)
     let meta: Record<string, any> | undefined
     if (geo && geo.wkid > 0) {
         ensureGeoTiffTagTypes()
-        meta = geoTiffMeta(w, h, geo.ext, geo.wkid) || undefined
+        meta = geoTiffMeta(w, h, geo.ext, geo.wkid, geo.geographic) || undefined
     }
     const buf: ArrayBuffer = meta
         ? UTIF.encodeImage(data.buffer, w, h, meta)
@@ -5160,7 +5246,7 @@ export async function renderLayout(
             case 'gif': blob = encodeGif(drawer.canvas); break
             case 'tiff': blob = encodeTiff(drawer.canvas,
                 (options.georeference && options.mapOnly && cap.rotation === 0 && cap.groundExtent && (options.georefWkid || 0) > 0)
-                    ? { ext: cap.groundExtent, wkid: Number(options.georefWkid) }
+                    ? { ext: cap.groundExtent, wkid: Number(options.georefWkid), geographic: typeof options.georefGeographic === 'boolean' ? options.georefGeographic : isGeographicWkt(options.georefWkt || options.srWkt) }
                     : null)
                 break
             case 'eps': blob = encodeEps(drawer.canvas, pageW, pageH); break
