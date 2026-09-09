@@ -347,6 +347,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                 .replace('{legend}', onOff(d.includeLegend))
                 .replace('{overview}', onOff(d.showOverview))
                 .replace('{grid}', onOff(d.showGrid))
+                .replace('{selection}', onOff(d.includeSelection))
             this.setState({
                 editingId: layouts.length ? layouts[0].id : '',
                 importXml: '',
@@ -1598,6 +1599,20 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     <SettingRow tag='label' label={messages.defGridOn}>
                         <Switch checked={((this.props.config as any)?.runtimeDefaults?.showGrid) !== false}
                             onChange={(e: any) => this.setSub('runtimeDefaults', 'showGrid', e.target.checked ? undefined : false)} />
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.defSelectionOn}>
+                        <Switch checked={((this.props.config as any)?.runtimeDefaults?.includeSelection) !== false}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'includeSelection', e.target.checked ? undefined : false)} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.defSelectionHint}</div>
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.diagLabel}>
+                        <Switch checked={!!((this.props.config as any)?.diagnostics)}
+                            onChange={(e: any) => this.setCfg('diagnostics', e.target.checked ? true : '')} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.diagHint}</div>
                     </SettingRow>
                     <SettingRow flow='wrap' label={messages.defDpi} truncateLabel>
                         <Select size='sm' className='w-100'

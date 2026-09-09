@@ -19,10 +19,41 @@ import SpatialReference from 'esri/geometry/SpatialReference'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
 import { metersPerMapUnit, printExtent, extentRings, extentFitScale, resolvePrintedScale } from './lib/scaleMath'
 import defaultMessages from './translations/default'
-import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, lookupEsriWkt, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner, renderSeries } from './lib/pdfRenderer'
+import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, lookupEsriWkt, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner, renderSeries, getPointProjector, SelectionGeometry } from './lib/pdfRenderer'
 import { gridTilesByCount, envelopeForFrame } from './lib/seriesMath'
+import { CalciteIcon } from 'calcite-components'
+import HelpPopup from './components/HelpPopup'
+import { buildHelpSections } from './helpSections'
 
 const printIcon = require('./assets/icons/icon.svg')
+
+/** Stamped on every graphic THIS widget puts on the map (print-extent
+ *  preview, map series page outlines and numbers). The selection sweep walks
+ *  view.graphics to find what the user has highlighted, and without a marker
+ *  it would print the widget's own preview rectangle back onto the page. */
+const PD_OWN = { __printAdvancedOwn: 1 }
+const isOwnGraphic = (g: any): boolean => {
+  try { return !!(g && g.attributes && g.attributes.__printAdvancedOwn) } catch (e) { return false }
+}
+
+/** Experience Builder's data source registry, which is how the Select,
+ *  Table and Query widgets record what the user has highlighted.
+ *
+ *  Read lazily off the module rather than imported by name on purpose. The
+ *  widget declares four dependencies and nothing else, and a named import
+ *  that a given Experience Builder build does not expose fails the whole
+ *  bundle. Reading it here means the worst case is that data source
+ *  selections are not found, while a clicked feature and app graphics still
+ *  print. */
+const dataSourceList = (): any[] => {
+  try {
+    const core: any = require('jimu-core')
+    const dsm = core && core.DataSourceManager
+    if (!dsm || typeof dsm.getInstance !== 'function') return []
+    const all = dsm.getInstance().getDataSources()
+    return Array.isArray(all) ? all : Object.keys(all || {}).map(k => all[k])
+  } catch (e) { return [] }
+}
 
 interface State {
   jimuMapView: JimuMapView | null
@@ -51,6 +82,7 @@ interface State {
   includeLegend: boolean
   showOverview: boolean
   showGrid: boolean
+  includeSelection: boolean
   legendPositionOv: string
   gridTypeOv: string
   legendHint: { level: 'tight' | 'cramped', count: number, missed: number, fontPt: number } | null
@@ -71,7 +103,20 @@ interface State {
   svcScalePreserved: boolean
   svcForceAttrs: boolean
   outWkid: string
+  helpOpen: boolean
+  helpHintDismissed: boolean
   results: Array<{ name: string, url: string, meta: string }>
+}
+
+/** Browser key for the first-run help hint, so a user is offered the guide
+ *  once and never nagged again. Namespaced by widget so two Print Advanced
+ *  widgets in one app do not share a dismissal. */
+const HELP_HINT_KEY = 'printAdvanced.helpHintDismissed'
+const readHelpHint = (widgetId: string): boolean => {
+  try { return window.localStorage.getItem(HELP_HINT_KEY + '.' + widgetId) === '1' } catch (e) { return false }
+}
+const writeHelpHint = (widgetId: string): void => {
+  try { window.localStorage.setItem(HELP_HINT_KEY + '.' + widgetId, '1') } catch (e) { /* private browsing */ }
 }
 
 export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>, State> {
@@ -123,6 +168,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       includeLegend: (d as any).includeLegend !== false,
       showOverview: (d as any).showOverview !== false,
       showGrid: (d as any).showGrid !== false,
+      includeSelection: (d as any).includeSelection !== false,
       legendPositionOv: '',
       gridTypeOv: '',
       legendHint: null,
@@ -143,6 +189,14 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       svcScalePreserved: false,
       svcForceAttrs: false,
       outWkid: cfgAny.defaultOutputWkid ? String(cfgAny.defaultOutputWkid) : '',
+      helpOpen: false,
+      // Cast is editor-only, same reason as the `declare readonly props`
+      // shim below: the shim covers `this.props`, but this is the raw
+      // CONSTRUCTOR parameter, and some Visual Studio TypeScript hosts
+      // resolve AllWidgetProps only partially there (reporting it as
+      // AllWidgetProps<ImmutableObject<T>> with T unbound), so every
+      // property read on it errors. Emits no JavaScript.
+      helpHintDismissed: readHelpHint((props as any).id),
       results: []
     }
     this.state = { ...this.state, format: this.initialFormat() }
@@ -365,7 +419,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       const rings = [[t.xmin, t.ymin], [t.xmax, t.ymin], [t.xmax, t.ymax], [t.xmin, t.ymax], [t.xmin, t.ymin]]
       this.seriesHighlight = new Graphic({
         geometry: { type: 'polygon', rings: [rings], spatialReference: view.spatialReference } as any,
-        symbol: { type: 'simple-fill', color: [235, 110, 20, 0.3], outline: { color: [225, 75, 10, 1], width: 3, style: 'solid' } } as any
+        symbol: { type: 'simple-fill', color: [235, 110, 20, 0.3], outline: { color: [225, 75, 10, 1], width: 3, style: 'solid' } } as any,
+        attributes: { ...PD_OWN }
       })
       view.graphics.add(this.seriesHighlight)
       this.seriesGraphics.push(this.seriesHighlight)
@@ -406,7 +461,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             type: 'simple-fill',
             color: [0, 0, 0, 0],
             outline: { color: [255, 255, 255, 0.95], width: 4.5, style: 'solid' }
-          } as any
+          } as any,
+          attributes: { ...PD_OWN }
         })
         const outline = new Graphic({
           geometry,
@@ -414,7 +470,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             type: 'simple-fill',
             color: [235, 110, 20, 0.08],
             outline: { color: [225, 75, 10, 1], width: 2.4, style: 'dash' }
-          } as any
+          } as any,
+          attributes: { ...PD_OWN }
         })
         const num = new Graphic({
           geometry: { type: 'point', x: t.centerX, y: t.centerY, spatialReference: sr } as any,
@@ -425,7 +482,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             haloColor: [255, 255, 255, 1],
             haloSize: 3,
             font: { size: Math.round(fontPx * 1.15), weight: 'bold' }
-          } as any
+          } as any,
+          attributes: { ...PD_OWN }
         })
         view.graphics.add(casing)
         view.graphics.add(outline)
@@ -674,7 +732,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         this.previewGraphic = null
       }
       if (!this.previewGraphic) {
-        this.previewGraphic = new Graphic({ geometry, symbol })
+        this.previewGraphic = new Graphic({ geometry, symbol, attributes: { ...PD_OWN } })
         view.graphics.add(this.previewGraphic)
         this.previewView = view
       } else {
@@ -1019,6 +1077,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       includeLegend: (d as any).includeLegend !== false,
       showOverview: (d as any).showOverview !== false,
       showGrid: (d as any).showGrid !== false,
+      includeSelection: (d as any).includeSelection !== false,
       // a fresh layout has not had its legend position hand-set yet
       legendPositionOv: '',
       legendPosUserSet: false,
@@ -1133,6 +1192,239 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     } catch (e) { /* tokens fall back to '' */ }
   }
 
+  /* ---------------------------------------------------------------- */
+  /* the selection highlight: it lives on the VIEW, not the MAP        */
+  /* ---------------------------------------------------------------- */
+
+  /* The offscreen capture view shares the live view's MAP, so every map
+   * layer prints. It does NOT share the live VIEW, and a selection
+   * highlight is view-scoped, which is why a selected parcel never showed
+   * up on the print. So the selected geometry is collected here and handed
+   * to the renderer as a page-space vector overlay. The live map is never
+   * touched, and the outline prints crisp rather than rasterized.
+   * Everything below is best-effort: any source that cannot be read is
+   * skipped, and the page still prints. */
+
+  /** Reduce an SDK geometry to the flat shape the renderer draws. Handles
+   *  polygon, polyline, point, multipoint and extent, in whatever CRS the
+   *  geometry carries; the caller projects. */
+  private overlayGeoms = (geometry: any): Array<{ g: SelectionGeometry, wkid: number }> => {
+    const out: Array<{ g: SelectionGeometry, wkid: number }> = []
+    try {
+      if (!geometry) return out
+      const sr: any = geometry.spatialReference || {}
+      const wkid = Number(sr.wkid || sr.latestWkid || 0)
+      const t = String(geometry.type || '')
+      if (t === 'polygon' && geometry.rings) {
+        out.push({ g: { kind: 'polygon', rings: geometry.rings as number[][][] }, wkid })
+      } else if (t === 'polyline' && geometry.paths) {
+        out.push({ g: { kind: 'polyline', paths: geometry.paths as number[][][] }, wkid })
+      } else if (t === 'point' && isFinite(geometry.x) && isFinite(geometry.y)) {
+        out.push({ g: { kind: 'point', x: Number(geometry.x), y: Number(geometry.y) }, wkid })
+      } else if (t === 'multipoint' && geometry.points) {
+        for (const p of geometry.points) {
+          if (isFinite(p[0]) && isFinite(p[1])) out.push({ g: { kind: 'point', x: Number(p[0]), y: Number(p[1]) }, wkid })
+        }
+      } else if (t === 'extent' && isFinite(geometry.xmin)) {
+        const e = geometry
+        out.push({
+          g: {
+            kind: 'polygon',
+            rings: [[[e.xmin, e.ymin], [e.xmax, e.ymin], [e.xmax, e.ymax], [e.xmin, e.ymax], [e.xmin, e.ymin]]]
+          },
+          wkid
+        })
+      }
+    } catch (e) { /* unreadable geometry is skipped */ }
+    return out
+  }
+
+  /** Every selected geometry on screen, from both places a selection lives
+   *  in an Experience Builder app:
+   *    1. records selected through a data source, which is how the Select,
+   *       Table and Query widgets highlight features, and how a clicked
+   *       feature is recorded
+   *    2. graphics the app has drawn on the view, minus this widget's own
+   *  The same feature often appears in both, so duplicates are dropped. */
+  private collectSelection = (view: any): Array<{ g: SelectionGeometry, wkid: number }> => {
+    const acc: Array<{ g: SelectionGeometry, wkid: number }> = []
+    const seen: Record<string, boolean> = {}
+    const add = (geometry: any): void => {
+      for (const item of this.overlayGeoms(geometry)) {
+        let key = ''
+        try {
+          const g: any = item.g
+          key = item.wkid + '|' + g.kind + '|' + JSON.stringify(g.rings || g.paths || [g.x, g.y]).slice(0, 400)
+        } catch (e) { key = String(acc.length) }
+        if (seen[key]) continue
+        seen[key] = true
+        acc.push(item)
+      }
+    }
+    try {
+      for (const ds of dataSourceList()) {
+        try {
+          if (!ds || typeof ds.getSelectedRecords !== 'function') continue
+          for (const rec of (ds.getSelectedRecords() || [])) {
+            const f = rec && typeof rec.getFeature === 'function' ? rec.getFeature() : null
+            if (f) add(f.geometry)
+          }
+        } catch (e) { /* one unreadable data source does not stop the rest */ }
+      }
+    } catch (e) { /* no data sources in this app */ }
+    try {
+      const gl: any = view && view.graphics
+      const arr: any[] = gl ? (gl.toArray ? gl.toArray() : gl.items || []) : []
+      // each graphic behind its own guard: one unreadable geometry must not
+      // cost the user every selection that follows it in the list
+      for (const g of arr) {
+        try { if (!isOwnGraphic(g)) add(g.geometry) } catch (e) { /* skip this graphic */ }
+      }
+    } catch (e) { /* no view graphics */ }
+    return acc
+  }
+
+  /** Collect the selected features and load them onto the render options,
+   *  projecting into the CAPTURE coordinate system. When an output CRS is
+   *  set and the projection engine will not load, the highlight is dropped
+   *  rather than drawn in the wrong place. */
+  collectViewDecorations = async (view: any, options: RenderOptions): Promise<void> => {
+    try {
+      if (!view) return
+      if (!this.state.includeSelection) return
+      // the capture CRS: the output WKID when one is set, else the live map
+      const sr: any = view.spatialReference || {}
+      const liveWkid = Number(sr.wkid || sr.latestWkid || 0)
+      const capWkid = Number(options.outputWkid || 0) || liveWkid
+      if (!capWkid) return
+
+      const geoms = this.collectSelection(view)
+      if (!geoms.length) return
+
+      // one projector per source CRS; identity when it matches the capture
+      const projectors: Record<number, ((x: number, y: number) => [number, number] | null) | null> = {}
+      const projectorFor = async (from: number): Promise<((x: number, y: number) => [number, number] | null) | null> => {
+        const key = from || liveWkid
+        if (projectors[key] === undefined) projectors[key] = await getPointProjector(key, capWkid)
+        return projectors[key]
+      }
+
+      const ready: SelectionGeometry[] = []
+      for (const item of geoms) {
+        const pj = await projectorFor(item.wkid)
+        if (!pj) continue // no projection engine: skip rather than misplace
+        const g = item.g
+        const mapPts = (list: number[][][] | undefined): number[][][] | undefined => {
+          if (!list) return undefined
+          const outer: number[][][] = []
+          for (const part of list) {
+            const pts: number[][] = []
+            for (const p of part) {
+              const q = pj(Number(p[0]), Number(p[1]))
+              if (q) pts.push(q)
+            }
+            if (pts.length > 1) outer.push(pts)
+          }
+          return outer.length ? outer : undefined
+        }
+        if (g.kind === 'polygon') {
+          const rings = mapPts(g.rings)
+          if (rings) ready.push({ kind: 'polygon', rings })
+        } else if (g.kind === 'polyline') {
+          const paths = mapPts(g.paths)
+          if (paths) ready.push({ kind: 'polyline', paths })
+        } else {
+          const q = pj(Number(g.x), Number(g.y))
+          if (q) ready.push({ kind: 'point', x: q[0], y: q[1] })
+        }
+      }
+      if (ready.length) {
+        options.selectionGeometries = ready
+        const c = this.selectionColorCfg()
+        if (c) options.selectionColor = c
+        const w = Number((this.cfg() as any).selectionWidthPt)
+        if (w > 0) options.selectionWidthPt = w
+      }
+
+      this.diag('selection', { collected: geoms.length, projected: ready.length, capWkid })
+    } catch (e) { /* overlays are best-effort; never lose the export */ }
+  }
+
+  /** Print-overlay diagnostics, off unless the builder switches them on.
+   *  The selection lives outside this widget, so when a highlight does not
+   *  print the only way to tell WHY is to report what was found. */
+  private diag = (what: string, detail: any): void => {
+    try {
+      if (!(this.cfg() as any).diagnostics) return
+      // eslint-disable-next-line no-console
+      console.info('[print-advanced] ' + what, detail)
+    } catch (e) { /* never let logging break an export */ }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* help guide                                                        */
+  /* ---------------------------------------------------------------- */
+
+  /** Translate one help string and fill any {token} placeholders. */
+  private helpT = (id: string, values?: Record<string, string>): string => {
+    let s = String((defaultMessages as any)[id] || '')
+    if (values) {
+      for (const k of Object.keys(values)) s = s.split('{' + k + '}').join(values[k])
+    }
+    return s
+  }
+
+  /** What this app actually offers right now. The guide is built from these,
+   *  so a reader never finds instructions for a button that is not there.
+   *  Read off the same config and layout checks the UI itself uses, which is
+   *  what keeps the two from drifting apart. */
+  private helpFeatures = (): any => {
+    const layout: any = this.getSelectedLayout()
+    const hasLegendEl = !!(layout && layout.elements && layout.elements.some((e: any) => e.type === 'legend'))
+    const service = this.printSource() === 'service'
+    return {
+      service,
+      // the pagx path owns the print-area, map-only and page-furniture
+      // controls; a service print has none of them
+      printArea: !service && this.meEnabled(),
+      mapOnly: !service && this.meMapOnly(),
+      georeference: !service && this.meMapOnly(),
+      kmz: !service && this.meMapOnly(),
+      legend: !service && this.ctrl('legend') && !!layout && (hasLegendEl || !!(layout.legend && layout.legend.enabled)),
+      overview: !service && !!layout && !!(layout.overview && layout.overview.enabled),
+      grid: !service && this.ctrl('grid') && !!layout && !!(layout.grid && layout.grid.enabled),
+      series: !service && this.ctrl('series'),
+      outSR: this.outSREnabled(),
+      qr: !service, // the QR row is always shown on the pagx path
+
+      selection: !service,
+      fonts: !service && this.ctrl('font')
+    }
+  }
+
+  private openHelp = (): void => {
+    // opening the guide answers the first-run hint, so it never comes back
+    if (!this.state.helpHintDismissed) writeHelpHint(this.props.id)
+    this.setState({ helpOpen: true, helpHintDismissed: true })
+  }
+
+  private dismissHelpHint = (): void => {
+    writeHelpHint(this.props.id)
+    this.setState({ helpHintDismissed: true })
+  }
+
+  /** Highlight color from settings, as 0-255 RGB. Defaults to the SDK's cyan
+   *  so the print matches what the user saw on screen. */
+  private selectionColorCfg = (): [number, number, number] | null => {
+    try {
+      const raw = String((this.cfg() as any).selectionColor || '').trim()
+      const m = /^#?([0-9a-f]{6})$/i.exec(raw)
+      if (!m) return null
+      const n = parseInt(m[1], 16)
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+    } catch (e) { return null }
+  }
+
   onExport = async (): Promise<void> => {
     if (this.printSource() === 'service') { return this.runServicePrint() }
     if (this.state.seriesOpen && this.ctrl('series') && this.state.format === 'pdf') {
@@ -1193,6 +1485,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         options.outputWkid = parseInt(this.state.outWkid, 10)
       }
       await this.applyTextContext(jimuMapView.view, options)
+      // selection highlight: view-scoped, so the shared-map capture never
+      // contains it. Must run AFTER outputWkid is set, since the geometry
+      // is projected into the capture coordinate system.
+      await this.collectViewDecorations(jimuMapView.view, options)
       if (this.meMapOnly() && this.state.mapOnly) {
         options.mapOnly = true
         if (Number(this.state.mapOnlyW) > 0) options.mapOnlyWidth = Number(this.state.mapOnlyW)
@@ -1372,6 +1668,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         options.fontFamily = family as any
       }
       await this.applyTextContext(view, options)
+      // the series draws its own page outlines and numbers on the map; the
+      // sweep skips those by their marker, so a real selection still prints
+      // on whichever sheets it falls on
+      await this.collectViewDecorations(view, options)
       const effLayout = this.state.dpi ? { ...layout, dpi: Number(this.state.dpi) } : layout
       const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0
       const name = (this.buildFileName(layout) || 'map-series').replace(/\.pdf$/i, '') + '-series.pdf'
@@ -1417,7 +1717,27 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    position: relative;
     .pd-scroll { flex: 1 1 auto; overflow: auto; padding: 12px; min-height: 0; position: relative; }
+    /* widget header: Help lives at the right, icon only, same as Droplets */
+    .pd-topbar { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end;
+      padding: 4px 8px 0 8px; }
+
+    /* First-run hint. Same shape as the Droplets banner: tinted background, a
+       3px accent bar on the left, a lightbulb, a bold lead-in, an inline
+       "Open the guide." link and an icon-only dismiss on the right. */
+    .pd-firstrun { display: flex; align-items: flex-start; gap: 10px;
+      margin: 0 0 10px 0; padding: 10px 12px; font-size: 12px; line-height: 1.5;
+      background: var(--sys-color-info-light, #eaf4ff);
+      color: var(--ref-palette-neutral-1100, #1b1f24);
+      border: 1px solid var(--ref-palette-neutral-500, #e1e5e9);
+      border-left: 3px solid var(--sys-color-primary-main, #0079c1);
+      border-radius: var(--sys-shape-1, 4px); }
+    .pd-firstrun-ico { color: var(--sys-color-primary-main, #0079c1); margin-top: 1px; flex: 0 0 auto; }
+    .pd-firstrun-body { flex: 1 1 auto; min-width: 0; }
+    .pd-firstrun-body strong { display: block; margin-bottom: 2px; }
+    .pd-firstrun-link { border: none; background: transparent; padding: 0; font: inherit;
+      color: var(--sys-color-primary-main, #0079c1); cursor: pointer; text-decoration: underline; }
     .pd-veil { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 5;
       background: rgba(255, 255, 255, 0.72); }
     .pd-veil-inner { position: sticky; top: 32%; display: flex; justify-content: center; }
@@ -1642,7 +1962,44 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           onActiveViewChange={this.onActiveViewChange}
         />
 
+        <HelpPopup
+          open={this.state.helpOpen}
+          onClose={() => this.setState({ helpOpen: false })}
+          sections={buildHelpSections(this.helpT, this.helpFeatures())}
+          title={messages.helpTitle}
+          intro={messages.helpIntro}
+          searchPlaceholder={messages.helpSearchPlaceholder}
+          noMatches={messages.helpNoMatches}
+          closeLabel={messages.close}
+        />
+
+        {/* Help sits at the right of the widget header, icon only, exactly as
+            it does in Droplets, so users find it in the same place in every
+            widget without being told. */}
+        <div className='pd-topbar'>
+          <Button size='sm' type='tertiary' icon onClick={this.openHelp}
+            title={messages.helpTitle} aria-label={messages.helpTitle}>
+            <CalciteIcon icon='question' scale='s' />
+          </Button>
+        </div>
+
         <div className='pd-scroll' aria-busy={this.state.busy}>
+        {!this.state.helpHintDismissed && !this.state.busy && (
+          <div className='pd-firstrun' role='note'>
+            <span className='pd-firstrun-ico' aria-hidden='true'><CalciteIcon icon='lightbulb' scale='s' /></span>
+            <span className='pd-firstrun-body'>
+              <strong>{messages.firstRunTitle}</strong>
+              {messages.firstRunBody}
+              {' '}
+              <button type='button' className='pd-firstrun-link' onClick={this.openHelp}>{messages.firstRunHelpLink}</button>
+            </span>
+            <Button size='sm' type='tertiary' icon onClick={this.dismissHelpHint}
+              title={messages.firstRunDismiss} aria-label={messages.firstRunDismiss}>
+              <CalciteIcon icon='x' scale='s' />
+            </Button>
+          </div>
+        )}
+
         {this.state.busy && (
           <div className='pd-veil' role='status' aria-live='polite'>
             <div className='pd-veil-inner'>
@@ -2068,6 +2425,17 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               </Tooltip>
             </div>
             )}
+
+            <div className='pd-row'>
+              <div className='pd-pa-switch'>
+                <Label className='pd-label' id={this.uid('sel') + '-lbl'}>{messages.selectionToggleLabel}</Label>
+                <Tooltip title={messages.selectionToggleTip} placement='top'>
+                  <Switch aria-labelledby={this.uid('sel') + '-lbl'} checked={this.state.includeSelection}
+                    onChange={(e) => this.setState({ includeSelection: e.target.checked })} />
+                </Tooltip>
+              </div>
+              <div className='pd-desc'>{messages.selectionToggleHint}</div>
+            </div>
 
             {this.ctrl('legend') && layout && (layout as any).legend?.enabled && this.state.includeLegend && (
             <div className='pd-row' data-testid='legendPosSelect'>

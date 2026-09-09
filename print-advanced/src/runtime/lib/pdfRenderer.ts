@@ -31,7 +31,6 @@ import { Drawer, PdfDrawer, CanvasDrawer, SvgDrawer, splitText } from './drawing
 const UPNG = require('upng-js')
 const UTIF = require('utif')
 const gifenc = require('gifenc')
-const fflate = require('fflate')
 /* eslint-enable @typescript-eslint/no-var-requires */
 
 // Pure UI constants live in printConstants.ts so the settings panel can use
@@ -134,6 +133,15 @@ export interface RenderOptions {
     /** Drop legend entries for layers whose visible scale range excludes the
      *  printed scale (default on). Title-matched; unmatched rows are kept. */
     legendScaleFilter?: boolean
+    /** Selected feature geometries, in the CAPTURE spatial reference, drawn
+     *  as a cased-outline highlight over the map. The capture shares the
+     *  live MAP but not the live VIEW, and a selection highlight lives on
+     *  the view, so it has to be handed over and drawn here. */
+    selectionGeometries?: SelectionGeometry[]
+    /** Highlight color, 0-255. Defaults to the SDK's cyan. */
+    selectionColor?: [number, number, number]
+    /** Highlight line width in points (default 2). */
+    selectionWidthPt?: number
 }
 
 export interface RenderProgress { (message: string): void }
@@ -421,6 +429,121 @@ export function isGeographicWkt (wkt: string | null | undefined): boolean | unde
     if (n === 'GEOGCS' || n === 'GEOGCRS') return true
     if (n === 'PROJCS' || n === 'PROJCRS') return false
     return undefined
+}
+
+/* ------------------------------------------------------------------ */
+/* view-scoped overlay: the selection highlight                         */
+/* ------------------------------------------------------------------ */
+
+/* The offscreen capture view shares the live view's MAP, so map layers
+ * print. It does NOT share the live VIEW, and a selection highlight and an
+ * a selection highlight belongs to the view, not the map. That is why a
+ * selected parcel never appeared on the print. Re-creating it on the temp
+ * view is not viable either: the symbol-true second pass screenshots only
+ * map.allLayers, so view graphics would be dropped, and adding a real layer
+ * would mutate the user's live map mid-export.
+ *
+ * So it is drawn here instead, as a vector overlay in page space, from
+ * geometry the widget hands over. That mutates nothing, survives every
+ * capture path, and prints crisp rather than rasterized in PDF and SVG. */
+
+/** A selected feature's geometry, in the CAPTURE spatial reference. */
+export interface SelectionGeometry {
+    kind: 'polygon' | 'polyline' | 'point'
+    /** polygon rings / polyline paths: [ [ [x,y], ... ], ... ] */
+    rings?: number[][][]
+    paths?: number[][][]
+    x?: number
+    y?: number
+}
+
+/** Map-coordinate to page-point converters for a capture in a frame. */
+function groundToPage (
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number },
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number }
+): { px: (x: number) => number, py: (y: number) => number } {
+    const spanX = ext.xmax - ext.xmin
+    const spanY = ext.ymax - ext.ymin
+    return {
+        px: (x: number) => (mf.xIn + (x - ext.xmin) / spanX * mf.wIn) * PT_PER_IN,
+        py: (y: number) => (mf.yIn + (ext.ymax - y) / spanY * mf.hIn) * PT_PER_IN
+    }
+}
+
+/** Stroke one page-space ring or path, clipped to the frame.
+ *
+ *  A ring out of the SDK already repeats its first point at the end, so the
+ *  closing segment is only added when it is actually missing. Without that
+ *  check every parcel picked up one extra zero-length segment, which round
+ *  line caps would render as a stray dot on the corner. */
+function strokeClippedPath (
+    d: Drawer, pts: Array<[number, number]>,
+    box: { x: number, y: number, w: number, h: number }, close: boolean
+): void {
+    if (pts.length < 2) return
+    const first = pts[0]
+    const last = pts[pts.length - 1]
+    const alreadyClosed = Math.abs(first[0] - last[0]) < 1e-9 && Math.abs(first[1] - last[1]) < 1e-9
+    const n = (close && !alreadyClosed) ? pts.length : pts.length - 1
+    for (let i = 0; i < n; i++) {
+        const a = pts[i]
+        const b = pts[(i + 1) % pts.length]
+        const seg = clipSegToRect(a[0], a[1], b[0], b[1], box.x, box.y, box.w, box.h)
+        if (seg) d.line(seg[0], seg[1], seg[2], seg[3])
+    }
+}
+
+/** Selection highlight over the map image.
+ *
+ *  Drawn as a CASED OUTLINE (white casing under a colored line) rather than
+ *  the translucent wash the screen shows. Two reasons: the Drawer backends
+ *  carry no alpha channel, and on paper an outline keeps the feature's own
+ *  labels and dimensions readable instead of washing them out. The casing
+ *  keeps it legible over both pale parcels and dark imagery. Returns how
+ *  many geometries landed inside the frame. Pure/exported for tests. */
+export function drawSelectionOverlay (
+    d: Drawer,
+    cap: { groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number } },
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number },
+    geoms: SelectionGeometry[],
+    color: [number, number, number] = [0, 255, 255],
+    widthPt = 2
+): number {
+    const ext = cap.groundExtent
+    if (!ext || !geoms || !geoms.length) return 0
+    if (!(ext.xmax > ext.xmin) || !(ext.ymax > ext.ymin)) return 0
+    const { px, py } = groundToPage(ext, mf)
+    const box = { x: mf.xIn * PT_PER_IN, y: mf.yIn * PT_PER_IN, w: mf.wIn * PT_PER_IN, h: mf.hIn * PT_PER_IN }
+    let drawn = 0
+
+    // pass 0 = white casing underneath, pass 1 = the highlight color on top
+    for (const pass of [0, 1]) {
+        if (pass === 0) {
+            d.setStroke(255, 255, 255); d.setLineWidth(widthPt + 1.6)
+        } else {
+            d.setStroke(color[0], color[1], color[2]); d.setLineWidth(widthPt)
+        }
+        for (const g of geoms) {
+            if (g.kind === 'polygon' && g.rings) {
+                for (const ring of g.rings) {
+                    strokeClippedPath(d, ring.map(p => [px(p[0]), py(p[1])] as [number, number]), box, true)
+                }
+                if (pass === 1) drawn++
+            } else if (g.kind === 'polyline' && g.paths) {
+                for (const path of g.paths) {
+                    strokeClippedPath(d, path.map(p => [px(p[0]), py(p[1])] as [number, number]), box, false)
+                }
+                if (pass === 1) drawn++
+            } else if (g.kind === 'point' && typeof g.x === 'number' && typeof g.y === 'number') {
+                const cx = px(g.x); const cy = py(g.y)
+                if (cx >= box.x && cx <= box.x + box.w && cy >= box.y && cy <= box.y + box.h) {
+                    d.circle(cx, cy, 5 + (pass === 0 ? 0.8 : 0), 'S')
+                    if (pass === 1) drawn++
+                }
+            }
+        }
+    }
+    return drawn
 }
 
 /* ---- coordinate formatting (Pro units: dd | dms | ddm | map units) ---- */
@@ -844,17 +967,124 @@ export function buildGroundOverlayKml (imgName: string, quad: LatLonQuad, title:
         '</kml>\n'
 }
 
-/** Zip a doc.kml + overlay image into a KMZ. The image is already compressed
- *  (PNG/JPG) so it is stored (level 0); doc.kml deflates. doc.kml is written
- *  first, as KMZ readers expect the root KML as the archive's first entry. */
+/* ---- minimal ZIP writer (STORE method) for KMZ ---- */
+
+/** CRC-32 (IEEE 802.3), table built once. Pure/exported for tests. */
+let _crcTable: Int32Array | null = null
+export function crc32 (bytes: Uint8Array): number {
+    if (!_crcTable) {
+        const t = new Int32Array(256)
+        for (let n = 0; n < 256; n++) {
+            let c = n
+            for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1)
+            t[n] = c
+        }
+        _crcTable = t
+    }
+    let crc = -1
+    for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ _crcTable[(crc ^ bytes[i]) & 0xFF]
+    return (crc ^ -1) >>> 0
+}
+
+const utf8Bytes = (s: string): Uint8Array => {
+    if (typeof TextEncoder === 'function') return new TextEncoder().encode(s)
+    // fallback: manual UTF-8
+    const out: number[] = []
+    for (let i = 0; i < s.length; i++) {
+        let c = s.charCodeAt(i)
+        if (c < 0x80) out.push(c)
+        else if (c < 0x800) out.push(0xC0 | (c >> 6), 0x80 | (c & 0x3F))
+        else if (c >= 0xD800 && c <= 0xDBFF) {
+            c = 0x10000 + ((c - 0xD800) << 10) + (s.charCodeAt(++i) - 0xDC00)
+            out.push(0xF0 | (c >> 18), 0x80 | ((c >> 12) & 0x3F), 0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F))
+        } else out.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F))
+    }
+    return new Uint8Array(out)
+}
+
+/** Build a ZIP archive with every entry STORED (compression method 0).
+ *  Entries keep the given order, which matters for KMZ: readers expect the
+ *  root KML first. Deflate buys almost nothing here (the overlay is already
+ *  a compressed PNG/JPG and doc.kml is under a kilobyte), so storing avoids
+ *  a compression dependency entirely. Pure/exported for tests. */
+export function zipStore (entries: Array<{ name: string, data: Uint8Array }>): Uint8Array {
+    const now = new Date()
+    const dosTime = ((now.getHours() & 0x1F) << 11) | ((now.getMinutes() & 0x3F) << 5) | ((now.getSeconds() / 2) & 0x1F)
+    const dosDate = (((now.getFullYear() - 1980) & 0x7F) << 9) | (((now.getMonth() + 1) & 0x0F) << 5) | (now.getDate() & 0x1F)
+
+    const parts = entries.map(e => ({ name: utf8Bytes(e.name), data: e.data, crc: crc32(e.data), offset: 0 }))
+    let localSize = 0
+    let centralSize = 0
+    for (const p of parts) {
+        localSize += 30 + p.name.length + p.data.length
+        centralSize += 46 + p.name.length
+    }
+    const out = new Uint8Array(localSize + centralSize + 22)
+    const dv = new DataView(out.buffer)
+    let o = 0
+    // local file headers + data
+    for (const p of parts) {
+        p.offset = o
+        dv.setUint32(o, 0x04034B50, true); o += 4      // signature
+        dv.setUint16(o, 20, true); o += 2               // version needed
+        dv.setUint16(o, 0, true); o += 2                // flags
+        dv.setUint16(o, 0, true); o += 2                // method 0 = store
+        dv.setUint16(o, dosTime, true); o += 2
+        dv.setUint16(o, dosDate, true); o += 2
+        dv.setUint32(o, p.crc, true); o += 4
+        dv.setUint32(o, p.data.length, true); o += 4    // compressed size
+        dv.setUint32(o, p.data.length, true); o += 4    // uncompressed size
+        dv.setUint16(o, p.name.length, true); o += 2
+        dv.setUint16(o, 0, true); o += 2                // extra length
+        out.set(p.name, o); o += p.name.length
+        out.set(p.data, o); o += p.data.length
+    }
+    // central directory
+    const cdStart = o
+    for (const p of parts) {
+        dv.setUint32(o, 0x02014B50, true); o += 4
+        dv.setUint16(o, 20, true); o += 2               // version made by
+        dv.setUint16(o, 20, true); o += 2               // version needed
+        dv.setUint16(o, 0, true); o += 2                // flags
+        dv.setUint16(o, 0, true); o += 2                // method
+        dv.setUint16(o, dosTime, true); o += 2
+        dv.setUint16(o, dosDate, true); o += 2
+        dv.setUint32(o, p.crc, true); o += 4
+        dv.setUint32(o, p.data.length, true); o += 4
+        dv.setUint32(o, p.data.length, true); o += 4
+        dv.setUint16(o, p.name.length, true); o += 2
+        dv.setUint16(o, 0, true); o += 2                // extra
+        dv.setUint16(o, 0, true); o += 2                // comment
+        dv.setUint16(o, 0, true); o += 2                // disk number
+        dv.setUint16(o, 0, true); o += 2                // internal attrs
+        dv.setUint32(o, 0, true); o += 4                // external attrs
+        dv.setUint32(o, p.offset, true); o += 4         // local header offset
+        out.set(p.name, o); o += p.name.length
+    }
+    // end of central directory record
+    const cdSize = o - cdStart
+    dv.setUint32(o, 0x06054B50, true); o += 4           // signature
+    dv.setUint16(o, 0, true); o += 2                    // this disk number
+    dv.setUint16(o, 0, true); o += 2                    // disk with central dir
+    dv.setUint16(o, parts.length, true); o += 2         // entries on this disk
+    dv.setUint16(o, parts.length, true); o += 2         // entries total
+    dv.setUint32(o, cdSize, true); o += 4               // central dir size
+    dv.setUint32(o, cdStart, true); o += 4              // central dir offset
+    dv.setUint16(o, 0, true); o += 2                    // zip comment length
+    return out
+}
+
+/** Zip a doc.kml + overlay image into a KMZ. doc.kml is written first, as
+ *  KMZ readers expect the root KML as the archive's first entry. Entries are
+ *  stored (uncompressed): the overlay is already a compressed PNG/JPG, so
+ *  this costs almost nothing and keeps the widget dependency-free. */
 function buildKmzBlob (imgBytes: Uint8Array, imgName: string, quad: LatLonQuad, title: string): Blob {
     const kml = buildGroundOverlayKml(imgName, quad, title)
-    const files: Record<string, any> = {}
-    files['doc.kml'] = fflate.strToU8(kml)
-    files[imgName] = [imgBytes, { level: 0 }]
-    const zipped: Uint8Array = fflate.zipSync(files, { level: 6 })
-    // Copy into a fresh ArrayBuffer-backed view so Blob accepts it regardless
-    // of how @types/fflate widens the return (Uint8Array<ArrayBufferLike>).
+    const zipped = zipStore([
+        { name: 'doc.kml', data: utf8Bytes(kml) },
+        { name: imgName, data: imgBytes }
+    ])
+    // Copy into a fresh ArrayBuffer-backed view so Blob always accepts it.
     const safe = new Uint8Array(zipped.length)
     safe.set(zipped)
     return new Blob([safe], { type: 'application/vnd.google-earth.kmz' })
@@ -4390,6 +4620,34 @@ async function getProjector(): Promise<{ project: (pt: any, sr: any) => any, Poi
     return null
 }
 
+/** A reusable point projector between two WKIDs, for overlay geometry that
+ *  arrives in a different coordinate system than the capture (an output CRS
+ *  is set, or a data source publishes in its own CRS).
+ *
+ *  Returns an identity function when the two systems are the same, and NULL
+ *  when the SDK projection engine is unavailable, so a caller can skip the
+ *  overlay rather than draw it in the wrong place. */
+export async function getPointProjector (
+    fromWkid: number, toWkid: number
+): Promise<((x: number, y: number) => [number, number] | null) | null> {
+    // Web Mercator's three WKIDs are the same ground, so treat them as equal
+    const norm = (w: number): number => (w === 102100 || w === 102113) ? 3857 : w
+    if (!fromWkid || !toWkid || norm(fromWkid) === norm(toWkid)) {
+        return (x: number, y: number) => [x, y]
+    }
+    const projector = await getProjector()
+    if (!projector) return null
+    const PointCls: any = projector.Point
+    const from = new SpatialReference({ wkid: fromWkid })
+    const to = new SpatialReference({ wkid: toWkid })
+    return (x: number, y: number): [number, number] | null => {
+        try {
+            const out: any = projector.project(new PointCls({ x, y, spatialReference: from }), to)
+            return out && isFinite(out.x) && isFinite(out.y) ? [out.x, out.y] : null
+        } catch (e) { return null }
+    }
+}
+
 export function getMapFrame(layout: PrintLayout): MapFrameEl {
     const mf = (layout.elements || []).find(e => e.type === 'mapFrame') as MapFrameEl
     if (!mf) throw new Error('Layout has no map frame element. Re-import the .pagx.')
@@ -4454,6 +4712,14 @@ export async function composePage(
                         ? buildReferenceGrid(mf, Number(gridCfg.refCols) || 4, Number(gridCfg.refRows) || 4, gridCfg.labels !== false)
                         : buildGridGeometry(cap, mf, gridCfg))
                     if (geom) drawGrid(d, geom, gridCfg)
+                }
+                // Selection highlight: view-scoped, so the shared-map capture
+                // never contains it. Drawn over the map, under the neatline.
+                if (opts.selectionGeometries && opts.selectionGeometries.length && cap.rotation === 0) {
+                    try {
+                        drawSelectionOverlay(d, cap, mf, opts.selectionGeometries,
+                            opts.selectionColor || [0, 255, 255], Number(opts.selectionWidthPt) || 2)
+                    } catch (e) { /* overlay is best-effort; never lose the page */ }
                 }
                 if (mf.borderColor && mf.borderWidthPt > 0) {
                     d.setStroke(mf.borderColor[0], mf.borderColor[1], mf.borderColor[2])
