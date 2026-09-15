@@ -23,6 +23,7 @@ import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, lookupEsriWkt
 import { gridTilesByCount, envelopeForFrame } from './lib/seriesMath'
 import { CalciteIcon } from 'calcite-components'
 import HelpPopup from './components/HelpPopup'
+import FirstRunHint from './components/FirstRunHint'
 import { buildHelpSections } from './helpSections'
 
 const printIcon = require('./assets/icons/icon.svg')
@@ -1723,21 +1724,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .pd-topbar { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end;
       padding: 4px 8px 0 8px; }
 
-    /* First-run hint. Same shape as the Droplets banner: tinted background, a
-       3px accent bar on the left, a lightbulb, a bold lead-in, an inline
-       "Open the guide." link and an icon-only dismiss on the right. */
-    .pd-firstrun { display: flex; align-items: flex-start; gap: 10px;
-      margin: 0 0 10px 0; padding: 10px 12px; font-size: 12px; line-height: 1.5;
-      background: var(--sys-color-info-light, #eaf4ff);
-      color: var(--ref-palette-neutral-1100, #1b1f24);
-      border: 1px solid var(--ref-palette-neutral-500, #e1e5e9);
-      border-left: 3px solid var(--sys-color-primary-main, #0079c1);
-      border-radius: var(--sys-shape-1, 4px); }
-    .pd-firstrun-ico { color: var(--sys-color-primary-main, #0079c1); margin-top: 1px; flex: 0 0 auto; }
-    .pd-firstrun-body { flex: 1 1 auto; min-width: 0; }
-    .pd-firstrun-body strong { display: block; margin-bottom: 2px; }
-    .pd-firstrun-link { border: none; background: transparent; padding: 0; font: inherit;
-      color: var(--sys-color-primary-main, #0079c1); cursor: pointer; text-decoration: underline; }
+    /* The first-run hint is rendered by components/FirstRunHint.tsx, using
+       useTokens() inline styles rather than CSS variables. The handoff's
+       contrast lesson forbids a theme's info.light as a banner background:
+       some Experience themes define it as a saturated color, and this one
+       painted a solid blue block with white text. tokens.infoBg mixes the
+       primary into the surface at 10 percent instead. */
     .pd-veil { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 5;
       background: rgba(255, 255, 255, 0.72); }
     .pd-veil-inner { position: sticky; top: 32%; display: flex; justify-content: center; }
@@ -1762,8 +1754,17 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .pd-q-row + .pd-q-row { border-top: 1px solid var(--ref-palette-neutral-300, #f0f0f0); }
     .pd-q-active { color: var(--ref-palette-neutral-1100, #444); }
     .pd-q-new { animation: pdQFlash 1.6s ease-out 1; }
-    @keyframes pdQFlash { 0% { background: var(--sys-color-info-light, #e3f0fd); } 100% { background: transparent; } }
-    .pd-q-pill { flex: 0 0 auto; font-size: 9px; font-weight: 700; letter-spacing: 0.03em; color: var(--sys-color-primary-dark, #0a5dc2); background: var(--sys-color-primary-light, #e8f1fd); border-radius: 3px; padding: 1px 5px; }
+    /* Tint the primary into the surface rather than using info.light, which
+       some Experience themes define as a saturated color (handoff 11.2). */
+    @keyframes pdQFlash {
+      0% { background: #eef4fb; background: color-mix(in srgb, var(--sys-color-primary-main, #0079c1) 12%, var(--sys-color-surface-paper, #fff)); }
+      100% { background: transparent; }
+    }
+    .pd-q-pill { flex: 0 0 auto; font-size: 9px; font-weight: 700; letter-spacing: 0.03em;
+      color: var(--sys-color-primary-main, #0079c1);
+      background: #eef4fb;
+      background: color-mix(in srgb, var(--sys-color-primary-main, #0079c1) 12%, var(--sys-color-surface-paper, #fff));
+      border-radius: 3px; padding: 1px 5px; }
     .pd-q-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pd-q-meta { flex: 0 0 auto; color: var(--ref-palette-neutral-1000, #6a6a6a); white-space: nowrap; font-size: 10px; }
     .pd-q-busy { display: block; }
@@ -1775,7 +1776,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .pd-range { flex: 1 1 auto; min-width: 90px; accent-color: var(--sys-color-primary-main, #076fe5); }
     .pd-thumb { margin: 6px 0 2px; display: flex; align-items: flex-end; gap: 8px; }
     .pd-thumb svg { display: block; border-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
-    .pd-thumb-badge { font-size: 10px; color: var(--sys-color-primary-dark, #0a5dc2); background: var(--sys-color-primary-light, #e8f1fd); border-radius: 3px; padding: 1px 6px; }
+    .pd-thumb-badge { font-size: 10px;
+      color: var(--sys-color-primary-main, #0079c1);
+      background: #eef4fb;
+      background: color-mix(in srgb, var(--sys-color-primary-main, #0079c1) 12%, var(--sys-color-surface-paper, #fff));
+      border-radius: 3px; padding: 1px 6px; }
     .pd-row { margin-bottom: 10px; }
     .pd-label { font-size: 12px; font-weight: 600; margin-bottom: 3px; display: block; }
     .pd-desc { font-size: 11px; color: var(--ref-palette-neutral-1100, #595959); margin-top: 3px; }
@@ -1985,19 +1990,14 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
         <div className='pd-scroll' aria-busy={this.state.busy}>
         {!this.state.helpHintDismissed && !this.state.busy && (
-          <div className='pd-firstrun' role='note'>
-            <span className='pd-firstrun-ico' aria-hidden='true'><CalciteIcon icon='lightbulb' scale='s' /></span>
-            <span className='pd-firstrun-body'>
-              <strong>{messages.firstRunTitle}</strong>
-              {messages.firstRunBody}
-              {' '}
-              <button type='button' className='pd-firstrun-link' onClick={this.openHelp}>{messages.firstRunHelpLink}</button>
-            </span>
-            <Button size='sm' type='tertiary' icon onClick={this.dismissHelpHint}
-              title={messages.firstRunDismiss} aria-label={messages.firstRunDismiss}>
-              <CalciteIcon icon='x' scale='s' />
-            </Button>
-          </div>
+          <FirstRunHint
+            title={messages.firstRunTitle}
+            body={messages.firstRunBody}
+            linkLabel={messages.firstRunHelpLink}
+            dismissLabel={messages.firstRunDismiss}
+            onOpenHelp={this.openHelp}
+            onDismiss={this.dismissHelpHint}
+          />
         )}
 
         {this.state.busy && (
