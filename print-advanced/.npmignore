@@ -6,3 +6,7 @@ node_modules/
 Thumbs.db
 desktop.ini
 dist/
+
+# Cowork working folder and release zips never ship
+Claude outputs/
+*.zip

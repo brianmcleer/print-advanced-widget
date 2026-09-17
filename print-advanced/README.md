@@ -41,6 +41,12 @@ Two print sources are available:
 3. From the `client` folder, run `npm install`. Experience Builder installs the widget dependencies from package.json for you.
 4. Restart the client (`npm start`) and hard refresh the browser.
 
+### The release zip and the editor shims
+
+The zip is the widget only. The Visual Studio type shims in the repo (`print-advanced/src/exb-editor-shims-print-advanced.d.ts`, `print-advanced/src/exb-editor-shims.d.ts`) are left out on purpose: their ambient `declare module` blocks are not file-scoped and would rewrite the react, jimu and esri types for every other widget in your `your-extensions` folder.
+
+If you clone the repository instead of using the zip, delete `print-advanced/src/exb-editor-shims-print-advanced.d.ts` and the other shim files listed above before building; nothing else depends on them.
+
 ## Troubleshooting: "print-advanced is duplicated"
 
 This build error means the widget name is registered more than once, so a second copy exists somewhere. Replacing only one folder does not fix it. Check in this order:
