@@ -209,6 +209,9 @@ export interface PrintLayout {
 }
 
 export interface Config {
+  /** Show the question-mark button that opens the help guide. Undefined means on,
+   *  so apps configured before this setting existed keep their help button. */
+  showHelp?: boolean
   layouts: PrintLayout[]
   /** Hard cap on the longest capture dimension (WebGL texture safety). */
   maxImagePx?: number

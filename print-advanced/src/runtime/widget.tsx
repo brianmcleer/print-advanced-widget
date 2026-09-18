@@ -1992,14 +1992,16 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             it does in Droplets, so users find it in the same place in every
             widget without being told. */}
         <div className='pd-topbar'>
-          <Button size='sm' type='tertiary' icon onClick={this.openHelp}
-            title={messages.helpTitle} aria-label={messages.helpTitle}>
-            <CalciteIcon icon='question' scale='s' />
-          </Button>
+          {this.props.config?.showHelp !== false && (
+              <Button size='sm' type='tertiary' icon onClick={this.openHelp}
+                title={messages.helpTitle} aria-label={messages.helpTitle}>
+                <CalciteIcon icon='question' scale='s' />
+              </Button>
+          )}
         </div>
 
         <div className='pd-scroll' aria-busy={this.state.busy}>
-        {!this.state.helpHintDismissed && !this.state.busy && (
+        {this.props.config?.showHelp !== false && !this.state.helpHintDismissed && !this.state.busy && (
           <FirstRunHint
             title={messages.firstRunTitle}
             body={messages.firstRunBody}

@@ -1,5 +1,7 @@
 # print-advanced-widget
 
+[![License](https://img.shields.io/github/license/brianmcleer/print-advanced-widget)](LICENSE) [![Release](https://img.shields.io/github/v/release/brianmcleer/=tag)](https://github.com/brianmcleer/print-advanced-widget/releases) [![Issues](https://img.shields.io/github/issues/brianmcleer/print-advanced-widget)](https://github.com/brianmcleer/print-advanced-widget/issues)
+
 Repository for the Print Advanced custom widget for ArcGIS Experience Builder Developer Edition (1.19 and 1.20, React 19).
 
 Print Advanced reproduces an ArcGIS Pro layout (.pagx) in the browser and exports it with no print service required. An optional Esri print service path is included for server side layouts. For the full feature list and install steps, see the widget README in the `print-advanced` subfolder.
@@ -14,21 +16,21 @@ Post and discussion: https://community.esri.com/t5/experience-builder-custom-wid
 
 ```
 print-advanced-widget/            <- this repo
-├── README.md                     <- this file (GitHub landing page)
-├── LICENSE                       <- Apache-2.0
-├── .gitignore                    <- ignores node_modules, .vs, dist, OS cruft
-├── publish.ps1                   <- one-command publish/update script
-└── print-advanced/               <- the widget (drops into your-extensions/widgets)
-    ├── package.json
-    ├── package-lock.json
-    ├── manifest.json
-    ├── config.json
-    ├── icon.svg
-    ├── README.md                 <- install steps, features, troubleshooting
-    ├── LICENSE
-    ├── .gitignore
-    ├── .npmignore
-    └── src/ ...
+â”œâ”€â”€ README.md                     <- this file (GitHub landing page)
+â”œâ”€â”€ LICENSE                       <- Apache-2.0
+â”œâ”€â”€ .gitignore                    <- ignores node_modules, .vs, dist, OS cruft
+â”œâ”€â”€ publish.ps1                   <- one-command publish/update script
+â””â”€â”€ print-advanced/               <- the widget (drops into your-extensions/widgets)
+    â”œâ”€â”€ package.json
+    â”œâ”€â”€ package-lock.json
+    â”œâ”€â”€ manifest.json
+    â”œâ”€â”€ config.json
+    â”œâ”€â”€ icon.svg
+    â”œâ”€â”€ README.md                 <- install steps, features, troubleshooting
+    â”œâ”€â”€ LICENSE
+    â”œâ”€â”€ .gitignore
+    â”œâ”€â”€ .npmignore
+    â””â”€â”€ src/ ...
 ```
 
 The widget lives in the `print-advanced` subfolder so this repo can hold project level files without polluting the shareable widget. Only the `print-advanced` folder is dropped into an Experience Builder install.
