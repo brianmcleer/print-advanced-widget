@@ -25,6 +25,8 @@ import { CalciteIcon } from 'calcite-components'
 import HelpPopup from './components/HelpPopup'
 import FirstRunHint from './components/FirstRunHint'
 import { buildHelpSections } from './helpSections'
+import { beacon } from '../shared/beacon'
+import type { BeaconHandle } from '../shared/beacon'
 
 const printIcon = require('./assets/icons/icon.svg')
 
@@ -867,8 +869,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   private uiVisible = true
   private rootRef: any = React.createRef()
   private visObserver: any = null
+  private beacon: BeaconHandle | null = null
 
   componentDidMount (): void {
+    this.beacon = beacon.init(this.props)
     try {
       if (typeof (window as any).IntersectionObserver === 'function' && this.rootRef.current) {
         this.visObserver = new (window as any).IntersectionObserver((entries: any[]) => {
@@ -1133,6 +1137,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (!jimuMapView || !jimuMapView.view) return
     const url = this.serviceUrl()
     if (!url) { this.setState({ error: (defaultMessages as any).svcNoUrl }); return }
+    this.beacon?.action('print-service')
     this.beginBusyClock(); this.setState({ busy: true, error: null, lastResult: null, status: (defaultMessages as any).svcSubmitting })
     try {
       const fmt = this.state.format === 'aix' ? 'aix' : this.state.format
@@ -1166,6 +1171,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       })
       try { window.open(outUrl, '_blank') } catch (e) { /* popup blocked; link is in the list */ }
     } catch (err: any) {
+      this.beacon?.error(err, 'print-service')
       this.setState({ busy: false, status: '', error: (err && err.message) || (defaultMessages as any).svcFailed })
     }
   }
@@ -1435,6 +1441,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const layout = this.getSelectedLayout()
     if (!jimuMapView || !jimuMapView.view || !layout) return
 
+    this.beacon?.action('export', this.state.format)
     this.beginBusyClock(); this.setState({ busy: true, error: null, lastResult: null, status: 'Preparing…' })
     try {
       const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0 // 0 = auto (GPU-detected)
@@ -1571,6 +1578,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           : this.state.results
       })
     } catch (err: any) {
+      this.beacon?.error(err, 'export')
       this.setState({ busy: false, status: '', error: (err && err.message) || 'Export failed.' })
     }
   }
@@ -1609,6 +1617,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const view: any = jimuMapView && jimuMapView.view
     if (!view || !layout) return
     if (this.seriesPageCount() > 31) return
+    this.beacon?.action('export-series')
     this.beginBusyClock(); this.setState({ busy: true, error: null, status: 'Preparing series\u2026' })
     try {
       const mfEl: any = (layout.elements || []).find((e: any) => e.type === 'mapFrame')
@@ -1703,6 +1712,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         })
       }, () => this.updateSeriesPreview())
     } catch (err: any) {
+      this.beacon?.error(err, 'export-series')
       this.setState({ busy: false, status: '', error: (err && err.message) || 'Series export failed.' }, () => this.updateSeriesPreview())
     }
   }
