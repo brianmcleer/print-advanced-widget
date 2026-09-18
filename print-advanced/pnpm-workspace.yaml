@@ -1,2 +1,4 @@
-overrides: 
+allowBuilds:
+  core-js: set this to true or false
+overrides:
   dompurify: ">=3.4.13"
