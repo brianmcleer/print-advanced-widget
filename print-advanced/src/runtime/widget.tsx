@@ -2224,7 +2224,13 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const names = this.featFieldList(layer).map(f => f.name)
     if (this.state.seriesNameField && names.indexOf(this.state.seriesNameField) >= 0) return this.state.seriesNameField
     if (layer && layer.displayField && names.indexOf(layer.displayField) >= 0) return String(layer.displayField)
-    return String(names[0] || (layer && layer.objectIdField) || '')
+    // otherwise the first readable text field (an address or name reads far
+    // better as a page name than an object id), then the first field
+    const types: Record<string, string> = {}
+    try { for (const f of ((layer && layer.fields) || [])) types[String(f.name)] = String(f.type) } catch (e) { /* none */ }
+    const oid = String((layer && layer.objectIdField) || '')
+    const text = names.find(n => types[n] === 'string' && n !== oid && !/^(globalid|guid|shape)/i.test(n))
+    return String(text || names[0] || oid || '')
   }
 
   /** Attribute values as printed text: coded-value domains show their

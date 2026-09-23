@@ -1512,6 +1512,10 @@ export function drawIndexOverlay(
     const gx = (x: number): number => fx + (x - ext.xmin) / (ext.xmax - ext.xmin) * fw
     const gy = (y: number): number => fy + (ext.ymax - y) / (ext.ymax - ext.ymin) * fh
     let drawn = 0
+    // one page-number size for the whole index (sized to the map frame, so
+    // it grows on large formats), never per tile: big and small pages
+    // read the same
+    const fs = Math.max(9, Math.min(18, Math.min(fw, fh) / 40))
     for (const t of tiles) {
         // stroke state per tile: the page-number halo changes the draw
         // color, so without this every tile after the first strokes white
@@ -1524,7 +1528,6 @@ export function drawIndexOverlay(
         // implement the typed ShapeStyle set, where 'D' would draw nothing
         d.rect(x1, y1, x2 - x1, y2 - y1, 'S')
         const label = String(t.page)
-        const fs = Math.max(7, Math.min(14, (y2 - y1) * 0.25))
         d.setFont('bold', fs)
         d.setTextColor(200, 60, 40)
         if (typeof (d as any).haloText === 'function') {
@@ -2592,7 +2595,15 @@ async function captureMapHiRes(
         // Only clamp when the DPI zoom actually over-zoomed (symbolRatio > 1);
         // at 96 DPI there is no zoom, so imagery is already to-scale and a
         // clamp pass would risk excluding symbols with no benefit.
-        const clampNeeded = symbolRatio > 1.05 && rasterRenderScale > viewScale * 1.02
+        // The view clamps its scale to the basemap's finest level. At very
+        // large print scales (a small building on a data-driven page) the
+        // first capture then shows MORE ground than the print extent while
+        // the extent readback says so too: the page would print at the
+        // wrong scale and overlays would not line up. Detect it here and
+        // force the corrected pass, which renders the exact print extent.
+        const snapScale = Number((tmp as any).scale) || 0
+        const scaleOff = snapScale > 0 && Math.abs(snapScale - viewScale) / viewScale > 0.01
+        const clampNeeded = (symbolRatio > 1.05 && rasterRenderScale > viewScale * 1.02) || scaleOff
         // container CSS size (px) that keeps the print extent to-scale while a
         // view renders at renderScale; takeScreenshot then supersamples to
         // capW. At renderScale = viewScale this equals capW (no supersample,
@@ -2623,13 +2634,26 @@ async function captureMapHiRes(
             if (c0 && isFinite(c0.x) && isFinite(c0.y)) centerSnapshot = { x: c0.x, y: c0.y }
         } catch (e) { /* snapshot best-effort */ }
         const renderAt = async (renderScale: number, shotOpts: any): Promise<any> => {
-            const css = cssFor(renderScale)
+            let css = cssFor(renderScale)
             if (Math.abs(css.w - capW) > 1 || Math.abs(css.h - capH) > 1 ||
                 Math.abs(Number((tmp as any).scale) - renderScale) > renderScale * 0.001) {
                 container.style.width = css.w + 'px'
                 container.style.height = css.h + 'px'
                 await new Promise(r => setTimeout(r, 60))
                 ;(tmp as any).scale = renderScale
+                await new Promise(r => setTimeout(r, 60))
+                // the view may refuse a scale finer than its finest level:
+                // size the container for the scale it actually took, so the
+                // screenshot still covers exactly the print extent
+                const got = Number((tmp as any).scale) || renderScale
+                if (Math.abs(got - renderScale) > renderScale * 0.005) {
+                    css = cssFor(got)
+                    container.style.width = css.w + 'px'
+                    container.style.height = css.h + 'px'
+                    await new Promise(r => setTimeout(r, 60))
+                    ;(tmp as any).scale = got
+                }
+                if (centerSnapshot) { try { (tmp as any).center = [centerSnapshot.x, centerSnapshot.y] } catch (e) { /* keep */ } }
                 await Promise.race([
                     reactiveUtils.whenOnce(() => !!tmp && !tmp.updating),
                     new Promise(resolve => setTimeout(resolve, 20000))
@@ -2657,8 +2681,11 @@ async function captureMapHiRes(
                 // raster/imagery base at the clamped render scale (never below
                 // the finest LOD). When no clamp is needed this renders at
                 // viewScale into a capW container - the original sharp path.
-                const baseShot = rasterLayers.length
-                    ? await renderAt(rasterRenderScale, { layers: rasterLayers, format: 'png' })
+                // with no symbol pass (96 DPI scale fix) the base carries
+                // every layer, so nothing is lost
+                const baseLayers = needSymbolPass ? rasterLayers : leaves
+                const baseShot = baseLayers.length
+                    ? await renderAt(scaleOff ? Math.max(rasterRenderScale, snapScale) : rasterRenderScale, { layers: baseLayers, format: 'png' })
                     : null
                 // symbols at the TRUE printed scale so marker/line/text sizes
                 // are correct; transparent so they composite over the base
@@ -2702,7 +2729,15 @@ async function captureMapHiRes(
         // live-SR computation only when not reprojected.
         const capWkid = reprojected ? Number(opts.outputWkid) : liveWkid
         let ground: { xmin: number, ymin: number, xmax: number, ymax: number } | undefined
-        // prefer the pre-resize snapshot; fall back to the live property
+        // prefer the pre-resize snapshot; fall back to the live property.
+        // When the first capture was scale-clamped and the corrected pass
+        // replaced it, the image covers the exact print extent instead.
+        if (scaleOff && symbolPassApplied && centerSnapshot) {
+            const mpuT = metersPerMapUnit(Number((tmp as any).scale) || viewScale, Number((tmp as any).resolution) || 1)
+            const gx = printExtent(centerSnapshot.x, centerSnapshot.y, mpuT, frameWIn, frameHIn, printedScale)
+            extSnapshot = { xmin: gx.xmin, ymin: gx.ymin, xmax: gx.xmax, ymax: gx.ymax }
+            resSnapshot = (gx.xmax - gx.xmin) / capW
+        }
         const tExt: any = extSnapshot || (tmp as any).extent
         if (tExt && isFinite(tExt.xmin) && tExt.xmax > tExt.xmin) {
             ground = { xmin: tExt.xmin, ymin: tExt.ymin, xmax: tExt.xmax, ymax: tExt.ymax }
@@ -4133,7 +4168,15 @@ function drawScaleBarEl(d: Drawer, el: ScaleBarEl, printedScale: number, opts: R
     const userStyle = opts.scaleBarStyle
     const dualMode = userStyle === 'doubleAlternating' || userStyle === 'hollowDouble'
     const style: ScaleBarStyle = userStyle || el.style || 'doubleAlternating'
-    const units: ScaleBarUnits = opts.scaleBarUnits || el.units
+    let units: ScaleBarUnits = opts.scaleBarUnits || el.units
+    // Layout-default units at very large scales (a small parcel on a
+    // data-driven page): a whole bar under 0.1 mile or 0.1 km would read
+    // "0 0 0.01 Miles", so step down to feet or meters, like Pro's
+    // automatic units. A unit the user picked is kept.
+    if (!opts.scaleBarUnits && !dualMode && (units === 'miles' || units === 'kilometers')) {
+        const reach = (boxW / PT_PER_IN) * 0.0254 * printedScale / METERS_PER_UNIT[units]
+        if (reach < 0.1) units = units === 'miles' ? 'feet' : 'meters'
+    }
     const units2: ScaleBarUnits | undefined = dualMode
         ? ((opts.scaleBarUnits2 && opts.scaleBarUnits2 !== units) ? opts.scaleBarUnits2 : (COMPLEMENT_UNIT[units] || 'feet'))
         : undefined
@@ -4141,7 +4184,8 @@ function drawScaleBarEl(d: Drawer, el: ScaleBarEl, printedScale: number, opts: R
     const segments = Math.max(1, el.divisions) * Math.max(1, el.subdivisions)
     const labelSize = Math.min(el.labelSizePt || 8, boxH * 0.45)
     const unitSize = el.unitLabelSizePt || Math.max(el.labelSizePt || 8, 10)
-    const fmt = (v: number): string => (v >= 1000 ? fmtNumber(v) : String(Math.round(v * 100) / 100))
+    // small distances keep two significant digits (0.005, not 0)
+    const fmt = (v: number): string => (v >= 1000 ? fmtNumber(v) : v >= 1 ? String(Math.round(v * 100) / 100) : String(+v.toPrecision(2)))
     const midLabels = style !== 'singleDivision' && (el.subdivisions > 1 || el.divisions > 1)
     // Rough glyph-width estimate (pt) so nothing overflows the frame on either side.
     const textW = (s: string, sz: number): number => s.length * sz * 0.55

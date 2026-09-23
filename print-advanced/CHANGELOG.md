@@ -12,6 +12,11 @@ Newest first. Every release bumps `manifest.json` and `package.json` together.
   - Graticules on projected maps (UTM, State Plane) now also print on every map series sheet, the index page and the page preview.
   - Grid type and style choices apply to map series too.
   - Labels never overprint each other: a label that would touch another is left off.
+- Data-driven page fixes:
+  - Page outline off the feature on very zoomed-in pages (like 1:180 on a small building): the map view cannot zoom past the basemap's finest level, so the first capture showed more ground than the page while the outline was drawn for the true page. The capture now detects the clamp and re-renders the exact print extent, and the outline, grid, GeoPDF coordinates and scale all use that extent.
+  - Scale bar at very large scales: a layout-default Miles or Kilometers bar that would read "0 0 0.01 Miles" switches to Feet or Meters, and small values keep two significant digits. A unit the user picked is kept.
+  - Index page numbers are one size for every page (sized to the map frame, larger on big formats) instead of growing and shrinking with each page's box.
+  - Default page name: after the layer's display field, the first text field (an address or name) is used before the object id.
 - Canvas exports (PNG, JPG, page preview) now support dashed lines, opacity, rotated text and clipping like PDF and SVG.
 
 ## 1.13.0 (2026-09-23)
