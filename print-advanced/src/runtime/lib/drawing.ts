@@ -422,12 +422,14 @@ export class CanvasDrawer implements Drawer {
     this.ctx.font = `${weight}${this.fontSize * this.s}px ${this.cssFamily()}`
   }
   private paint (style: ShapeStyle): void {
-    if (style === 'F' || style === 'FD') { this.ctx.fillStyle = this.fill; this.ctx.fill() }
+    if (style === 'F' || style === 'FD') { this.ctx.globalAlpha = this.alphaFill; this.ctx.fillStyle = this.fill; this.ctx.fill() }
     if (style === 'S' || style === 'FD') {
+      this.ctx.globalAlpha = this.alphaStroke
       this.ctx.strokeStyle = this.stroke
       this.ctx.lineWidth = this.lw * this.s
       this.ctx.stroke()
     }
+    this.ctx.globalAlpha = 1
   }
 
   setFill (r: number, g: number, b: number): void { this.fill = this.rgb(r, g, b) }
@@ -476,7 +478,9 @@ export class CanvasDrawer implements Drawer {
     c.lineTo(x2 * s, y2 * s)
     c.strokeStyle = this.stroke
     c.lineWidth = this.lw * s
+    c.globalAlpha = this.alphaStroke
     c.stroke()
+    c.globalAlpha = 1
   }
 
   setFont (weight: FontWeight, sizePt: number): void { this.font = weight; this.fontSize = sizePt; this.applyFont() }
@@ -492,6 +496,7 @@ export class CanvasDrawer implements Drawer {
   haloText (str: string, x: number, y: number, align: TextAlign, halo: [number, number, number], haloWidthPt: number): void {
     this.applyFont()
     this.ctx.save()
+    this.ctx.setLineDash([])
     this.ctx.textAlign = align
     this.ctx.textBaseline = 'alphabetic'
     this.ctx.lineJoin = 'round'
@@ -506,6 +511,50 @@ export class CanvasDrawer implements Drawer {
   textWidth (str: string): number {
     this.applyFont()
     return this.ctx.measureText(str).width / this.s
+  }
+
+  /** Stroke/fill opacity for later shapes (grid lines, hatch). */
+  setAlpha (fill: number, stroke: number): void {
+    // canvas has one alpha; lines use the stroke value, fills the fill value
+    this.alphaFill = Math.max(0, Math.min(1, fill)); this.alphaStroke = Math.max(0, Math.min(1, stroke))
+  }
+  private alphaFill = 1
+  private alphaStroke = 1
+  setDash (dash: number[] | null): void {
+    this.ctx.setLineDash(dash && dash.length ? dash.map(v => v * this.s) : [])
+  }
+  textAngle (str: string, x: number, y: number, angleDeg: number, halo: [number, number, number] | null, haloWidthPt: number): void {
+    this.applyFont()
+    const c = this.ctx
+    c.save()
+    c.globalAlpha = 1
+    c.setLineDash([])
+    c.translate(x * this.s, y * this.s)
+    c.rotate(angleDeg * Math.PI / 180)
+    c.textAlign = 'left'
+    c.textBaseline = 'alphabetic'
+    if (halo && haloWidthPt > 0) {
+      c.lineJoin = 'round'; c.miterLimit = 2
+      c.strokeStyle = this.rgb(halo[0], halo[1], halo[2])
+      c.lineWidth = haloWidthPt * 2 * this.s
+      c.strokeText(str, 0, 0)
+    }
+    c.fillStyle = this.textColor
+    c.fillText(str, 0, 0)
+    c.restore()
+  }
+  private clipDepth = 0
+  clipRect (x: number, y: number, w: number, h: number): void {
+    this.ctx.save()
+    this.ctx.beginPath()
+    this.ctx.rect(x * this.s, y * this.s, w * this.s, h * this.s)
+    this.ctx.clip()
+    this.clipDepth++
+  }
+  restoreClip (): void {
+    if (this.clipDepth <= 0) return
+    this.ctx.restore()
+    this.clipDepth--
   }
 
   async image (dataUrl: string, _fmt: 'JPEG' | 'PNG', x: number, y: number, w: number, h: number, fit: 'stretch' | 'contain' = 'stretch', anchorH: AnchorH = 'center', anchorV: AnchorV = 'center'): Promise<void> {
@@ -651,7 +700,9 @@ export class SvgDrawer implements Drawer {
     this.parts.push(`<polygon points="${x1},${y1} ${x2},${y2} ${x3},${y3}" ${this.styleAttr(style)}/>`)
   }
   line (x1: number, y1: number, x2: number, y2: number): void {
-    this.parts.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${this.stroke}" stroke-width="${this.lw}" stroke-linecap="round" stroke-linejoin="round"/>`)
+    const so = this.strokeA < 1 ? ` stroke-opacity="${+this.strokeA.toFixed(3)}"` : ''
+    const da = this.dash && this.dash.length ? ` stroke-dasharray="${this.dash.map(v => +v.toFixed(2)).join(' ')}"` : ''
+    this.parts.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${this.stroke}" stroke-width="${this.lw}" stroke-linecap="round" stroke-linejoin="round"${so}${da}/>`)
   }
 
   private customName: string | null = null

@@ -26,6 +26,8 @@ export interface HelpFeatures {
   legend: boolean
   overview: boolean
   grid: boolean
+  /** The Grid style panel is offered. */
+  gridStyle?: boolean
   series: boolean
   outSR: boolean
   qr: boolean
@@ -103,6 +105,7 @@ export function buildHelpSections (t: T, f: HelpFeatures): HelpSection[] {
       body: [
         ...when(f.legend, 'helpPartsLegend', 'helpPartsLegendPos', 'helpPartsLegendScale'),
         ...when(f.grid, 'helpPartsGrid'),
+        ...when(!!f.gridStyle, 'helpPartsGridStyle'),
         ...when(f.overview, 'helpPartsOverview'),
         ...when(f.qr, 'helpPartsQr'),
         ...when(f.fonts, 'helpPartsFont')
@@ -200,6 +203,7 @@ export function buildHelpSections (t: T, f: HelpFeatures): HelpSection[] {
       ...when(f.legend, 'helpTroubleLegend'),
       ...when(!!f.vector, 'helpTroubleVector'),
       ...when(!!f.pagePreview, 'helpTroublePreview'),
+      ...when(f.grid, 'helpTroubleGrid'),
       t('helpTroubleSlow'),
       ...when(f.series, 'helpTroubleSeriesLimit'),
       ...when(f.series, 'helpTroubleSeries'),

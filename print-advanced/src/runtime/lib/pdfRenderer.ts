@@ -72,6 +72,9 @@ export interface RenderOptions {
     /** Runtime user overrides from the widget's advanced options. */
     legendPositionOverride?: string
     gridTypeOverride?: string
+    /** Per-export grid style from the widget (color, labels, interval ...),
+     *  merged over the layout's grid settings. */
+    gridStyleOverride?: Partial<GridConfig>
     /** Bound Legend widget id ('' = automatic: first legend DOM found). */
     legendWidgetId?: string
     /** Internal: reports the computed legend panel so the live print-extent
@@ -1845,6 +1848,7 @@ export async function renderSeries(
     if (options.legendPositionOverride && useLayout.legend && useLayout.legend.enabled) {
         useLayout = { ...useLayout, legend: { ...useLayout.legend, position: options.legendPositionOverride as any } }
     }
+    useLayout = applyGridOverrides(useLayout, options)
     const pageW = useLayout.pageWidthIn * PT_PER_IN
     const pageH = useLayout.pageHeightIn * PT_PER_IN
     const doc = new jsPDF({
@@ -2019,6 +2023,15 @@ export async function renderSeries(
         }
         if (i > 0) doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
         const pageTitle = seriesPageTitle(title || useLayout.name || 'Map', i, n, t, isFeatures)
+        // graticule on a projected output: projected per sheet
+        const gS: any = useLayout.grid
+        if (gS && gS.enabled && gS.type === 'graticule' && options.showGrid !== false && cap.projection === 'projected') {
+            try {
+                const capWkid = (options.outputWkid && options.outputWkid > 0) ? options.outputWkid : ((view.spatialReference as any)?.wkid || 4326)
+                const gg = await projectedGraticule(cap, mf0, gS, capWkid)
+                if (gg) pageOpts = { ...pageOpts, gridGeomOverride: gg }
+            } catch (e) { /* the sheet prints without its graticule */ }
+        }
         await composePage(pd, useLayout, cap, rowsForPage(i), pageTitle, pageOpts)
         if (putGeo && await addGeoPdfViewport(putGeo, i + 1, pageH, mf0, cap, tileOpts)) geoPages++
         pd.beginLayer(PAGE_LAYERS.series)
@@ -2070,7 +2083,16 @@ export async function renderSeries(
         warnings.push('Printed as pixels: ' + why + '.')
     }
     doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
-    await composePage(pd, useLayout, idxCap, idxHasLegend ? legendRows : [], (title || useLayout.name || 'Map') + '  (Index)', idxOpts)
+    let idxOptsG: RenderOptions = idxOpts
+    const gI: any = useLayout.grid
+    if (gI && gI.enabled && gI.type === 'graticule' && options.showGrid !== false && idxCap.projection === 'projected') {
+        try {
+            const capWkid = (options.outputWkid && options.outputWkid > 0) ? options.outputWkid : ((view.spatialReference as any)?.wkid || 4326)
+            const gg = await projectedGraticule(idxCap, mf0, gI, capWkid)
+            if (gg) idxOptsG = { ...idxOpts, gridGeomOverride: gg }
+        } catch (e) { /* index prints without its graticule */ }
+    }
+    await composePage(pd, useLayout, idxCap, idxHasLegend ? legendRows : [], (title || useLayout.name || 'Map') + '  (Index)', idxOptsG)
     pd.beginLayer(PAGE_LAYERS.series)
     drawIndexOverlay(pd, useLayout, idxCap as any, tiles)
     pd.endLayer()
@@ -4911,7 +4933,7 @@ export function buildGraticuleGeometry(
     const g: GridGeometry = { lines: [], crosses: [], ticks: [], labels: [] }
     const pageX = (x: number): number => mf.xIn + (x - ext.xmin) / (ext.xmax - ext.xmin) * mf.wIn
     const pageY = (y: number): number => mf.yIn + (ext.ymax - y) / (ext.ymax - ext.ymin) * mf.hIn
-    const markScale = gridMarkScale(mf)
+    const markScale = gridMarkScale(mf, cfg)
 
     // Border sampling for the geographic range
     let lonMin = Infinity, lonMax = -Infinity, latMin = Infinity, latMax = -Infinity
@@ -4961,7 +4983,7 @@ export function buildGraticuleGeometry(
                 let best: [number, number] | null = null
                 for (const pt of pts) if (!best || Math.abs(pt[1] - targetY) < Math.abs(best[1] - targetY)) best = pt
                 if (best && best[0] >= fx0 - 0.05 && best[0] <= fx0 + fw + 0.05) {
-                    g.labels.push({ text: fmtGeoLabel(lon, step, 'lon'), xIn: Math.min(Math.max(best[0], fx0), fx0 + fw), yIn: targetY, edge })
+                    g.labels.push({ text: fmtGeoLabelFmt(lon, step, 'lon', cfg.geoFormat), xIn: Math.min(Math.max(best[0], fx0), fx0 + fw), yIn: targetY, edge })
                 }
             }
         }
@@ -4984,7 +5006,7 @@ export function buildGraticuleGeometry(
                 let best: [number, number] | null = null
                 for (const pt of pts) if (!best || Math.abs(pt[0] - targetX) < Math.abs(best[0] - targetX)) best = pt
                 if (best && best[1] >= fy0 - 0.05 && best[1] <= fy0 + fh + 0.05) {
-                    g.labels.push({ text: fmtGeoLabel(lat, step, 'lat'), xIn: targetX, yIn: Math.min(Math.max(best[1], fy0), fy0 + fh), edge })
+                    g.labels.push({ text: fmtGeoLabelFmt(lat, step, 'lat', cfg.geoFormat), xIn: targetX, yIn: Math.min(Math.max(best[1], fy0), fy0 + fh), edge })
                 }
             }
         }
@@ -5010,7 +5032,7 @@ export function buildGraticuleGeometry(
         const at = (x: number, y: number): string[] => {
             const ll = toGeo(x, y)
             if (!ll || !isFinite(ll[0]) || !isFinite(ll[1])) return []
-            return [fmtGeoLabel(ll[1], fine, 'lat'), fmtGeoLabel(ll[0], fine, 'lon')]
+            return [fmtGeoLabelFmt(ll[1], fine, 'lat', cfg.geoFormat), fmtGeoLabelFmt(ll[0], fine, 'lon', cfg.geoFormat)]
         }
         addGridCornerLabels(g, mf, cfg, {
             tl: at(ext.xmin, ext.ymax), tr: at(ext.xmax, ext.ymax),
@@ -5022,8 +5044,50 @@ export function buildGraticuleGeometry(
 
 /** Marks (ticks, crosses) scale with the map frame so they stay visible on
  *  large formats: 1x at letter size, ~4x on a 36x48 sheet. */
-export function gridMarkScale(mf: { wIn: number, hIn: number }): number {
-    return Math.max(1, Math.min(5, Math.min(mf.wIn, mf.hIn) / 6.5))
+export function gridMarkScale(mf: { wIn: number, hIn: number }, cfg?: Partial<GridConfig>): number {
+    const base = Math.max(1, Math.min(5, Math.min(mf.wIn, mf.hIn) / 6.5))
+    const pct = cfg && Number(cfg.markScalePct) > 0 ? Math.max(25, Math.min(400, Number(cfg.markScalePct))) : 100
+    return base * pct / 100
+}
+
+/** Graticule label in the chosen format: 108\u00B030'W (dms / dm by the
+ *  interval), 108\u00B030.5'W (dm), or 108.508\u00B0W (dd). */
+export function fmtGeoLabelFmt(deg: number, intervalDeg: number, axis: 'lon' | 'lat', fmt?: string): string {
+    const hemi = Math.abs(deg) < 1e-12 ? '' : (axis === 'lon' ? (deg < 0 ? 'W' : 'E') : (deg < 0 ? 'S' : 'N'))
+    const a = Math.abs(deg)
+    if (fmt === 'dd') {
+        const dec = intervalDeg >= 1 ? 0 : intervalDeg >= 0.1 ? 1 : intervalDeg >= 0.01 ? 2 : intervalDeg >= 0.001 ? 3 : 4
+        return a.toFixed(dec) + '\u00B0' + hemi
+    }
+    if (fmt === 'dm') {
+        let d = Math.floor(a)
+        const decM = intervalDeg >= 1 / 60 ? 0 : intervalDeg >= 1 / 600 ? 1 : 2
+        let m = +((a - d) * 60).toFixed(decM)
+        if (m >= 60) { m = 0; d += 1 }
+        if (intervalDeg >= 1 && m === 0) return d + '\u00B0' + hemi
+        const ms = m.toFixed(decM)
+        return d + '\u00B0' + (Number(ms) < 10 ? '0' : '') + ms + "'" + hemi
+    }
+    return fmtGeoLabel(deg, intervalDeg, axis)
+}
+
+/** Short unit name for measured grid labels from the unit text. */
+export function gridUnitAbbrev(unit: string | undefined): string {
+    const u = String(unit || '').toLowerCase()
+    if (/foot|feet|ft/.test(u)) return 'ft'
+    if (/meter|metre/.test(u)) return 'm'
+    if (/kilomet/.test(u)) return 'km'
+    if (/mile/.test(u)) return 'mi'
+    return ''
+}
+
+/** Measured grid label: 4,327,000 (comma), 4327000 (plain) or 4,327,000 m. */
+export function fmtMeasuredLabel(v: number, fmt?: string, unit?: string): string {
+    const r = Math.round(v)
+    if (fmt === 'plain') return String(r)
+    const c = String(r).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    if (fmt === 'unit') { const u = gridUnitAbbrev(unit); return u ? c + ' ' + u : c }
+    return c
 }
 
 /** Cartographic geographic label: 108°30'W rather than -108°30'. */
@@ -5038,7 +5102,7 @@ export interface GridLabel {
     text: string
     xIn: number
     yIn: number
-    edge: 'top' | 'bottom' | 'left' | 'right' | 'corner'
+    edge: 'top' | 'bottom' | 'left' | 'right' | 'corner' | 'cell'
     /** Corner labels only: which neatline corner, and the stacked lines. */
     corner?: 'tl' | 'tr' | 'bl' | 'br'
     lines?: string[]
@@ -5085,7 +5149,7 @@ export function buildGridGeometry(
     const g: GridGeometry = { lines: [], crosses: [], ticks: [], labels: [] }
     const ext = cap.groundExtent
     if (!ext) return null
-    const markScale = gridMarkScale(mf)
+    const markScale = gridMarkScale(mf, cfg)
     const tickLen = 0.12 * markScale
     const crossLen = 0.08 * markScale
 
@@ -5104,10 +5168,7 @@ export function buildGridGeometry(
         const step = cfg.intervalMode === 'fixed' && Number(cfg.fixedInterval) > 0
             ? Number(cfg.fixedInterval)
             : niceGridInterval(Math.max(ext.xmax - ext.xmin, ext.ymax - ext.ymin))
-        const fmt = (v: number): string => {
-            const r = Math.round(v)
-            return String(r).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-        }
+        const fmt = (v: number): string => fmtMeasuredLabel(v, cfg.measuredFormat, (cfg as any)._unit)
         for (let x = Math.ceil(ext.xmin / step) * step; x <= ext.xmax + 1e-9; x += step) {
             xs.push({ v: x, pageX: mf.xIn + (x - ext.xmin) / (ext.xmax - ext.xmin) * mf.wIn, label: fmt(x) })
         }
@@ -5141,7 +5202,7 @@ export function buildGridGeometry(
         }
     }
     if (cfg.cornerLabels === true) {
-        const f = (v: number): string => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+        const f = (v: number): string => fmtMeasuredLabel(v, cfg.measuredFormat === 'plain' ? 'plain' : 'comma')
         const at = (x: number, y: number): string[] => [f(y) + ' N', f(x) + ' E']
         addGridCornerLabels(g, mf, cfg, {
             tl: at(ext.xmin, ext.ymax), tr: at(ext.xmax, ext.ymax),
@@ -5154,12 +5215,15 @@ export function buildGridGeometry(
 /** Reference (alphanumeric index) grid: pure page-space. */
 export function buildReferenceGrid(
     mf: { xIn: number, yIn: number, wIn: number, hIn: number },
-    cols: number, rows: number, labels: boolean
+    cols: number, rows: number, labels: boolean, cfg?: Partial<GridConfig>
 ): GridGeometry {
     const g: GridGeometry = { lines: [], crosses: [], ticks: [], labels: [] }
-    const c = Math.max(1, Math.min(26, Math.round(cols) || 4))
-    const r = Math.max(1, Math.min(99, Math.round(rows) || 4))
-    const tickLen = 0.12 * gridMarkScale(mf)
+    const lettersOnRows = !!cfg && cfg.refLetters === 'rows'
+    const c = Math.max(1, Math.min(lettersOnRows ? 99 : 26, Math.round(cols) || 4))
+    const r = Math.max(1, Math.min(lettersOnRows ? 26 : 99, Math.round(rows) || 4))
+    const tickLen = 0.12 * gridMarkScale(mf, cfg)
+    const colId = (i: number): string => lettersOnRows ? String(i + 1) : String.fromCharCode(65 + i)
+    const rowId = (j: number): string => lettersOnRows ? String.fromCharCode(65 + j) : String(j + 1)
     for (let i = 1; i < c; i++) {
         const x = mf.xIn + (i / c) * mf.wIn
         g.lines.push({ x1In: x, y1In: mf.yIn, x2In: x, y2In: mf.yIn + mf.hIn })
@@ -5175,91 +5239,359 @@ export function buildReferenceGrid(
     if (labels !== false) {
         for (let i = 0; i < c; i++) {
             const x = mf.xIn + ((i + 0.5) / c) * mf.wIn
-            const letter = String.fromCharCode(65 + i)
+            const letter = colId(i)
             g.labels.push({ text: letter, xIn: x, yIn: mf.yIn, edge: 'top' })
             g.labels.push({ text: letter, xIn: x, yIn: mf.yIn + mf.hIn, edge: 'bottom' })
         }
         for (let j = 0; j < r; j++) {
             const y = mf.yIn + ((j + 0.5) / r) * mf.hIn
-            g.labels.push({ text: String(j + 1), xIn: mf.xIn, yIn: y, edge: 'left' })
-            g.labels.push({ text: String(j + 1), xIn: mf.xIn + mf.wIn, yIn: y, edge: 'right' })
+            g.labels.push({ text: rowId(j), xIn: mf.xIn, yIn: y, edge: 'left' })
+            g.labels.push({ text: rowId(j), xIn: mf.xIn + mf.wIn, yIn: y, edge: 'right' })
+        }
+    }
+    if (cfg && cfg.refCellLabels === true) {
+        // cell ids (A1, B1 ...) in each cell's top-left corner
+        for (let i = 0; i < c; i++) {
+            for (let j = 0; j < r; j++) {
+                const id = lettersOnRows ? rowId(j) + colId(i) : colId(i) + rowId(j)
+                g.labels.push({ text: id, xIn: mf.xIn + (i / c) * mf.wIn, yIn: mf.yIn + (j / r) * mf.hIn, edge: 'cell' })
+            }
         }
     }
     return g
 }
 
+/** Page-inch <-> ground maps for a capture: the pixel affine when present
+ *  (rotated maps), else the axis-aligned ground extent. Pure/exported. */
+export function gridPageMaps (
+    cap: { groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number }, affine?: GroundAffine, widthPx?: number, heightPx?: number },
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number }
+): { toPage: (x: number, y: number) => [number, number], toGround: (xIn: number, yIn: number) => [number, number] } | null {
+    const A: any = cap.affine
+    const W = Number(cap.widthPx) || 0, H = Number(cap.heightPx) || 0
+    if (A && W > 0 && H > 0) {
+        const det = A.a * A.e - A.b * A.d
+        if (Math.abs(det) > 1e-300) {
+            return {
+                toPage: (x, y) => {
+                    const dx = x - A.c, dy = y - A.f
+                    const col = (A.e * dx - A.b * dy) / det
+                    const row = (-A.d * dx + A.a * dy) / det
+                    return [mf.xIn + col / W * mf.wIn, mf.yIn + row / H * mf.hIn]
+                },
+                toGround: (xIn, yIn) => {
+                    const col = (xIn - mf.xIn) / mf.wIn * W, row = (yIn - mf.yIn) / mf.hIn * H
+                    return [A.a * col + A.b * row + A.c, A.d * col + A.e * row + A.f]
+                }
+            }
+        }
+    }
+    const ext = cap.groundExtent
+    if (ext && ext.xmax > ext.xmin && ext.ymax > ext.ymin) {
+        return {
+            toPage: (x, y) => [mf.xIn + (x - ext.xmin) / (ext.xmax - ext.xmin) * mf.wIn, mf.yIn + (ext.ymax - y) / (ext.ymax - ext.ymin) * mf.hIn],
+            toGround: (xIn, yIn) => [ext.xmin + (xIn - mf.xIn) / mf.wIn * (ext.xmax - ext.xmin), ext.ymax - (yIn - mf.yIn) / mf.hIn * (ext.ymax - ext.ymin)]
+        }
+    }
+    return null
+}
+
+/** Measured grid or graticule through any ground-to-page transform, so it
+ *  also works on rotated maps and reprojected output: lines are clipped to
+ *  the frame, labels and ticks sit where each line meets the neatline, and
+ *  crosses turn with the map. Pure/exported. */
+export function buildGridTransformed (
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number },
+    cfg: GridConfig,
+    maps: { toPage: (x: number, y: number) => [number, number], toGround: (xIn: number, yIn: number) => [number, number] },
+    geo?: { toGeo: (x: number, y: number) => [number, number] | null, fromGeo: (lon: number, lat: number) => [number, number] | null }
+): GridGeometry {
+    const g: GridGeometry = { lines: [], crosses: [], ticks: [], labels: [] }
+    const x0 = mf.xIn, y0 = mf.yIn, x1 = mf.xIn + mf.wIn, y1 = mf.yIn + mf.hIn
+    const markScale = gridMarkScale(mf, cfg)
+    const tickLen = 0.12 * markScale, crossLen = 0.08 * markScale
+    const eps = 1e-6
+    const edgeOf = (px: number, py: number): 'top' | 'bottom' | 'left' | 'right' | null => {
+        if (Math.abs(py - y0) < eps) return 'top'
+        if (Math.abs(py - y1) < eps) return 'bottom'
+        if (Math.abs(px - x0) < eps) return 'left'
+        if (Math.abs(px - x1) < eps) return 'right'
+        return null
+    }
+    const seen = new Set<string>()
+    const mark = (px: number, py: number, qx: number, qy: number, text: string): void => {
+        // (px,py) on the neatline, (qx,qy) further along the line inside
+        const edge = edgeOf(px, py)
+        if (!edge) return
+        const key = edge + ':' + px.toFixed(4) + ':' + py.toFixed(4)
+        if (seen.has(key)) return
+        seen.add(key)
+        const len = Math.hypot(qx - px, qy - py) || 1
+        const k = Math.min(1, tickLen / len)
+        g.ticks.push({ x1In: px, y1In: py, x2In: px + (qx - px) * k, y2In: py + (qy - py) * k })
+        if (cfg.labels !== false) g.labels.push({ text, xIn: px, yIn: py, edge })
+    }
+    const addLine = (pts: Array<[number, number]>, text: string): void => {
+        for (let i = 1; i < pts.length; i++) {
+            const c = clipSegToRect(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], x0, y0, mf.wIn, mf.hIn)
+            if (!c) continue
+            g.lines.push({ x1In: c[0], y1In: c[1], x2In: c[2], y2In: c[3] })
+            mark(c[0], c[1], c[2], c[3], text)
+            mark(c[2], c[3], c[0], c[1], text)
+        }
+    }
+    const cross = (p: [number, number] | null, a: [number, number] | null, b: [number, number] | null): void => {
+        if (!p || p[0] < x0 || p[0] > x1 || p[1] < y0 || p[1] > y1) return
+        for (const q of [a, b]) {
+            if (!q) continue
+            const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1
+            const ux = dx / L * crossLen / 2, uy = dy / L * crossLen / 2
+            g.crosses.push({ x1In: p[0] - ux, y1In: p[1] - uy, x2In: p[0] + ux, y2In: p[1] + uy })
+        }
+    }
+    const corners: Array<[number, number]> = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+    const gc = corners.map(c => maps.toGround(c[0], c[1]))
+    if (cfg.type === 'graticule') {
+        if (!geo) return g
+        const toPageGeo = (lon: number, lat: number): [number, number] | null => {
+            const xy = geo.fromGeo(lon, lat)
+            return xy && isFinite(xy[0]) && isFinite(xy[1]) ? maps.toPage(xy[0], xy[1]) : null
+        }
+        let lonMin = Infinity, lonMax = -Infinity, latMin = Infinity, latMax = -Infinity
+        const N = 16
+        for (let e = 0; e < 4; e++) {
+            const A = corners[e], B = corners[(e + 1) % 4]
+            for (let i = 0; i <= N; i++) {
+                const gp = maps.toGround(A[0] + (B[0] - A[0]) * i / N, A[1] + (B[1] - A[1]) * i / N)
+                const ll = geo.toGeo(gp[0], gp[1])
+                if (!ll || !isFinite(ll[0]) || !isFinite(ll[1])) continue
+                lonMin = Math.min(lonMin, ll[0]); lonMax = Math.max(lonMax, ll[0])
+                latMin = Math.min(latMin, ll[1]); latMax = Math.max(latMax, ll[1])
+            }
+        }
+        if (!isFinite(lonMin) || lonMax <= lonMin || latMax <= latMin) return g
+        const step = cfg.intervalMode === 'fixed' && Number(cfg.fixedInterval) > 0
+            ? Number(cfg.fixedInterval)
+            : niceGraticuleInterval(Math.max(lonMax - lonMin, latMax - latMin))
+        const S = 32
+        const mer: number[] = [], par: number[] = []
+        for (let lon = Math.ceil(lonMin / step) * step; lon <= lonMax + 1e-12 && mer.length < 400; lon += step) mer.push(lon)
+        for (let lat = Math.ceil(latMin / step) * step; lat <= latMax + 1e-12 && par.length < 400; lat += step) par.push(lat)
+        for (const lon of mer) {
+            const pts: Array<[number, number]> = []
+            for (let i = 0; i <= S; i++) { const p = toPageGeo(lon, latMin + (latMax - latMin) * i / S); if (p) pts.push(p) }
+            addLine(pts, fmtGeoLabelFmt(lon, step, 'lon', cfg.geoFormat))
+        }
+        for (const lat of par) {
+            const pts: Array<[number, number]> = []
+            for (let i = 0; i <= S; i++) { const p = toPageGeo(lonMin + (lonMax - lonMin) * i / S, lat); if (p) pts.push(p) }
+            addLine(pts, fmtGeoLabelFmt(lat, step, 'lat', cfg.geoFormat))
+        }
+        const d = step / 50
+        for (const lon of mer) for (const lat of par) cross(toPageGeo(lon, lat), toPageGeo(lon + d, lat), toPageGeo(lon, lat + d))
+        if (cfg.cornerLabels === true) {
+            const fine = Math.max(1 / 3600, Math.min(step / 60, 1 / 60))
+            const at = (p: [number, number]): string[] => {
+                const ll = geo.toGeo(p[0], p[1])
+                return ll && isFinite(ll[0]) && isFinite(ll[1]) ? [fmtGeoLabelFmt(ll[1], fine, 'lat', cfg.geoFormat), fmtGeoLabelFmt(ll[0], fine, 'lon', cfg.geoFormat)] : []
+            }
+            addGridCornerLabels(g, mf, cfg, { tl: at(gc[0]), tr: at(gc[1]), bl: at(gc[3]), br: at(gc[2]) })
+        }
+        return g
+    }
+    // measured grid in ground units
+    let gx0 = Infinity, gx1 = -Infinity, gy0 = Infinity, gy1 = -Infinity
+    for (const p of gc) { gx0 = Math.min(gx0, p[0]); gx1 = Math.max(gx1, p[0]); gy0 = Math.min(gy0, p[1]); gy1 = Math.max(gy1, p[1]) }
+    if (!(gx1 > gx0 && gy1 > gy0)) return g
+    const wG = Math.hypot(gc[1][0] - gc[0][0], gc[1][1] - gc[0][1])
+    const hG = Math.hypot(gc[3][0] - gc[0][0], gc[3][1] - gc[0][1])
+    const step = cfg.intervalMode === 'fixed' && Number(cfg.fixedInterval) > 0
+        ? Number(cfg.fixedInterval)
+        : niceGridInterval(Math.max(wG, hG))
+    const unit = (cfg as any)._unit
+    const xsV: number[] = [], ysV: number[] = []
+    for (let x = Math.ceil(gx0 / step) * step; x <= gx1 + 1e-9 && xsV.length < 400; x += step) xsV.push(x)
+    for (let y = Math.ceil(gy0 / step) * step; y <= gy1 + 1e-9 && ysV.length < 400; y += step) ysV.push(y)
+    for (const x of xsV) addLine([maps.toPage(x, gy0), maps.toPage(x, gy1)], fmtMeasuredLabel(x, cfg.measuredFormat, unit))
+    for (const y of ysV) addLine([maps.toPage(gx0, y), maps.toPage(gx1, y)], fmtMeasuredLabel(y, cfg.measuredFormat, unit))
+    const dd = step / 50
+    for (const x of xsV) for (const y of ysV) cross(maps.toPage(x, y), maps.toPage(x + dd, y), maps.toPage(x, y + dd))
+    if (cfg.cornerLabels === true) {
+        const f = (v: number): string => fmtMeasuredLabel(v, cfg.measuredFormat === 'plain' ? 'plain' : 'comma')
+        const at = (p: [number, number]): string[] => [f(p[1]) + ' N', f(p[0]) + ' E']
+        addGridCornerLabels(g, mf, cfg, { tl: at(gc[0]), tr: at(gc[1]), bl: at(gc[3]), br: at(gc[2]) })
+    }
+    return g
+}
+
+/** Merge the widget's per-export grid choices (type, style) over a layout's
+ *  grid settings. Pure/exported. */
+export function applyGridOverrides (layout: PrintLayout, options: RenderOptions): PrintLayout {
+    const gcfg: any = layout.grid
+    if (!gcfg || !gcfg.enabled) return layout
+    let next: any = gcfg
+    if (options.gridTypeOverride) next = { ...next, type: options.gridTypeOverride }
+    const st: any = options.gridStyleOverride
+    if (st && typeof st === 'object') {
+        const clean: any = {}
+        for (const k of Object.keys(st)) if (st[k] !== undefined && st[k] !== null && st[k] !== '') clean[k] = st[k]
+        next = { ...next, ...clean, enabled: true }
+    }
+    return next === gcfg ? layout : { ...layout, grid: next }
+}
+
+/** Graticule on a projected output (any rotation), through the SDK
+ *  projection engine. Returns null when it cannot be built. */
+export async function projectedGraticule (
+    cap: CaptureResult, mf: { xIn: number, yIn: number, wIn: number, hIn: number }, cfg: GridConfig, capWkid: number
+): Promise<GridGeometry | null> {
+    const to = await getPointProjector(capWkid || 4326, 4326)
+    const from = await getPointProjector(4326, capWkid || 4326)
+    if (!to || !from) return null
+    if (cap.rotation === 0 && cap.groundExtent) {
+        return buildGraticuleGeometry(cap.groundExtent, mf, cfg,
+            (x, y) => to(x, y) || [NaN, NaN], (lon, lat) => from(lon, lat) || [NaN, NaN])
+    }
+    const maps = gridPageMaps(cap as any, mf)
+    if (!maps) return null
+    return buildGridTransformed(mf, cfg, maps, { toGeo: to, fromGeo: from })
+}
+
 /** Draw a built grid over the map frame. */
 function drawGrid(d: Drawer, geom: GridGeometry, cfg: GridConfig): void {
     const lc = cfg.lineColor || [90, 90, 90]
+    const lw = cfg.lineWidthPt > 0 ? cfg.lineWidthPt : 0.5
     d.setStroke(lc[0], lc[1], lc[2])
-    d.setLineWidth(cfg.lineWidthPt > 0 ? cfg.lineWidthPt : 0.5)
+    d.setLineWidth(lw)
+    const op = Number(cfg.lineOpacity)
+    const alpha = isFinite(op) && op > 0 && op < 1 ? op : 1
+    if (alpha < 1 && typeof d.setAlpha === 'function') d.setAlpha(1, alpha)
+    const dash = cfg.lineDash === 'dash' ? [Math.max(3, lw * 6), Math.max(2, lw * 4)]
+        : cfg.lineDash === 'dot' ? [Math.max(0.6, lw), Math.max(1.8, lw * 3)] : null
+    if (dash && typeof d.setDash === 'function') d.setDash(dash)
     const seg = cfg.lineStyle === 'ticks' ? geom.ticks
         : cfg.lineStyle === 'crosses' ? geom.ticks.concat(geom.crosses)
             : geom.lines
     for (const L of seg) {
         d.line(L.x1In * PT_PER_IN, L.y1In * PT_PER_IN, L.x2In * PT_PER_IN, L.y2In * PT_PER_IN)
     }
-    if (geom.labels.length) {
-        const size = cfg.labelSizePt > 0 ? cfg.labelSizePt : 7
-        const pad = 3 // pt
-        d.setFont('normal', size)
-        const inside = cfg.labelsInside !== false
-        const halo = (text: string, tx: number, baseline: number, align: 'left' | 'center' | 'right'): void => {
-            d.setTextColor(lc[0], lc[1], lc[2])
-            if (typeof d.haloText === 'function') {
-                d.haloText(text, tx, baseline, align, [255, 255, 255], Math.max(1.2, size * 0.11))
-            } else {
-                const tw = d.textWidth(text)
-                const bx = align === 'center' ? tx - tw / 2 : align === 'right' ? tx - tw : tx
-                d.setFill(255, 255, 255)
-                d.rect(bx - 2, baseline - size, tw + 4, size + 3, 'F')
-                d.text(text, tx, baseline, align)
-            }
-        }
-        for (const lb of geom.labels) {
-            const x = lb.xIn * PT_PER_IN
-            const y = lb.yIn * PT_PER_IN
-            if (lb.edge === 'corner') {
-                // stacked block anchored on the neatline corner: inside sits
-                // in the map corner; outside sits in the top/bottom margin,
-                // flush with the frame's side edge, so it needs no side
-                // margin and never overprints the frame
-                const lines = lb.lines && lb.lines.length ? lb.lines : [lb.text]
-                const lead = size * 1.15
-                const isLeft = lb.corner === 'tl' || lb.corner === 'bl'
-                const isTop = lb.corner === 'tl' || lb.corner === 'tr'
-                const align: 'left' | 'right' = isLeft ? 'left' : 'right'
-                const tx = inside ? (isLeft ? x + pad : x - pad) : x
-                const blockH = lead * (lines.length - 1)
-                let first: number
-                if (inside) first = isTop ? y + pad + size : y - pad - size * 0.3 - blockH
-                else first = isTop ? y - pad - blockH : y + pad + size
-                lines.forEach((t, k) => halo(t, tx, first + k * lead, align))
-                continue
-            }
-            let tx = x
-            let baseline = y
-            let align: 'left' | 'center' | 'right' = 'center'
-            if (lb.edge === 'top') { baseline = inside ? y + size + pad : y - pad; align = 'center' }
-            // Bottom-inside labels need descender + halo clearance or the
-            // glyphs collide with the frame border below the baseline.
-            else if (lb.edge === 'bottom') { baseline = inside ? y - pad - size * 0.3 : y + size + pad; align = 'center' }
-            else if (lb.edge === 'left') { tx = inside ? x + pad : x - pad; baseline = y + size * 0.35; align = inside ? 'left' : 'right' }
-            else { tx = inside ? x - pad : x + pad; baseline = y + size * 0.35; align = inside ? 'right' : 'left' }
-            // Cartographic halo: white stroke behind the glyphs so labels
-            // read over imagery and grid lines without a boxy backing.
-            d.setTextColor(lc[0], lc[1], lc[2])
-            if (typeof d.haloText === 'function') {
-                d.haloText(lb.text, tx, baseline, align, [255, 255, 255], Math.max(1.2, size * 0.11))
-            } else {
-                const tw = d.textWidth(lb.text)
-                const bx = align === 'center' ? tx - tw / 2 : align === 'right' ? tx - tw : tx
-                d.setFill(255, 255, 255)
-                d.rect(bx - 2, baseline - size, tw + 4, size + 3, 'F')
-                d.text(lb.text, tx, baseline, align)
-            }
+    if (dash && typeof d.setDash === 'function') d.setDash(null)
+    if (alpha < 1 && typeof d.setAlpha === 'function') d.setAlpha(1, 1)
+    if (!geom.labels.length) return
+    const tcol = cfg.labelColor || lc
+    const size = cfg.labelSizePt > 0 ? cfg.labelSizePt : 7
+    const pad = 3 // pt
+    const weight = cfg.labelBold === true ? 'bold' : 'normal'
+    d.setFont(weight as any, size)
+    const inside = cfg.labelsInside !== false
+    const useHalo = cfg.labelHalo !== false
+    const hc: [number, number, number] = (cfg.haloColor || [255, 255, 255]) as any
+    const haloW = Math.max(1.2, size * 0.11)
+    const edges = gridEdgeSet(cfg.labelEdges)
+    const put = (text: string, tx: number, baseline: number, align: 'left' | 'center' | 'right'): void => {
+        d.setTextColor(tcol[0], tcol[1], tcol[2])
+        if (!useHalo) { d.text(text, tx, baseline, align); return }
+        if (typeof d.haloText === 'function') {
+            d.haloText(text, tx, baseline, align, hc, haloW)
+        } else {
+            const tw = d.textWidth(text)
+            const bx = align === 'center' ? tx - tw / 2 : align === 'right' ? tx - tw : tx
+            d.setFill(hc[0], hc[1], hc[2])
+            d.rect(bx - 2, baseline - size, tw + 4, size + 3, 'F')
+            d.text(text, tx, baseline, align)
         }
     }
+    // rotated side label, centered on its line: left reads bottom to top,
+    // right top to bottom (ArcGIS Pro style)
+    const vertical = cfg.labelsVertical === true && typeof d.textAngle === 'function'
+    const side = (text: string, x: number, y: number, left: boolean): void => {
+        d.setTextColor(tcol[0], tcol[1], tcol[2])
+        const tw = d.textWidth(text)
+        const halo = useHalo ? hc : null
+        if (left) {
+            const bx = inside ? x + pad + size * 0.8 : x - pad - size * 0.2
+            ;(d as any).textAngle(text, bx, y + tw / 2, -90, halo, haloW)
+        } else {
+            const bx = inside ? x - pad - size * 0.8 : x + pad + size * 0.2
+            ;(d as any).textAngle(text, bx, y - tw / 2, 90, halo, haloW)
+        }
+    }
+    // Labels never overprint each other (rotated maps put many lines near
+    // one edge): corner blocks are placed first, then edge labels in order,
+    // and any label whose box would touch one already placed is dropped.
+    type Box = { x0: number, y0: number, x1: number, y1: number }
+    const placed: Box[] = []
+    // a clear word space between neighbors, so two values never read as one
+    const gap = Math.max(3, size * 1.2)
+    const free = (b: Box): boolean => !placed.some(p => b.x0 < p.x1 + gap && b.x1 > p.x0 - gap && b.y0 < p.y1 + gap && b.y1 > p.y0 - gap)
+    const hBox = (text: string, tx: number, baseline: number, align: 'left' | 'center' | 'right'): Box => {
+        const tw = d.textWidth(text)
+        const bx = align === 'center' ? tx - tw / 2 : align === 'right' ? tx - tw : tx
+        return { x0: bx, y0: baseline - size, x1: bx + tw, y1: baseline + size * 0.25 }
+    }
+    const order = geom.labels.slice().sort((a, b) => (a.edge === 'corner' ? 0 : 1) - (b.edge === 'corner' ? 0 : 1))
+    for (const lb of order) {
+        const x = lb.xIn * PT_PER_IN
+        const y = lb.yIn * PT_PER_IN
+        if (lb.edge === 'cell') {
+            put(lb.text, x + pad, y + pad + size, 'left')
+            continue
+        }
+        if (lb.edge === 'corner') {
+            // stacked block anchored on the neatline corner: inside sits
+            // in the map corner; outside sits in the top/bottom margin,
+            // flush with the frame's side edge, so it needs no side
+            // margin and never overprints the frame
+            const lines = lb.lines && lb.lines.length ? lb.lines : [lb.text]
+            const lead = size * 1.15
+            const isLeft = lb.corner === 'tl' || lb.corner === 'bl'
+            const isTop = lb.corner === 'tl' || lb.corner === 'tr'
+            const align: 'left' | 'right' = isLeft ? 'left' : 'right'
+            const tx = inside ? (isLeft ? x + pad : x - pad) : x
+            const blockH = lead * (lines.length - 1)
+            let first: number
+            if (inside) first = isTop ? y + pad + size : y - pad - size * 0.3 - blockH
+            else first = isTop ? y - pad - blockH : y + pad + size
+            lines.forEach((t, k) => {
+                placed.push(hBox(t, tx, first + k * lead, align))
+                put(t, tx, first + k * lead, align)
+            })
+            continue
+        }
+        if (!edges.has(lb.edge)) continue
+        if (vertical && (lb.edge === 'left' || lb.edge === 'right')) {
+            const tw = d.textWidth(lb.text)
+            const left = lb.edge === 'left'
+            const bx0 = left ? (inside ? x + pad : x - pad - size) : (inside ? x - pad - size : x + pad)
+            const b: Box = { x0: bx0, y0: y - tw / 2, x1: bx0 + size, y1: y + tw / 2 }
+            if (!free(b)) continue
+            placed.push(b)
+            side(lb.text, x, y, left)
+            continue
+        }
+        let tx = x
+        let baseline = y
+        let align: 'left' | 'center' | 'right' = 'center'
+        if (lb.edge === 'top') { baseline = inside ? y + size + pad : y - pad; align = 'center' }
+        // Bottom-inside labels need descender + halo clearance or the
+        // glyphs collide with the frame border below the baseline.
+        else if (lb.edge === 'bottom') { baseline = inside ? y - pad - size * 0.3 : y + size + pad; align = 'center' }
+        else if (lb.edge === 'left') { tx = inside ? x + pad : x - pad; baseline = y + size * 0.35; align = inside ? 'left' : 'right' }
+        else { tx = inside ? x - pad : x + pad; baseline = y + size * 0.35; align = inside ? 'right' : 'left' }
+        const b = hBox(lb.text, tx, baseline, align)
+        if (!free(b)) continue
+        placed.push(b)
+        put(lb.text, tx, baseline, align)
+    }
+}
+
+/** Neatline edges that carry labels. Pure/exported. */
+export function gridEdgeSet (e?: string): Set<string> {
+    const m: Record<string, string[]> = {
+        all: ['top', 'bottom', 'left', 'right'], topLeft: ['top', 'left'], bottomRight: ['bottom', 'right'],
+        topBottom: ['top', 'bottom'], leftRight: ['left', 'right'], top: ['top'], bottom: ['bottom'], left: ['left'], right: ['right']
+    }
+    return new Set(m[String(e || 'all')] || m.all)
 }
 
 /** Inset box (page inches, top-left origin) for a settings-defined overview,
@@ -5506,12 +5838,32 @@ export async function composePage(
                     }
                 }
                 // Settings-defined grid/graticule over the map, under the border.
-                const gridCfg = layout.grid
-                if (gridCfg && gridCfg.enabled && opts.showGrid !== false && cap.rotation === 0 &&
-                    (gridCfg.type === 'reference' || cap.groundExtent)) {
-                    const geom = opts.gridGeomOverride || (gridCfg.type === 'reference'
-                        ? buildReferenceGrid(mf, Number(gridCfg.refCols) || 4, Number(gridCfg.refRows) || 4, gridCfg.labels !== false)
-                        : buildGridGeometry(cap, mf, gridCfg))
+                // Reference grids are page space (any rotation); measured grids
+                // and graticules follow the capture's transform, so they also
+                // print on rotated maps.
+                const gridBase = layout.grid
+                if (gridBase && gridBase.enabled && opts.showGrid !== false) {
+                    let unit = ''
+                    try { unit = srInfoFromWkt(opts.srWkt, cap.wkid || 0, opts.srUnit).unit || String(opts.srUnit || '') } catch (e) { unit = String(opts.srUnit || '') }
+                    const gridCfg: GridConfig = { ...gridBase, _unit: unit } as any
+                    let geom: GridGeometry | null = opts.gridGeomOverride || null
+                    try {
+                        if (!geom && gridCfg.type === 'reference') {
+                            geom = buildReferenceGrid(mf, Number(gridCfg.refCols) || 4, Number(gridCfg.refRows) || 4, gridCfg.labels !== false, gridCfg)
+                        } else if (!geom && cap.rotation === 0 && cap.groundExtent) {
+                            geom = buildGridGeometry(cap, mf, gridCfg)
+                        } else if (!geom && cap.affine) {
+                            const maps = gridPageMaps(cap as any, mf)
+                            if (maps && gridCfg.type === 'measured') geom = buildGridTransformed(mf, gridCfg, maps)
+                            else if (maps && gridCfg.type === 'graticule' && (cap.projection === 'webMercator' || cap.projection === 'geographic')) {
+                                const merc = cap.projection === 'webMercator'
+                                geom = buildGridTransformed(mf, gridCfg, maps, {
+                                    toGeo: merc ? (x, y) => [mercXToLon(x), mercYToLat(y)] : (x, y) => [x, y],
+                                    fromGeo: merc ? (lon, lat) => [lonToMercX(lon), latToMercY(lat)] : (lon, lat) => [lon, lat]
+                                })
+                            }
+                        }
+                    } catch (e) { geom = null }
                     if (geom) { layer(PAGE_LAYERS.grid); drawGrid(d, geom, gridCfg) }
                 }
                 // Selection highlight: view-scoped, so the shared-map capture
@@ -6106,9 +6458,7 @@ export async function renderPagePreview (
     if (options.legendPositionOverride && useLayout.legend && useLayout.legend.enabled) {
         useLayout = { ...useLayout, legend: { ...useLayout.legend, position: options.legendPositionOverride as any } }
     }
-    if (options.gridTypeOverride && useLayout.grid && useLayout.grid.enabled) {
-        useLayout = { ...useLayout, grid: { ...useLayout.grid, type: options.gridTypeOverride as any } }
-    }
+    useLayout = applyGridOverrides(useLayout, options)
     let mf = getMapFrame(useLayout)
     const hasLegendEl = (useLayout.elements || []).some(e => (e as LayoutElement).type === 'legend')
     let rows: LegendRow[] = (!options.mapOnly && options.includeLegend !== false) ? (legendRows || []) : []
@@ -6208,7 +6558,15 @@ export async function renderPagePreview (
         center: { x: c.x, y: c.y }
     }
     const g = useLayout.grid
-    if (g && g.enabled && opts.showGrid !== false && g.type === 'graticule' && cap.projection === 'projected') notes.push('graticule prints on export')
+    if (g && g.enabled && opts.showGrid !== false && g.type === 'graticule' && cap.projection === 'projected') {
+        // projected graticule: the same projection-engine build the export uses
+        try {
+            const w = (opts.outputWkid && opts.outputWkid > 0) ? opts.outputWkid : ((liveView.spatialReference as any)?.wkid || 4326)
+            const gg = await projectedGraticule(cap, getMapFrame(useLayout), g as any, w)
+            if (gg) opts = { ...opts, gridGeomOverride: gg }
+            else notes.push('graticule prints on export')
+        } catch (e) { notes.push('graticule prints on export') }
+    }
     const drawer = new CanvasDrawer(useLayout.pageWidthIn * PT_PER_IN, useLayout.pageHeightIn * PT_PER_IN, pageDpi)
     drawer.setFontFamily(opts.fontFamily || 'sans')
     await composePage(drawer, { ...useLayout, imageFormat: 'png' }, cap, rows, title, { ...opts, georeference: false })
@@ -6369,9 +6727,7 @@ export async function renderLayout(
     if (options.legendPositionOverride && useLayout.legend && useLayout.legend.enabled) {
         useLayout = { ...useLayout, legend: { ...useLayout.legend, position: options.legendPositionOverride as any } }
     }
-    if (options.gridTypeOverride && useLayout.grid && useLayout.grid.enabled) {
-        useLayout = { ...useLayout, grid: { ...useLayout.grid, type: options.gridTypeOverride as any } }
-    }
+    useLayout = applyGridOverrides(useLayout, options)
 
     let mf = getMapFrame(useLayout)
 
@@ -6499,43 +6855,21 @@ export async function renderLayout(
         legendRows = applyScaleFilter(legendRows, cap.printedScale)
     }
 
-    // A grid cannot be drawn correctly on a rotated capture or when an
-    // output WKID reprojected the map; say so on the result instead of
-    // drawing wrong lines.
+    // Grids: reference grids are page space; measured grids and graticules
+    // follow the capture's transform (rotated maps included). A graticule on
+    // a projected output is projected through the SDK engine here.
     const gCfg = useLayout.grid
     if (gCfg && gCfg.enabled && options.showGrid !== false && !options.mapOnly) {
-        if (cap.rotation !== 0) {
-            cap.warning = (cap.warning ? cap.warning + ' ' : '') +
-                'Grid skipped: the map is rotated. Reset rotation to 0 to print the grid.'
-            onProgress('Grid skipped: the map is rotated.')
-        } else if (gCfg.type !== 'reference' && !cap.groundExtent) {
+        if (gCfg.type !== 'reference' && !cap.groundExtent && !cap.affine) {
             cap.warning = (cap.warning ? cap.warning + ' ' : '') +
                 'Grid skipped: the map extent could not be determined for this capture.'
             onProgress('Grid skipped: no map extent.')
         } else if (gCfg.type === 'graticule' && cap.projection === 'projected') {
-            // Lat/lon lines on an arbitrary projected output: build the
-            // geometry with the JSAPI client-side projection engine.
             onProgress('Adding graticule (projecting coordinates)…')
             try {
-                const projector = await getProjector()
-                if (!projector) throw new Error('projection engine unavailable')
-                const PointCls: any = projector.Point
-                const capSR = new SpatialReference({
-                    wkid: (options.outputWkid && options.outputWkid > 0)
-                        ? options.outputWkid
-                        : ((liveView.spatialReference as any)?.wkid || 4326)
-                })
-                const wgs = new SpatialReference({ wkid: 4326 })
-                const toGeo = (x: number, y: number): [number, number] => {
-                    const out: any = projector.project(new PointCls({ x, y, spatialReference: capSR }), wgs)
-                    return out ? [out.x, out.y] : [NaN, NaN]
-                }
-                const fromGeo = (lon: number, lat: number): [number, number] => {
-                    const out: any = projector.project(new PointCls({ x: lon, y: lat, spatialReference: wgs }), capSR)
-                    return out ? [out.x, out.y] : [NaN, NaN]
-                }
-                const geomBuilt = buildGraticuleGeometry(cap.groundExtent, getMapFrame(useLayout), gCfg, toGeo, fromGeo)
-                if (geomBuilt.lines.length || geomBuilt.ticks.length) {
+                const capWkid = (options.outputWkid && options.outputWkid > 0) ? options.outputWkid : ((liveView.spatialReference as any)?.wkid || 4326)
+                const geomBuilt = await projectedGraticule(cap, getMapFrame(useLayout), gCfg, capWkid)
+                if (geomBuilt && (geomBuilt.lines.length || geomBuilt.ticks.length)) {
                     options = { ...options, gridGeomOverride: geomBuilt }
                 } else {
                     cap.warning = (cap.warning ? cap.warning + ' ' : '') +

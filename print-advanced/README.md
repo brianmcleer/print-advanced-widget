@@ -34,7 +34,7 @@ Two print sources are available:
 - Data-driven pages: one page per feature (parcels, parks, projects) with best-fit or fixed scale, the page feature outlined, {field:NAME} dynamic text, and an index page. Pick any layer that is turned on, including layers in groups, nested groups and map image services. Only fields published as visible are offered, every layer filter is honored (Map Layers, Filter widgets, the map itself), and pages can come from the current view, the print area, or the whole layer. Title buttons add the page name, page number or any field, with a live sample of page 1, and each page can carry its own locator overview.
 - Map series progress: page by page bar ("Page 3 of 12"), time left, and a Cancel button.
 - Map series guardrails: this runs in the browser, not ArcGIS Pro, so an admin sets a warning (default 20 pages) and a hard limit (default 50, up to 200) in the settings.
-- Grid corner labels: the four neatline corners labeled with full lat/long or northing/easting.
+- Grids your way: graticule, measured or reference grid with any line color, width, opacity and pattern, ticks and crosses, custom interval, label color, size, bold, halo, sides, along-the-edge side labels, DMS, decimal minutes or decimal degrees, number formats, corner coordinates, and reference cell ids. Admins set the layout default, users restyle it in the Grid style panel. Works on rotated maps, projected maps and every map series sheet.
 - Legend filters: hide layers not drawn at the print scale (on by default) and hide layers with no features in the print area (off by default).
 
 ## Requirements

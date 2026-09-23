@@ -92,6 +92,9 @@ interface State {
   includeSelection: boolean
   legendPositionOv: string
   gridTypeOv: string
+  /** per-user grid style over the layout's grid (JSON of Partial<GridConfig>; '' = layout) */
+  gridStyleJson: string
+  gridStyleOpen: boolean
   legendHint: { level: 'tight' | 'cramped', count: number, missed: number, fontPt: number } | null
   legendHintDismissed: boolean
   legendPosUserSet: boolean
@@ -200,6 +203,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       includeSelection: (d as any).includeSelection !== false,
       legendPositionOv: '',
       gridTypeOv: '',
+      gridStyleJson: '',
+      gridStyleOpen: false,
       legendHint: null,
       legendHintDismissed: false,
       legendPosUserSet: false,
@@ -1188,7 +1193,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
    *  have to re-pick the same format, DPI, or styles on every visit.
    *  Stored per browser + widget instance; admin runtime defaults still
    *  seed first-time users, and saved picks win afterward. */
-  private static readonly PREF_KEYS = ['format', 'dpi', 'naStyle', 'sbStyle', 'sbUnits', 'sbUnits2', 'fontFamily', 'author', 'fileName'] as const
+  private static readonly PREF_KEYS = ['format', 'dpi', 'naStyle', 'sbStyle', 'sbUnits', 'sbUnits2', 'fontFamily', 'author', 'fileName', 'gridStyleJson'] as const
   private prefSaveTimer: any = null
 
   prefStorageKey = (): string => 'print-advanced-prefs-' + String((this.props as any).id || 'w')
@@ -1622,6 +1627,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       legend: !service && this.ctrl('legend') && !!layout && (hasLegendEl || !!(layout.legend && layout.legend.enabled)),
       overview: !service && !!layout && !!(layout.overview && layout.overview.enabled),
       grid: !service && this.ctrl('grid') && !!layout && !!(layout.grid && layout.grid.enabled),
+      gridStyle: !service && this.ctrl('grid') && this.ctrl('gridStyle') !== false && !!layout && !!(layout.grid && layout.grid.enabled),
       series: !service && this.ctrl('series'),
       outSR: this.outSREnabled(),
       qr: !service, // the QR row is always shown on the pagx path
@@ -1711,6 +1717,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       options.showGrid = this.state.showGrid
       if (this.state.legendPositionOv) options.legendPositionOverride = this.state.legendPositionOv
       if (this.state.gridTypeOv) options.gridTypeOverride = this.state.gridTypeOv
+      this.applyGridStyle(options)
       if ((this.cfg() as any).legendWidgetId) options.legendWidgetId = String((this.cfg() as any).legendWidgetId)
       options.onPanelComputed = (panel) => {
         this.lastPanel = panel
@@ -1898,6 +1905,157 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   private featSeq = 0
 
   seriesFeatures = (): boolean => this.state.seriesMode === 'features'
+
+  /* ---------------------------------------------------------------- */
+  /* grid style (per user, over the layout's grid settings)            */
+  /* ---------------------------------------------------------------- */
+
+  gridOv = (): Record<string, any> => {
+    try { const v = this.state.gridStyleJson ? JSON.parse(this.state.gridStyleJson) : {}; return v && typeof v === 'object' ? v : {} } catch (e) { return {} }
+  }
+
+  setGridOv = (patch: Record<string, any>): void => {
+    const next: Record<string, any> = { ...this.gridOv(), ...patch }
+    for (const k of Object.keys(next)) if (next[k] === undefined || next[k] === null || next[k] === '') delete next[k]
+    this.setState({ gridStyleJson: Object.keys(next).length ? JSON.stringify(next) : '' })
+  }
+
+  applyGridStyle = (options: RenderOptions): void => {
+    if (this.ctrl('gridStyle') === false) return
+    const ov = this.gridOv()
+    if (Object.keys(ov).length) options.gridStyleOverride = ov as any
+  }
+
+  /** Effective grid value: the user's choice, else the layout's, else d. */
+  gridVal = (layout: any, key: string, d: any): any => {
+    const ov = this.gridOv()
+    if (ov[key] !== undefined) return ov[key]
+    const g = layout && layout.grid
+    return g && g[key] !== undefined ? g[key] : d
+  }
+
+  private static rgbHex = (c: any, d: string): string => {
+    if (!Array.isArray(c) || c.length < 3) return d
+    return '#' + c.slice(0, 3).map((v: number) => Math.max(0, Math.min(255, Math.round(Number(v) || 0))).toString(16).padStart(2, '0')).join('')
+  }
+
+  private static hexRgb = (h: string): number[] | null => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim())
+    if (!m) return null
+    const n = parseInt(m[1], 16)
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  }
+
+  /** Grid style panel: every look of the grid, per user, over the layout. */
+  renderGridStyle = (messages: any, layout: any): React.ReactNode => {
+    if (this.ctrl('gridStyle') === false) return null
+    const W: any = Widget
+    const type = this.state.gridTypeOv || this.gridVal(layout, 'type', 'measured')
+    const labels = this.gridVal(layout, 'labels', true) !== false
+    const lineHex = W.rgbHex(this.gridVal(layout, 'lineColor', [90, 90, 90]), '#5a5a5a')
+    const labelHex = W.rgbHex(this.gridVal(layout, 'labelColor', this.gridVal(layout, 'lineColor', [90, 90, 90])), lineHex)
+    const haloHex = W.rgbHex(this.gridVal(layout, 'haloColor', [255, 255, 255]), '#ffffff')
+    const style = this.gridVal(layout, 'lineStyle', 'solid')
+    const fixed = this.gridVal(layout, 'intervalMode', 'auto') === 'fixed'
+    const changed = !!this.state.gridStyleJson
+    const row = (id: string, label: string, control: React.ReactNode, inline = true): React.ReactNode => (
+      <div className={'pd-row' + (inline ? ' pd-inline' : '')}>
+        <Label className='pd-label' id={this.uid(id) + '-lbl'}>{label}</Label>
+        {control}
+      </div>
+    )
+    const sel = (id: string, key: string, value: any, opts: Array<[string, string]>, width = 150, conv?: (v: string) => any): React.ReactNode => (
+      <Select size='sm' style={{ width }} aria-labelledby={this.uid(id) + '-lbl'} value={String(value)}
+        onChange={(e: any) => this.setGridOv({ [key]: conv ? conv(e.target.value) : e.target.value })}>
+        {opts.map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}
+      </Select>
+    )
+    const sw = (id: string, key: string, on: boolean): React.ReactNode => (
+      <Switch aria-labelledby={this.uid(id) + '-lbl'} checked={on} onChange={(e: any) => this.setGridOv({ [key]: !!(e.target && e.target.checked) })} />
+    )
+    const color = (id: string, key: string, hex: string): React.ReactNode => (
+      <input type='color' className='pd-color' aria-labelledby={this.uid(id) + '-lbl'} value={hex}
+        onChange={(e: any) => { const c = W.hexRgb(e.target.value); if (c) this.setGridOv({ [key]: c }) }} />
+    )
+    return (
+      <React.Fragment>
+        <div className='pd-row'>
+          <Button size='sm' type='tertiary' aria-expanded={this.state.gridStyleOpen} aria-controls={this.uid('gstyle')}
+            onClick={() => this.setState({ gridStyleOpen: !this.state.gridStyleOpen })}>
+            {this.state.gridStyleOpen ? <DownOutlined size={12} aria-hidden='true' /> : <RightOutlined size={12} aria-hidden='true' />}
+            <span style={{ marginLeft: 4 }}>{messages.gridStyleToggle}</span>
+          </Button>
+          {changed && <span className='pd-desc'>{messages.gridStyleChanged}</span>}
+        </div>
+        {this.state.gridStyleOpen && (
+        <div id={this.uid('gstyle')} role='group' aria-label={messages.gridStyleToggle} className='pd-gstyle'>
+          <div className='pd-gs-head' role='heading' aria-level={4}>{messages.gridLinesHead}</div>
+          {row('gs-style', messages.gridLineStyle, sel('gs-style', 'lineStyle', style, [['solid', messages.gridStyleLines], ['ticks', messages.gridStyleTicks], ['crosses', messages.gridStyleCrosses]]))}
+          {row('gs-lc', messages.gridLineColor, color('gs-lc', 'lineColor', lineHex))}
+          {row('gs-lw', messages.gridLineWidth, sel('gs-lw', 'lineWidthPt', this.gridVal(layout, 'lineWidthPt', 0.5),
+            [['0.25', '0.25 pt'], ['0.5', '0.5 pt'], ['0.75', '0.75 pt'], ['1', '1 pt'], ['1.5', '1.5 pt'], ['2', '2 pt'], ['3', '3 pt']], 110, Number))}
+          {row('gs-op', messages.gridLineOpacity, sel('gs-op', 'lineOpacity', this.gridVal(layout, 'lineOpacity', 1),
+            [['1', '100%'], ['0.75', '75%'], ['0.5', '50%'], ['0.25', '25%']], 110, Number))}
+          {row('gs-dash', messages.gridLineDash, sel('gs-dash', 'lineDash', this.gridVal(layout, 'lineDash', 'solid'),
+            [['solid', messages.gridDashSolid], ['dash', messages.gridDashDash], ['dot', messages.gridDashDot]], 110))}
+          {style !== 'solid' && row('gs-mk', messages.gridMarkSize, sel('gs-mk', 'markScalePct', this.gridVal(layout, 'markScalePct', 100),
+            [['50', '50%'], ['75', '75%'], ['100', '100%'], ['150', '150%'], ['200', '200%'], ['300', '300%']], 110, Number))}
+          {type !== 'reference' && (
+            <React.Fragment>
+              {row('gs-int', messages.gridIntervalLabel, sel('gs-int', 'intervalMode', fixed ? 'fixed' : 'auto', [['auto', messages.gridIntervalAuto], ['fixed', messages.gridIntervalFixed]], 110))}
+              {fixed && row('gs-intv', type === 'graticule' ? messages.gridIntervalDeg : messages.gridIntervalUnits, (
+                <TextInput size='sm' style={{ width: 110 }} aria-labelledby={this.uid('gs-intv') + '-lbl'}
+                  value={String(this.gridVal(layout, 'fixedInterval', ''))}
+                  onChange={(e: any) => { const v = parseFloat(String(e.target.value).replace(/[^0-9.]/g, '')); this.setGridOv({ fixedInterval: v > 0 ? v : undefined }) }} />
+              ))}
+            </React.Fragment>
+          )}
+          {type === 'reference' && (
+            <React.Fragment>
+              {row('gs-rc', messages.gridRefCols, (
+                <TextInput size='sm' style={{ width: 64 }} aria-labelledby={this.uid('gs-rc') + '-lbl'} value={String(this.gridVal(layout, 'refCols', 4))}
+                  onChange={(e: any) => { const v = parseInt(e.target.value, 10); this.setGridOv({ refCols: v > 0 ? Math.min(99, v) : undefined }) }} />
+              ))}
+              {row('gs-rr', messages.gridRefRows, (
+                <TextInput size='sm' style={{ width: 64 }} aria-labelledby={this.uid('gs-rr') + '-lbl'} value={String(this.gridVal(layout, 'refRows', 4))}
+                  onChange={(e: any) => { const v = parseInt(e.target.value, 10); this.setGridOv({ refRows: v > 0 ? Math.min(99, v) : undefined }) }} />
+              ))}
+              {row('gs-rl', messages.gridRefLetters, sel('gs-rl', 'refLetters', this.gridVal(layout, 'refLetters', 'cols'), [['cols', messages.gridRefLettersCols], ['rows', messages.gridRefLettersRows]], 130))}
+              {row('gs-cell', messages.gridRefCells, sw('gs-cell', 'refCellLabels', this.gridVal(layout, 'refCellLabels', false) === true))}
+            </React.Fragment>
+          )}
+          <div className='pd-gs-head' role='heading' aria-level={4}>{messages.gridLabelsHead}</div>
+          {row('gs-lbl', messages.gridShowLabels, sw('gs-lbl', 'labels', labels))}
+          {labels && (
+            <React.Fragment>
+              {row('gs-tc', messages.gridLabelColor, color('gs-tc', 'labelColor', labelHex))}
+              {row('gs-ts', messages.gridLabelSizeRt, sel('gs-ts', 'labelSizePt', this.gridVal(layout, 'labelSizePt', 7),
+                [['6', '6 pt'], ['7', '7 pt'], ['8', '8 pt'], ['9', '9 pt'], ['10', '10 pt'], ['12', '12 pt'], ['14', '14 pt'], ['18', '18 pt'], ['24', '24 pt']], 110, Number))}
+              {row('gs-bold', messages.gridLabelBold, sw('gs-bold', 'labelBold', this.gridVal(layout, 'labelBold', false) === true))}
+              {row('gs-halo', messages.gridLabelHalo, sw('gs-halo', 'labelHalo', this.gridVal(layout, 'labelHalo', true) !== false))}
+              {this.gridVal(layout, 'labelHalo', true) !== false && row('gs-hc', messages.gridHaloColor, color('gs-hc', 'haloColor', haloHex))}
+              {row('gs-pos', messages.gridLabelPosRt, sel('gs-pos', 'labelsInside', this.gridVal(layout, 'labelsInside', true) !== false ? 'inside' : 'outside',
+                [['inside', messages.gridPosInside], ['outside', messages.gridPosOutside]], 130, (v: string) => v === 'inside'))}
+              {row('gs-edges', messages.gridLabelEdges, sel('gs-edges', 'labelEdges', this.gridVal(layout, 'labelEdges', 'all'),
+                [['all', messages.gridEdgesAll], ['topLeft', messages.gridEdgesTopLeft], ['bottomRight', messages.gridEdgesBottomRight],
+                  ['topBottom', messages.gridEdgesTopBottom], ['leftRight', messages.gridEdgesLeftRight]], 150))}
+              {row('gs-vert', messages.gridLabelVertical, sw('gs-vert', 'labelsVertical', this.gridVal(layout, 'labelsVertical', false) === true))}
+              {type === 'graticule' && row('gs-gf', messages.gridGeoFormat, sel('gs-gf', 'geoFormat', this.gridVal(layout, 'geoFormat', 'dms'),
+                [['dms', messages.gridFmtDms], ['dm', messages.gridFmtDm], ['dd', messages.gridFmtDd]], 150))}
+              {type === 'measured' && row('gs-mf', messages.gridMeasuredFormat, sel('gs-mf', 'measuredFormat', this.gridVal(layout, 'measuredFormat', 'comma'),
+                [['comma', '4,327,000'], ['plain', '4327000'], ['unit', messages.gridFmtUnit]], 150))}
+              {type !== 'reference' && row('gs-corner', messages.gridCornerRt, sw('gs-corner', 'cornerLabels', this.gridVal(layout, 'cornerLabels', false) === true))}
+            </React.Fragment>
+          )}
+          <div className='pd-row'>
+            <Button size='sm' type='tertiary' disabled={!changed} onClick={() => this.setState({ gridStyleJson: '' })}>{messages.gridStyleReset}</Button>
+          </div>
+          <div className='pd-desc'>{messages.gridStyleHint}</div>
+        </div>
+        )}
+      </React.Fragment>
+    )
+  }
 
   /** A map series (either kind) is set up for the next PDF export. */
   seriesActive = (): boolean => !!this.state.seriesOpen && this.ctrl('series') && this.state.format === 'pdf'
@@ -2311,6 +2469,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       options.showOverview = this.seriesFeatures() ? this.state.showOverview : false
       options.showGrid = this.state.showGrid
       if (this.state.legendPositionOv) options.legendPositionOverride = this.state.legendPositionOv
+      // grid type and style choices apply to every sheet too
+      if (this.state.gridTypeOv) options.gridTypeOverride = this.state.gridTypeOv
+      this.applyGridStyle(options)
       if ((this.cfg() as any).legendWidgetId) options.legendWidgetId = String((this.cfg() as any).legendWidgetId)
       if ((this.props.config as any)?.includeAttribution !== false) {
         options.attribution = this.captureAttribution(view)
@@ -2445,6 +2606,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .pd-q-barwrap { margin: 5px 2px 2px; height: 5px; border-radius: 3px; background: var(--ref-palette-neutral-400, #e2e2e2); overflow: hidden; }
     .pd-q-bar { height: 100%; background: var(--sys-color-primary-main, #076fe5); border-radius: 3px; transition: width 0.5s ease; }
     .pd-sp-head { font-weight: 600; }
+    .pd-gstyle { border-left: 2px solid var(--ref-palette-neutral-500, #d0d0d0); padding-left: 8px; margin: 2px 0 6px; }
+    .pd-gs-head { font-size: 11px; font-weight: 600; margin: 6px 0 2px; }
+    .pd-color { width: 44px; height: 24px; padding: 0; border: 1px solid var(--ref-palette-neutral-600, #b0b0b0); border-radius: 3px; background: none; cursor: pointer; }
+    .pd-color:focus-visible { outline: 2px solid var(--sys-color-primary-main, #076fe5); outline-offset: 1px; }
     .pd-sp-actions { display: flex; justify-content: flex-end; margin-top: 2px; }
     .pd-sp-track { display: flex; gap: 2px; margin: 6px 2px 3px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--ref-palette-neutral-400, #e2e2e2); }
     .pd-sp-seg { flex: 1 1 0; min-width: 2px; background: var(--ref-palette-neutral-400, #e2e2e2); }
@@ -2559,7 +2724,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   pagePreviewSig = (): string => {
     const s: any = this.state
     return [s.selectedLayoutId, s.title, s.author, s.copyright, s.includeLegend, s.showGrid, s.showOverview,
-      s.legendPositionOv, s.gridTypeOv, s.naStyle, s.sbStyle, s.sbUnits, s.sbUnits2, s.fontFamily, s.qrOn,
+      s.legendPositionOv, s.gridTypeOv, s.gridStyleJson, s.naStyle, s.sbStyle, s.sbUnits, s.sbUnits2, s.fontFamily, s.qrOn,
       s.scaleMode, s.fixedScale, s.locked, s.mapOnly, s.includeSelection, s.outWkid].join('|')
   }
 
@@ -2600,6 +2765,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     options.showGrid = this.state.showGrid
     if (this.state.legendPositionOv) options.legendPositionOverride = this.state.legendPositionOv
     if (this.state.gridTypeOv) options.gridTypeOverride = this.state.gridTypeOv
+    this.applyGridStyle(options)
     if (this.outSREnabled() && parseInt(this.state.outWkid, 10) > 0) options.outputWkid = parseInt(this.state.outWkid, 10)
     if (this.meMapOnly() && this.state.mapOnly) options.mapOnly = true
     const family = this.state.fontFamily || (this.props.config as any)?.defaultFontFamily || ''
@@ -3417,6 +3583,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               </Tooltip>
             </div>
             )}
+            {this.ctrl('grid') && layout && (layout as any).grid?.enabled && this.state.showGrid && !this.state.mapOnly && this.renderGridStyle(messages, layout)}
 
             {this.outSREnabled() && (
             <div className='pd-row'>

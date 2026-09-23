@@ -2,6 +2,18 @@
 
 Newest first. Every release bumps `manifest.json` and `package.json` together.
 
+## 1.14.0 (2026-09-23)
+
+- Grid maxed out:
+  - New Grid style panel under Grid type (per user, remembered in the browser, admin can hide it with the new Grid style panel control): draw as full lines, edge ticks or ticks and crosses; any line color; width 0.25 to 3 pt; opacity; solid, dashed or dotted; tick and cross size; automatic or custom interval; label on or off, any label color, size up to 24 pt, bold, halo on or off with any halo color, inside or outside, which sides get labels, side labels that run along the edge (ArcGIS Pro style), coordinate format (DMS, decimal minutes, decimal degrees) or number format (with commas, plain, or with units), corner coordinates; reference grids with any columns and rows, letters on columns or rows, and cell ids (A1, B2) in every cell. Reset to layout grid puts it back.
+  - Every one of these is also a per-layout default in Settings (Grid section, with Apply to all layouts), and all round-trip through XML. Hand-edited XML is forgiving: "true"/"false", numbers typed as text and colors written as "200,0,0" are all read correctly.
+  - Accessibility: every grid control has a visible label tied to it, color pickers have accessible names and a visible focus ring, the panel toggle reports expanded or collapsed, and the Lines and Labels groups are marked as headings.
+  - Grids now print on rotated maps (lines turn with the map, clipped to the frame, labels where lines meet the neatline) and on reprojected output; reference grids print at any rotation.
+  - Graticules on projected maps (UTM, State Plane) now also print on every map series sheet, the index page and the page preview.
+  - Grid type and style choices apply to map series too.
+  - Labels never overprint each other: a label that would touch another is left off.
+- Canvas exports (PNG, JPG, page preview) now support dashed lines, opacity, rotated text and clipping like PDF and SVG.
+
 ## 1.13.0 (2026-09-23)
 
 - Map series fixes from a full review:

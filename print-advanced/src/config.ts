@@ -161,7 +161,37 @@ export interface GridConfig {
   /** Graticule / measured grid: label the four neatline corners with their
    *  full coordinates (lat/long, or easting/northing). Undefined means off. */
   cornerLabels?: boolean
+  /* ---- style (all optional; absent keeps the historical look) ---- */
+  /** Line opacity 0 to 1 (default 1). */
+  lineOpacity?: number
+  /** Line pattern (default solid). */
+  lineDash?: GridDash
+  /** Tick and cross size, percent of the automatic size (default 100). */
+  markScalePct?: number
+  /** Label color (default: the line color). */
+  labelColor?: RGB
+  /** Bold labels (default off). */
+  labelBold?: boolean
+  /** Halo behind labels (default on) and its color (default white). */
+  labelHalo?: boolean
+  haloColor?: RGB
+  /** Which neatline edges carry labels (default all four). */
+  labelEdges?: GridEdges
+  /** Left and right labels run along the edge, like ArcGIS Pro (default off). */
+  labelsVertical?: boolean
+  /** Graticule label format: degrees minutes seconds, degrees decimal
+   *  minutes, or decimal degrees (default dms). */
+  geoFormat?: 'dms' | 'dm' | 'dd'
+  /** Measured grid label format: 4,327,000 / 4327000 / 4,327,000 m. */
+  measuredFormat?: 'comma' | 'plain' | 'unit'
+  /** Reference grid: letters across the columns (default) or down the rows. */
+  refLetters?: 'cols' | 'rows'
+  /** Reference grid: print the cell id (A1, B1 ...) in each cell. */
+  refCellLabels?: boolean
 }
+
+export type GridDash = 'solid' | 'dash' | 'dot'
+export type GridEdges = 'all' | 'topLeft' | 'bottomRight' | 'topBottom' | 'leftRight' | 'top' | 'bottom' | 'left' | 'right'
 
 export type OverviewPosition = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight'
 
@@ -291,6 +321,8 @@ export interface Config {
     overview?: boolean
     grid?: boolean
     series?: boolean
+    /** Grid style panel (colors, labels, interval) under Grid type. */
+    gridStyle?: boolean
     /** Live page preview switch in the panel. */
     pagePreview?: boolean
   }

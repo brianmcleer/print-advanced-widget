@@ -343,9 +343,27 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                 else if (v === 'false') (parsed as any)[k] = false
             }
             for (const lay of (Array.isArray((parsed as any).layouts) ? (parsed as any).layouts : [])) {
-                const gv = lay && lay.grid ? lay.grid.cornerLabels : undefined
-                if (gv === 'true') lay.grid.cornerLabels = true
-                else if (gv === 'false') lay.grid.cornerLabels = false
+                if (lay && lay.grid) {
+                    for (const gk of ['enabled', 'labels', 'labelsInside', 'cornerLabels', 'labelBold', 'labelHalo', 'labelsVertical', 'refCellLabels']) {
+                        const gv = lay.grid[gk]
+                        if (gv === 'true') lay.grid[gk] = true
+                        else if (gv === 'false') lay.grid[gk] = false
+                    }
+                    // hand-edited numbers arrive as text: make them numbers
+                    for (const gk of ['lineWidthPt', 'labelSizePt', 'lineOpacity', 'markScalePct', 'fixedInterval', 'refCols', 'refRows']) {
+                        const gv = lay.grid[gk]
+                        if (typeof gv === 'string' && gv.trim() !== '' && isFinite(Number(gv))) lay.grid[gk] = Number(gv)
+                    }
+                    // colors hand-edited as "r,g,b" text
+                    for (const gk of ['lineColor', 'labelColor', 'haloColor']) {
+                        const gv = lay.grid[gk]
+                        if (typeof gv === 'string') {
+                            const parts = gv.split(/[ ,]+/).map(Number).filter(n => isFinite(n))
+                            if (parts.length >= 3) lay.grid[gk] = parts.slice(0, 3)
+                            else delete lay.grid[gk]
+                        }
+                    }
+                }
             }
             const next: any = Immutable(parsed)
             const layouts = (next.layouts && next.layouts.asMutable ? next.layouts.asMutable() : next.layouts) || []
@@ -896,6 +914,19 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         <SettingRow label={label} truncateLabel>{this.withAria(label, control)}</SettingRow>
     )
 
+    /** Native color picker for an RGB array (accessible name from the row). */
+    colorPick = (label: string, rgb: any, fallback: number[], onChange: (c: number[]) => void) => {
+        const c = Array.isArray(rgb) && rgb.length >= 3 ? rgb : fallback
+        const hex = '#' + c.slice(0, 3).map((v: number) => Math.max(0, Math.min(255, Math.round(Number(v) || 0))).toString(16).padStart(2, '0')).join('')
+        return (
+            <input type='color' aria-label={label} value={hex} style={{ width: 48, height: 26, padding: 0, border: '1px solid var(--ref-palette-neutral-600)', borderRadius: 3, background: 'none' }}
+                onChange={(e: any) => {
+                    const m = /^#([0-9a-f]{6})$/i.exec(String(e.target.value || ''))
+                    if (m) { const n = parseInt(m[1], 16); onChange([(n >> 16) & 255, (n >> 8) & 255, n & 255]) }
+                }} />
+        )
+    }
+
     select = (value: string, onChange: (v: string) => void, options: Array<{ value: string, label: string }>) => (
         <Select size='sm' className='w-100' value={value} onChange={(e: any) => onChange(e.target.value)}>
             {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -1271,15 +1302,45 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                             { value: '[0,92,230]', label: messages.colorBlue },
                                             { value: '[221,0,0]', label: messages.colorRed }
                                         ]))}
+                                    <SettingRow label={messages.gridColorCustom} truncateLabel>
+                                        {this.colorPick(messages.gridColorCustom, (editing as any).grid?.lineColor, [90, 90, 90], c => this.patchGrid({ lineColor: c as any }))}
+                                    </SettingRow>
                                     {this.rowWrap(messages.gridWidth, this.select(
                                         String(Number((editing as any).grid?.lineWidthPt) || 0.5),
                                         v => this.patchGrid({ lineWidthPt: Number(v) }),
                                         [
                                             { value: '0.25', label: '0.25 pt' },
                                             { value: '0.5', label: '0.5 pt' },
+                                            { value: '0.75', label: '0.75 pt' },
                                             { value: '1', label: '1 pt' },
-                                            { value: '2', label: '2 pt' }
+                                            { value: '1.5', label: '1.5 pt' },
+                                            { value: '2', label: '2 pt' },
+                                            { value: '3', label: '3 pt' }
                                         ]))}
+                                    {this.rowWrap(messages.gridOpacity, this.select(
+                                        String(Number((editing as any).grid?.lineOpacity) || 1),
+                                        v => this.patchGrid({ lineOpacity: Number(v) === 1 ? undefined : Number(v) } as any),
+                                        [{ value: '1', label: '100%' }, { value: '0.75', label: '75%' }, { value: '0.5', label: '50%' }, { value: '0.25', label: '25%' }]))}
+                                    {this.rowWrap(messages.gridDash, this.select(
+                                        String((editing as any).grid?.lineDash || 'solid'),
+                                        v => this.patchGrid({ lineDash: v === 'solid' ? undefined : v } as any),
+                                        [{ value: 'solid', label: messages.gridDashSolid }, { value: 'dash', label: messages.gridDashDash }, { value: 'dot', label: messages.gridDashDot }]))}
+                                    {((editing as any).grid?.lineStyle || 'solid') !== 'solid' && this.rowWrap(messages.gridMarkSize, this.select(
+                                        String(Number((editing as any).grid?.markScalePct) || 100),
+                                        v => this.patchGrid({ markScalePct: Number(v) === 100 ? undefined : Number(v) } as any),
+                                        [{ value: '50', label: '50%' }, { value: '75', label: '75%' }, { value: '100', label: '100%' }, { value: '150', label: '150%' }, { value: '200', label: '200%' }, { value: '300', label: '300%' }]))}
+                                    {((editing as any).grid?.type) === 'reference' && (
+                                        <React.Fragment>
+                                            {this.rowWrap(messages.gridRefLetters, this.select(
+                                                String((editing as any).grid?.refLetters || 'cols'),
+                                                v => this.patchGrid({ refLetters: v === 'cols' ? undefined : v } as any),
+                                                [{ value: 'cols', label: messages.gridRefLettersCols }, { value: 'rows', label: messages.gridRefLettersRows }]))}
+                                            <SettingRow tag='label' label={messages.gridRefCells} truncateLabel>
+                                                <Switch checked={((editing as any).grid?.refCellLabels) === true}
+                                                    onChange={(e) => this.patchGrid({ refCellLabels: e.target.checked } as any)} />
+                                            </SettingRow>
+                                        </React.Fragment>
+                                    )}
                                     <SettingRow tag='label' label={messages.gridLabels} truncateLabel>
                                         <Switch checked={((editing as any).grid?.labels) !== false}
                                             onChange={(e) => this.patchGrid({ labels: e.target.checked })} />
@@ -1311,12 +1372,51 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                                     { value: '6', label: '6 pt' },
                                                     { value: '7', label: '7 pt' },
                                                     { value: '8', label: '8 pt' },
+                                                    { value: '9', label: '9 pt' },
                                                     { value: '10', label: '10 pt' },
                                                     { value: '12', label: '12 pt' },
                                                     { value: '14', label: '14 pt' },
                                                     { value: '18', label: '18 pt (large formats)' },
                                                     { value: '24', label: '24 pt (large formats)' }
                                                 ]))}
+                                            <SettingRow label={messages.gridLabelColor} truncateLabel>
+                                                {this.colorPick(messages.gridLabelColor, (editing as any).grid?.labelColor || (editing as any).grid?.lineColor, [90, 90, 90], c => this.patchGrid({ labelColor: c } as any))}
+                                            </SettingRow>
+                                            <SettingRow tag='label' label={messages.gridLabelBold} truncateLabel>
+                                                <Switch checked={((editing as any).grid?.labelBold) === true}
+                                                    onChange={(e) => this.patchGrid({ labelBold: e.target.checked } as any)} />
+                                            </SettingRow>
+                                            <SettingRow tag='label' label={messages.gridLabelHalo} truncateLabel>
+                                                <Switch checked={((editing as any).grid?.labelHalo) !== false}
+                                                    onChange={(e) => this.patchGrid({ labelHalo: e.target.checked } as any)} />
+                                            </SettingRow>
+                                            {((editing as any).grid?.labelHalo) !== false && (
+                                                <SettingRow label={messages.gridHaloColor} truncateLabel>
+                                                    {this.colorPick(messages.gridHaloColor, (editing as any).grid?.haloColor, [255, 255, 255], c => this.patchGrid({ haloColor: c } as any))}
+                                                </SettingRow>
+                                            )}
+                                            {this.rowWrap(messages.gridLabelEdges, this.select(
+                                                String((editing as any).grid?.labelEdges || 'all'),
+                                                v => this.patchGrid({ labelEdges: v === 'all' ? undefined : v } as any),
+                                                [
+                                                    { value: 'all', label: messages.gridEdgesAll },
+                                                    { value: 'topLeft', label: messages.gridEdgesTopLeft },
+                                                    { value: 'bottomRight', label: messages.gridEdgesBottomRight },
+                                                    { value: 'topBottom', label: messages.gridEdgesTopBottom },
+                                                    { value: 'leftRight', label: messages.gridEdgesLeftRight }
+                                                ]))}
+                                            <SettingRow tag='label' label={messages.gridLabelVertical} truncateLabel>
+                                                <Switch checked={((editing as any).grid?.labelsVertical) === true}
+                                                    onChange={(e) => this.patchGrid({ labelsVertical: e.target.checked } as any)} />
+                                            </SettingRow>
+                                            {((editing as any).grid?.type || 'measured') === 'graticule' && this.rowWrap(messages.gridGeoFormat, this.select(
+                                                String((editing as any).grid?.geoFormat || 'dms'),
+                                                v => this.patchGrid({ geoFormat: v === 'dms' ? undefined : v } as any),
+                                                [{ value: 'dms', label: messages.gridFmtDms }, { value: 'dm', label: messages.gridFmtDm }, { value: 'dd', label: messages.gridFmtDd }]))}
+                                            {((editing as any).grid?.type || 'measured') === 'measured' && this.rowWrap(messages.gridMeasuredFormat, this.select(
+                                                String((editing as any).grid?.measuredFormat || 'comma'),
+                                                v => this.patchGrid({ measuredFormat: v === 'comma' ? undefined : v } as any),
+                                                [{ value: 'comma', label: '4,327,000' }, { value: 'plain', label: '4327000' }, { value: 'unit', label: messages.gridFmtUnit }]))}
                                         </React.Fragment>
                                     )}
                                 </React.Fragment>
@@ -1916,6 +2016,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                         ['overview', messages.ctrlOverview],
                         ['grid', messages.ctrlGrid],
                         ['series', messages.ctrlSeries],
+                        ['gridStyle', messages.ctrlGridStyle],
                         ['pagePreview', messages.ctrlPagePreview]
                     ] as Array<[string, string]>).map(([key, label]) => (
                         <SettingRow key={key} tag='label' label={label} truncateLabel>
