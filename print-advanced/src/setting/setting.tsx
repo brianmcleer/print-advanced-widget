@@ -335,6 +335,18 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
             }
             coerceBools((parsed as any).runtimeDefaults)
             coerceBools((parsed as any).controls)
+            // top-level switches whose "!== false" / "=== true" reads would
+            // misread a string: normalize only these, never free-text keys
+            for (const k of ['legendScaleFilter', 'legendExtentFilter', 'geoPdf', 'pdfLayers', 'vectorLayers', 'georefKeepRotation', 'diagnostics']) {
+                const v = (parsed as any)[k]
+                if (v === 'true') (parsed as any)[k] = true
+                else if (v === 'false') (parsed as any)[k] = false
+            }
+            for (const lay of (Array.isArray((parsed as any).layouts) ? (parsed as any).layouts : [])) {
+                const gv = lay && lay.grid ? lay.grid.cornerLabels : undefined
+                if (gv === 'true') lay.grid.cornerLabels = true
+                else if (gv === 'false') lay.grid.cornerLabels = false
+            }
             const next: any = Immutable(parsed)
             const layouts = (next.layouts && next.layouts.asMutable ? next.layouts.asMutable() : next.layouts) || []
             this.props.onSettingChange({ id: this.props.id, config: next })
@@ -1272,6 +1284,17 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                         <Switch checked={((editing as any).grid?.labels) !== false}
                                             onChange={(e) => this.patchGrid({ labels: e.target.checked })} />
                                     </SettingRow>
+                                    {((editing as any).grid?.type || 'measured') !== 'reference' && (
+                                        <React.Fragment>
+                                            <SettingRow tag='label' label={messages.gridCornerLabels} truncateLabel>
+                                                <Switch checked={((editing as any).grid?.cornerLabels) === true}
+                                                    onChange={(e) => this.patchGrid({ cornerLabels: e.target.checked })} />
+                                            </SettingRow>
+                                            <SettingRow>
+                                                <div className='pd-hint'>{messages.gridCornerHint}</div>
+                                            </SettingRow>
+                                        </React.Fragment>
+                                    )}
                                     {((editing as any).grid?.labels) !== false && (
                                         <React.Fragment>
                                             {this.rowWrap(messages.gridLabelPos, this.select(
@@ -1607,6 +1630,48 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     <SettingRow>
                         <div className='pd-hint'>{messages.defSelectionHint}</div>
                     </SettingRow>
+                    <SettingRow tag='label' label={messages.legendScaleFilterLabel}>
+                        <Switch checked={((this.props.config as any)?.legendScaleFilter) !== false}
+                            onChange={(e: any) => this.setCfg('legendScaleFilter', e.target.checked ? '' : false)} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.legendScaleFilterHint}</div>
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.legendExtentFilterLabel}>
+                        <Switch checked={((this.props.config as any)?.legendExtentFilter) === true}
+                            onChange={(e: any) => this.setCfg('legendExtentFilter', e.target.checked ? true : '')} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.legendExtentFilterHint}</div>
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.geoPdfLabel}>
+                        <Switch checked={((this.props.config as any)?.geoPdf) !== false}
+                            onChange={(e: any) => this.setCfg('geoPdf', e.target.checked ? '' : false)} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.geoPdfHint}</div>
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.pdfLayersLabel}>
+                        <Switch checked={((this.props.config as any)?.pdfLayers) !== false}
+                            onChange={(e: any) => this.setCfg('pdfLayers', e.target.checked ? '' : false)} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.pdfLayersHint}</div>
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.vectorLabel}>
+                        <Switch checked={((this.props.config as any)?.vectorLayers) === true}
+                            onChange={(e: any) => this.setCfg('vectorLayers', e.target.checked ? true : '')} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.vectorHint}</div>
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.keepRotationLabel}>
+                        <Switch checked={((this.props.config as any)?.georefKeepRotation) === true}
+                            onChange={(e: any) => this.setCfg('georefKeepRotation', e.target.checked ? true : '')} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.keepRotationHint}</div>
+                    </SettingRow>
                     <SettingRow tag='label' label={messages.diagLabel}>
                         <Switch checked={!!((this.props.config as any)?.diagnostics)}
                             onChange={(e: any) => this.setCfg('diagnostics', e.target.checked ? true : '')} />
@@ -1711,6 +1776,32 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     </SettingRow>
                     <SettingRow>
                         <div className='pd-hint'>{messages.defaultsHint}</div>
+                    </SettingRow>
+                </SettingSection>
+
+                <SettingSection title={messages.seriesLimitSection}>
+                    <SettingRow flow='wrap' label={messages.seriesWarnLabel} truncateLabel>
+                        <NumericInput size='sm' className='w-100' min={1} max={200} step={1} placeholder='20'
+                            aria-label={messages.seriesWarnLabel}
+                            value={Number((this.props.config as any)?.seriesWarnPages) || undefined}
+                            onChange={(v: number) => this.setCfg('seriesWarnPages', v > 0 ? Math.min(200, Math.round(v)) : '')} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.seriesMaxLabel} truncateLabel>
+                        <NumericInput size='sm' className='w-100' min={1} max={200} step={1} placeholder='50'
+                            aria-label={messages.seriesMaxLabel}
+                            value={Number((this.props.config as any)?.seriesMaxPages) || undefined}
+                            onChange={(v: number) => this.setCfg('seriesMaxPages', v > 0 ? Math.min(200, Math.round(v)) : '')} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.seriesModeLabel} truncateLabel>
+                        <Select size='sm' className='w-100' aria-label={messages.seriesModeLabel}
+                            value={((this.props.config as any)?.seriesLimitMode) === 'first' ? 'first' : 'block'}
+                            onChange={(e: any) => this.setCfg('seriesLimitMode', e.target.value === 'first' ? 'first' : '')}>
+                            <option value='block'>{messages.seriesModeBlock}</option>
+                            <option value='first'>{messages.seriesModeFirst}</option>
+                        </Select>
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.seriesLimitHint}</div>
                     </SettingRow>
                 </SettingSection>
 
@@ -1824,7 +1915,8 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                         ['legend', messages.ctrlLegend],
                         ['overview', messages.ctrlOverview],
                         ['grid', messages.ctrlGrid],
-                        ['series', messages.ctrlSeries]
+                        ['series', messages.ctrlSeries],
+                        ['pagePreview', messages.ctrlPagePreview]
                     ] as Array<[string, string]>).map(([key, label]) => (
                         <SettingRow key={key} tag='label' label={label} truncateLabel>
                             <Switch

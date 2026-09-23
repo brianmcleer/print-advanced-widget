@@ -213,3 +213,86 @@ export function envelopeForFrame (
     const cy = (viewExt.ymin + viewExt.ymax) / 2
     return { xmin: cx - w / 2, xmax: cx + w / 2, ymin: cy - h / 2, ymax: cy + h / 2 }
 }
+
+/* ------------------------------------------------------------------ */
+/* data-driven pages: one page per feature                             */
+/* ------------------------------------------------------------------ */
+
+/** One feature to put on its own page: its extent in map units, the page
+ *  name, formatted attribute values for {field:NAME} tokens, and opaque
+ *  highlight geometry handed through to the renderer. */
+export interface FeaturePageInput extends SeriesEnvelope {
+    name?: string
+    fields?: Record<string, string>
+    geoms?: any[]
+}
+
+export interface FeaturePageTile extends SeriesTile {
+    /** Printed scale of THIS page (1:n); pages of a data-driven series can
+     *  each have their own scale. */
+    scale: number
+    name: string
+    fields?: Record<string, string>
+    geoms?: any[]
+}
+
+/** Round a scale UP to two significant digits (1:2,347 -> 1:2,400), the
+ *  way Pro's best-fit rounding keeps sheet scales readable. */
+export function niceScaleUp (scale: number): number {
+    if (!(scale > 0) || !isFinite(scale)) return 0
+    const p = Math.pow(10, Math.max(0, Math.floor(Math.log10(scale)) - 1))
+    return Math.ceil(scale / p - 1e-9) * p
+}
+
+/** Page tiles for a data-driven series. 'fit' sizes each page so the
+ *  feature plus a margin (percent of its size on each side) fills the
+ *  frame, rounded up to a clean scale; points and zero-size features use
+ *  pointScale. 'fixed' prints every page at fixedScale, centered on the
+ *  feature. Tiles keep the input order and are numbered from 1; row and
+ *  col are -1 because the pages do not form a grid. Pure. */
+export function featurePageTiles (
+    feats: FeaturePageInput[],
+    frameWIn: number, frameHIn: number,
+    metersPerMapUnit: number,
+    opts: { mode: 'fit' | 'fixed', marginPct?: number, fixedScale?: number, pointScale?: number, minScale?: number }
+): FeaturePageTile[] {
+    const out: FeaturePageTile[] = []
+    if (!(frameWIn > 0) || !(frameHIn > 0) || !(metersPerMapUnit > 0)) return out
+    const margin = Math.max(0, Math.min(200, Number(opts.marginPct) || 0)) / 100
+    const minScale = Number(opts.minScale) > 0 ? Number(opts.minScale) : 100
+    const fixed = Number(opts.fixedScale) > 0 ? Number(opts.fixedScale) : 0
+    const pointScale = Number(opts.pointScale) > 0 ? Number(opts.pointScale) : (fixed || 1200)
+    let page = 1
+    for (const f of feats) {
+        if (!f || !isFinite(f.xmin) || !isFinite(f.xmax) || !isFinite(f.ymin) || !isFinite(f.ymax)) continue
+        const cx = (f.xmin + f.xmax) / 2
+        const cy = (f.ymin + f.ymax) / 2
+        const w = Math.max(0, f.xmax - f.xmin)
+        const h = Math.max(0, f.ymax - f.ymin)
+        let scale: number
+        if (opts.mode === 'fixed' && fixed > 0) {
+            scale = fixed
+        } else if (w <= 0 && h <= 0) {
+            scale = pointScale
+        } else {
+            const need = Math.max(
+                (w * (1 + 2 * margin) * metersPerMapUnit) / (frameWIn * 0.0254),
+                (h * (1 + 2 * margin) * metersPerMapUnit) / (frameHIn * 0.0254))
+            scale = Math.max(minScale, niceScaleUp(need))
+        }
+        const g = tileGroundSize(frameWIn, frameHIn, scale, metersPerMapUnit)
+        out.push({
+            page: page++,
+            row: -1,
+            col: -1,
+            xmin: cx - g.w / 2, xmax: cx + g.w / 2,
+            ymin: cy - g.h / 2, ymax: cy + g.h / 2,
+            centerX: cx, centerY: cy,
+            scale,
+            name: String(f.name == null ? '' : f.name),
+            fields: f.fields,
+            geoms: f.geoms
+        })
+    }
+    return out
+}

@@ -1,6 +1,6 @@
 # Print Advanced
 
-An advanced print widget for ArcGIS Experience Builder Developer Edition (1.19 and 1.20, React 19). It reproduces an ArcGIS Pro layout (.pagx) in the browser and exports it, with no print service required. An optional Esri print service path is also included for server side layouts.
+An advanced print widget for ArcGIS Experience Builder Developer Edition (1.19 to 1.21, React 19). It reproduces an ArcGIS Pro layout (.pagx) in the browser and exports it, with no print service required. An optional Esri print service path is also included for server side layouts.
 
 Author: Brian McLeer, City of Grand Junction, CO.
 
@@ -26,10 +26,20 @@ Two print sources are available:
 - Recent exports list with per item remove and a clear all button.
 - Per control visibility and export defaults set by an administrator in the settings panel.
 - XML import and export of the entire configuration, so a setup can be moved between apps.
+- GeoPDF output: every PDF map frame carries its coordinate system and corner coordinates (ISO 32000 geospatial), so Avenza Maps shows a blue dot, Acrobat reads coordinates, and ArcGIS Pro, QGIS and GDAL place the PDF on the ground. Map series georeference every sheet and the index page. On by default; a settings switch turns it off.
+- Georeferenced map only images: true GeoTIFF, world file with .prj, or Google Earth KMZ. An optional setting keeps a rotated map rotated (rotated world file, GeoTIFF ModelTransformationTag, rotated KMZ quad).
+- PDF and SVG layers: map, grid, selection, overview, legend, north arrow and scale bar, text, graphics and QR code each toggle on and off in Acrobat, Avenza Maps, Illustrator or Inkscape.
+- Live page preview: the whole printed page, redrawn in the panel as you pan and change options.
+- Vector feature layers (experimental): simple-symbol feature layers, including hatched fills, custom and picture markers and field labels (with where clauses), print as true vector shapes and searchable text in PDF and SVG, on rotated maps and every map series sheet, with an honest raster fallback that names each layer it could not reproduce.
+- Data-driven pages: one page per feature (parcels, parks, projects) with best-fit or fixed scale, the page feature outlined, {field:NAME} dynamic text, and an index page. Pick any layer that is turned on, including layers in groups, nested groups and map image services. Only fields published as visible are offered, every layer filter is honored (Map Layers, Filter widgets, the map itself), and pages can come from the current view, the print area, or the whole layer. Title buttons add the page name, page number or any field, with a live sample of page 1, and each page can carry its own locator overview.
+- Map series progress: page by page bar ("Page 3 of 12"), time left, and a Cancel button.
+- Map series guardrails: this runs in the browser, not ArcGIS Pro, so an admin sets a warning (default 20 pages) and a hard limit (default 50, up to 200) in the settings.
+- Grid corner labels: the four neatline corners labeled with full lat/long or northing/easting.
+- Legend filters: hide layers not drawn at the print scale (on by default) and hide layers with no features in the print area (off by default).
 
 ## Requirements
 
-- ArcGIS Experience Builder Developer Edition 1.19 or 1.20 (React 19). EB 1.18 and earlier (React 18) are not supported.
+- ArcGIS Experience Builder Developer Edition 1.19 to 1.21 (React 19). EB 1.18 and earlier (React 18) are not supported.
 - The widget dependencies (jspdf, upng-js, utif, gifenc) are declared in package.json and are installed automatically by the standard client install described below. No per package commands are needed.
 
 ## Install

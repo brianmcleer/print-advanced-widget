@@ -156,6 +156,7 @@ function valignFromAnchor (anchor: string | undefined): 'top' | 'center' | 'bott
  *   {sr:name|pcs|gcs|datum|projection|units|authority|wkid|<parameter>}
  *   {coord:<center|center.x|center.y|lowerLeft|...|upperRight>:<dd|dms|ddm|>:<dp>}
  *   {pageNumber} {pageCount} {pageName} {pageIndex}   (map series)
+ *   {field:<NAME>}                               page feature attribute (data-driven pages)
  *   {pageWidth} {pageHeight} {pageUnits}
  *
  * Pro's preStr/postStr/emptyStr: for values that are always present the
@@ -264,6 +265,11 @@ export function normalizeDynText (raw: string, warnings: string[]): { text: stri
       if (propL === 'count') return bake('pageCount')
       if (propL === 'name') return bake('pageName')
       if (propL === 'index') return bake('pageIndex')
+      // Pro map series page attribute: <dyn type="page" property="attribute" field="NAME"/>
+      if (propL === 'attribute') {
+        const fld = clean(attrs.field || attrs.attribute || '').replace(/[^\w.]/g, '')
+        if (fld) return wrap('field:' + fld)
+      }
     }
 
     warnings.push('Dynamic text tag not supported, removed: type="' + (attrs.type || '?') + '"' +

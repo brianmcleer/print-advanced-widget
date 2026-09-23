@@ -158,6 +158,9 @@ export interface GridConfig {
   /** Reference grid only: index cell counts. */
   refCols?: number
   refRows?: number
+  /** Graticule / measured grid: label the four neatline corners with their
+   *  full coordinates (lat/long, or easting/northing). Undefined means off. */
+  cornerLabels?: boolean
 }
 
 export type OverviewPosition = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight'
@@ -215,6 +218,16 @@ export interface Config {
   layouts: PrintLayout[]
   /** Hard cap on the longest capture dimension (WebGL texture safety). */
   maxImagePx?: number
+  /** Map series guardrails (browser memory and time): warn above this many
+   *  map pages (default 20) ... */
+  seriesWarnPages?: number
+  /** ... and never go past this many map pages in one PDF (default 50,
+   *  1 to 200). The index and legend pages are not counted. */
+  seriesMaxPages?: number
+  /** Over the limit: 'block' stops the export (default); 'first' prints the
+   *  first seriesMaxPages pages in page order (data-driven pages only; a
+   *  grid over the limit is always blocked). */
+  seriesLimitMode?: 'block' | 'first'
   /** Admin-set initial values for the runtime controls. Users can still
    *  change any control that remains visible. The boolean trio is stored
    *  SPARSELY: absent = on (the default), false = off. */
@@ -240,6 +253,27 @@ export interface Config {
   selectionColor?: string
   /** Selection outline width in points (default 2). */
   selectionWidthPt?: number
+  /** Drop legend entries for layers that do not draw at the printed scale.
+   *  Stored sparsely: absent = on, false = off. */
+  legendScaleFilter?: boolean
+  /** Drop legend entries for layers with no features inside the printed
+   *  area (one count query per layer at export time). Absent = off. */
+  legendExtentFilter?: boolean
+  /** Write GeoPDF coordinates (ISO 32000 geospatial Measure dictionary) into
+   *  every PDF map frame, so Avenza Maps, Acrobat, GDAL and ArcGIS Pro read
+   *  coordinates off the page. Stored sparsely: absent = on, false = off. */
+  geoPdf?: boolean
+  /** Each part of the page (map, grid, selection, legend, text, graphics)
+   *  goes in its own toggleable layer in PDF and SVG exports. Stored
+   *  sparsely: absent = on, false = off. */
+  pdfLayers?: boolean
+  /** Experimental: draw eligible feature layers as true vectors in PDF and
+   *  SVG exports instead of pixels. Absent = off. */
+  vectorLayers?: boolean
+  /** Georeferenced map-only rasters keep the map rotation (rotated world file,
+   *  GeoTIFF ModelTransformationTag, rotated KMZ quad) instead of being
+   *  captured north-up. Absent = off (north-up, the historical behavior). */
+  georefKeepRotation?: boolean
   /** Per-control visibility in the runtime widget (default: all shown).
    *  Hidden controls still apply their configured default values. Stored
    *  sparsely: absent = shown, false = hidden. */
@@ -257,6 +291,8 @@ export interface Config {
     overview?: boolean
     grid?: boolean
     series?: boolean
+    /** Live page preview switch in the panel. */
+    pagePreview?: boolean
   }
   /** Bind the printed legend to a specific Legend widget id (''/absent =
    *  automatic: first Legend widget found in the app). */

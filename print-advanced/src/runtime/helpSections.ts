@@ -31,6 +31,16 @@ export interface HelpFeatures {
   qr: boolean
   selection: boolean
   fonts: boolean
+  /** PDF exports carry GeoPDF coordinates (Settings, on unless turned off). */
+  geoPdf?: boolean
+  /** PDF and SVG exports carry toggleable layers (Settings, on by default). */
+  pdfLayers?: boolean
+  /** Feature layers print as vectors in PDF and SVG (Settings, off by default). */
+  vector?: boolean
+  /** The live Page preview switch is shown. */
+  pagePreview?: boolean
+  /** Georeferenced images keep the map rotation (Settings, off by default). */
+  keepRotation?: boolean
 }
 
 type T = (id: string, values?: Record<string, string>) => string
@@ -63,7 +73,8 @@ export function buildHelpSections (t: T, f: HelpFeatures): HelpSection[] {
       t('helpStart1'),
       t('helpStart2'),
       t('helpStart3'),
-      t('helpStart4')
+      t('helpStart4'),
+      ...when(!!f.pagePreview, 'helpStartPreview')
     ]
   })
 
@@ -120,6 +131,9 @@ export function buildHelpSections (t: T, f: HelpFeatures): HelpSection[] {
     intro: t('helpFormatIntro'),
     body: [
       t('helpFormatPdf'),
+      ...when(!!f.geoPdf, 'helpFormatGeoPdf'),
+      ...when(!!f.pdfLayers, 'helpFormatLayers'),
+      ...when(!!f.vector, 'helpFormatVector'),
       t('helpFormatSvg'),
       t('helpFormatPng'),
       t('helpFormatTiff'),
@@ -135,7 +149,9 @@ export function buildHelpSections (t: T, f: HelpFeatures): HelpSection[] {
       title: t('helpGeoTitle'),
       intro: t('helpGeoIntro'),
       body: [
-        ...when(f.georeference, 'helpGeoTiff', 'helpGeoWorld', 'helpGeoNorth'),
+        ...when(f.georeference, 'helpGeoTiff', 'helpGeoWorld'),
+        ...when(f.georeference && !f.keepRotation, 'helpGeoNorth'),
+        ...when(f.georeference && !!f.keepRotation, 'helpGeoRotated'),
         ...when(f.kmz, 'helpGeoKmz', 'helpGeoKmzOpen'),
         ...when(f.outSR, 'helpGeoOutSR')
       ]
@@ -153,7 +169,11 @@ export function buildHelpSections (t: T, f: HelpFeatures): HelpSection[] {
         t('helpSeries2'),
         t('helpSeries3'),
         t('helpSeries4'),
-        t('helpSeries5')
+        t('helpSeries5'),
+        t('helpSeriesFeatures'),
+        t('helpSeriesLinks'),
+        t('helpSeriesLimits'),
+        t('helpSeriesProgress')
       ]
     })
   }
@@ -178,7 +198,10 @@ export function buildHelpSections (t: T, f: HelpFeatures): HelpSection[] {
       ...when(f.selection, 'helpTroubleSelection'),
       t('helpTroubleSoft'),
       ...when(f.legend, 'helpTroubleLegend'),
+      ...when(!!f.vector, 'helpTroubleVector'),
+      ...when(!!f.pagePreview, 'helpTroublePreview'),
       t('helpTroubleSlow'),
+      ...when(f.series, 'helpTroubleSeriesLimit'),
       ...when(f.series, 'helpTroubleSeries'),
       t('helpTroubleNoDownload'),
       ...when(f.service, 'helpTroubleService'),

@@ -16,14 +16,16 @@ import * as print from 'esri/rest/print'
 import PrintTemplate from 'esri/rest/support/PrintTemplate'
 import PrintParameters from 'esri/rest/support/PrintParameters'
 import SpatialReference from 'esri/geometry/SpatialReference'
+import Polygon from 'esri/geometry/Polygon'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
 import { metersPerMapUnit, printExtent, extentRings, extentFitScale, resolvePrintedScale } from './lib/scaleMath'
 import defaultMessages from './translations/default'
-import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, lookupEsriWkt, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner, renderSeries, getPointProjector, SelectionGeometry } from './lib/pdfRenderer'
-import { gridTilesByCount, envelopeForFrame } from './lib/seriesMath'
+import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, lookupEsriWkt, renderPagePreview, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner, renderSeries, seriesPageTitle, getPointProjector, SelectionGeometry, SeriesStep } from './lib/pdfRenderer'
+import { gridTilesByCount, envelopeForFrame, featurePageTiles, FeaturePageInput } from './lib/seriesMath'
 import { CalciteIcon } from 'calcite-components'
 import HelpPopup from './components/HelpPopup'
 import FirstRunHint from './components/FirstRunHint'
+import PagePreview from './components/PagePreview'
 import { buildHelpSections } from './helpSections'
 import { beacon } from '../shared/beacon'
 import type { BeaconHandle } from '../shared/beacon'
@@ -79,6 +81,8 @@ interface State {
   busy: boolean
   status: string
   error: string | null
+  /** short neutral note under Export (e.g. a cancelled series) */
+  note: string
   lastResult: string | null
   author: string
   copyright: string
@@ -96,6 +100,27 @@ interface State {
   seriesRows: string
   seriesSizePct: string
   seriesCols: string
+  /** 'grid' = pages cut from the view; 'features' = one page per feature */
+  seriesMode: string
+  /** live map series progress while a series exports (null otherwise) */
+  seriesStep: SeriesStep | null
+  seriesLayerId: string
+  seriesNameField: string
+  /** data-driven page order by the name field: false = A to Z */
+  seriesSortDesc: boolean
+  /** 'view' = features in the current map view; 'all' = whole layer */
+  seriesScope: string
+  /** 'fit' = best fit per feature; 'fixed' = one scale for every page */
+  seriesScaleMode: string
+  seriesMargin: string
+  seriesFixedScale: string
+  featCount: number | null
+  featLoading: boolean
+  /** live page preview in the panel */
+  pagePreviewOn: boolean
+  pagePreviewUrl: string
+  pagePreviewBusy: boolean
+  pagePreviewNote: string
   legendAutoPaged: boolean
   mapOnly: boolean
   mapOnlyW: string
@@ -164,6 +189,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       busy: false,
       status: '',
       error: null,
+      note: '',
       lastResult: null,
       author: cfgAny.defaultAuthor || ((this.props as any).user && (this.props as any).user.username) || '',
       copyright: cfgAny.defaultCopyright || '',
@@ -182,6 +208,21 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       seriesRows: '2',
       seriesSizePct: '100',
       seriesCols: '2',
+      seriesMode: 'grid',
+      seriesLayerId: '',
+      seriesStep: null,
+      seriesNameField: '',
+      seriesSortDesc: false,
+      seriesScope: 'view',
+      seriesScaleMode: 'fit',
+      seriesMargin: '10',
+      seriesFixedScale: '1200',
+      featCount: null,
+      featLoading: false,
+      pagePreviewOn: false,
+      pagePreviewUrl: '',
+      pagePreviewBusy: false,
+      pagePreviewNote: '',
       legendAutoPaged: false,
       mapOnly: false,
       mapOnlyW: '',
@@ -412,6 +453,85 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   /** Light up the page currently being captured, so users watch the
    *  export march across the map page by page. */
+  /* map series progress: sheet timing for the time-left estimate */
+  private seriesSheetStart = 0
+  private seriesCancelled = false
+  /** the last page query could not sort on the server */
+  private featUnsorted = false
+  private seriesSheetsDone = 0
+
+  private onSeriesStep = (st: SeriesStep): void => {
+    if (st.kind === 'sheet') {
+      if (!this.seriesSheetStart) this.seriesSheetStart = Date.now()
+      this.seriesSheetsDone = st.done
+    }
+    this.setState({ seriesStep: st })
+  }
+
+  /** Time left, from the average finished sheet (index page counts as one). */
+  seriesTimeLeft = (st: SeriesStep): string => {
+    if (!this.seriesSheetStart || this.seriesSheetsDone < 1) return ''
+    const per = (Date.now() - this.seriesSheetStart) / this.seriesSheetsDone
+    const left = Math.max(0, st.pageCount - this.seriesSheetsDone) + (st.kind === 'sheet' ? 1 : 0)
+    if (st.kind !== 'sheet' || left <= 0) return ''
+    const sec = Math.round((per * left) / 1000)
+    if (sec < 60) return String((defaultMessages as any).seriesStepEtaSec || '').replace('{s}', String(Math.max(5, Math.round(sec / 5) * 5)))
+    return String((defaultMessages as any).seriesStepEtaMin || '').replace('{m}', String(Math.round(sec / 60)))
+  }
+
+  seriesStepHeadline = (st: SeriesStep, messages: any): string => {
+    if (st.kind === 'sheet') {
+      const base = String(messages.seriesStepPage).replace('{i}', String(st.page)).replace('{n}', String(st.pageCount))
+      return st.name ? base + ': ' + st.name : base
+    }
+    if (st.kind === 'index') return messages.seriesStepIndex
+    if (st.kind === 'prep') return messages.seriesStepPrep
+    if (st.kind === 'legend') return String(messages.seriesStepLegend).replace('{i}', String(st.page)).replace('{n}', String(st.pageCount))
+    return messages.seriesStepSave
+  }
+
+  /** The busy row for a map series: page headline, segmented bar (one
+   *  segment per printed page; a plain bar past 60 pages), the sub-step,
+   *  done count, elapsed time and time left. */
+  renderSeriesProgress = (st: SeriesStep, messages: any, elapsed: string): React.ReactNode => {
+    const headline = this.seriesStepHeadline(st, messages)
+    const pct = st.total > 0 ? Math.round((st.done / st.total) * 100) : 0
+    const eta = this.seriesTimeLeft(st)
+    const sub = String(this.state.status || '')
+    const showSub = sub && !/^Exporting page \d+ of \d+/i.test(sub) && !/^Creating index page/i.test(sub) && !/^Saving PDF/i.test(sub)
+    const segs = st.total <= 60
+    const count = String(messages.seriesStepCount).replace('{done}', String(st.done)).replace('{total}', String(st.total))
+    return (
+      <li className='pd-q-row pd-q-active pd-q-busy pd-sp'>
+        <div className='pd-q-busyline'>
+          <Loading type={LoadingType.Donut} width={14} height={14} />
+          <span className='pd-q-name pd-sp-head'>{headline}</span>
+          <span className='pd-q-meta' aria-hidden='true'>{elapsed}</span>
+        </div>
+        <div className='pd-sp-track' role='progressbar' aria-label={messages.seriesStepProgress}
+          aria-valuemin={0} aria-valuemax={st.total} aria-valuenow={st.done} aria-valuetext={headline + ', ' + count}>
+          {segs
+            ? Array.from({ length: st.total }).map((_, k) => (
+              <span key={k} className={'pd-sp-seg' + (k < st.done ? ' is-done' : k === st.done ? ' is-active' : '')} />
+            ))
+            : <span className='pd-sp-fill' style={{ width: pct + '%' }} />}
+        </div>
+        <div className='pd-sp-foot'>
+          <span aria-hidden='true'>{count} ({pct}%)</span>
+          {eta && <span aria-hidden='true'>{eta}</span>}
+        </div>
+        {showSub && <div className='pd-sp-sub' aria-hidden='true'>{sub}</div>}
+        <div className='pd-sp-actions'>
+          <Button size='sm' type='tertiary' disabled={this.seriesCancelled}
+            onClick={() => { this.seriesCancelled = true; this.setState({ status: messages.seriesCancelling }) }}>
+            {this.seriesCancelled ? messages.seriesCancelling : messages.seriesCancel}
+          </Button>
+        </div>
+        <div className='pd-sr-only' aria-live='polite'>{headline}</div>
+      </li>
+    )
+  }
+
   highlightSeriesTile = (tiles: any[], idx: number): void => {
     try {
       const view: any = this.state.jimuMapView && this.state.jimuMapView.view
@@ -435,8 +555,13 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     try {
       const view: any = this.state.jimuMapView && this.state.jimuMapView.view
       const layout = this.getSelectedLayout()
-      const active = !!view && !!layout && this.ctrl('series') && this.state.format === 'pdf' &&
-        this.state.seriesOpen && this.seriesPageCount() <= 31
+      // data-driven pages: keep the feature count current whatever its size,
+      // so the panel, the limit notes and Export never go stale
+      if (view && layout && this.seriesActive() && this.seriesFeatures()) {
+        const fl = this.featLayer()
+        if (fl && (!this.featCache || this.featCache.key !== this.featKey(view, fl))) { this.clearSeriesPreview(); this.refreshFeaturePages(); return }
+      }
+      const active = !!view && !!layout && this.seriesActive() && !this.seriesBlocked()
       this.clearSeriesPreview()
       if (!active) return
       const mfEl: any = (layout.elements || []).find((e: any) => e.type === 'mapFrame')
@@ -448,12 +573,25 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       const ext = view.extent
       const rows = Math.max(1, Math.min(8, parseInt(this.state.seriesRows, 10) || 1))
       const cols = Math.max(1, Math.min(8, parseInt(this.state.seriesCols, 10) || 1))
-      const env = this.seriesScaleEnv(envelopeForFrame(
-        { xmin: ext.xmin, ymin: ext.ymin, xmax: ext.xmax, ymax: ext.ymax },
-        rows, cols, mf.wIn, mf.hIn, 0.1))
-      const tiles = gridTilesByCount(env, rows, cols, mf.wIn, mf.hIn, 0.1)
+      let tiles: any[]
+      let fontPx: number
+      if (this.seriesFeatures()) {
+        // data-driven pages: fetched asynchronously; a stale or missing
+        // cache starts a fetch that redraws this preview when it lands
+        const layer = this.featLayer()
+        if (!layer) return
+        const key = this.featKey(view, layer)
+        if (!this.featCache || this.featCache.key !== key) { this.refreshFeaturePages(); return }
+        tiles = this.featTilesFor(view, mf.wIn, mf.hIn, this.featCache.feats)
+        fontPx = 16
+      } else {
+        const env = this.seriesScaleEnv(envelopeForFrame(
+          { xmin: ext.xmin, ymin: ext.ymin, xmax: ext.xmax, ymax: ext.ymax },
+          rows, cols, mf.wIn, mf.hIn, 0.1))
+        tiles = gridTilesByCount(env, rows, cols, mf.wIn, mf.hIn, 0.1)
+        fontPx = Math.max(12, Math.min(28, 220 / Math.max(rows, cols)))
+      }
       const sr = view.spatialReference
-      const fontPx = Math.max(12, Math.min(28, 220 / Math.max(rows, cols)))
       for (const t of tiles) {
         const rings = [[t.xmin, t.ymin], [t.xmax, t.ymin], [t.xmax, t.ymax], [t.xmin, t.ymax], [t.xmin, t.ymin]]
         const geometry: any = { type: 'polygon', rings: [rings], spatialReference: sr }
@@ -705,11 +843,34 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     return { scale, center: { x: view.center.x, y: view.center.y } }
   }
 
+  /** The current single-page print area as a polygon in the view's
+   *  coordinate system (rotation included), or null. */
+  printAreaPolygon = (view: any): any => {
+    try {
+      const mf = this.effFrameOf()
+      if (!view || !mf) return null
+      let scale: number, center: { x: number, y: number }
+      if (this.state.locked && this.lockedScale && this.lockedCenter) {
+        scale = this.lockedScale; center = this.lockedCenter
+      } else {
+        const r = this.computeScaleCenter(view, mf); scale = r.scale; center = r.center
+      }
+      const mpu = metersPerMapUnit(view.scale, view.resolution)
+      const ext = printExtent(center.x, center.y, mpu, mf.wIn, mf.hIn, scale)
+      const rings = extentRings(ext, center.x, center.y, view.rotation || 0)
+      return { type: 'polygon', rings: [rings], spatialReference: view.spatialReference }
+    } catch (e) { return null }
+  }
+
   updatePreview = (): void => {
     if (!this.uiVisible) return
     // while the map series panel is open, the series grid IS the print
     // area; the single-page rectangle contradicts it, so it yields
-    if (this.state.seriesOpen && this.ctrl('series') && this.state.format === 'pdf') {
+    // (except data-driven pages limited to the print area: that rectangle
+    // is then the filter, so it stays on the map)
+    const ddpFrame = this.ddpFrameActive()
+    if (!this.state.previewOn && !ddpFrame) { this.clearPreview(); return }
+    if (this.state.seriesOpen && this.ctrl('series') && this.state.format === 'pdf' && !ddpFrame) {
       this.clearPreview()
       return
     }
@@ -760,7 +921,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     try {
       this.previewWatch = reactiveUtils.watch(
         () => [view.stationary, view.scale, view.center && view.center.x, view.center && view.center.y, view.rotation],
-        () => { if (this.state.previewOn && !this.state.locked) this.updatePreview() }
+        () => {
+          if ((this.state.previewOn || this.ddpFrameActive()) && !this.state.locked) this.updatePreview()
+          // Inside the print area: moving the map moves the filter
+          if (this.ddpFrameActive()) this.queueEstimate()
+        }
       )
     } catch (e) { /* ignore */ }
   }
@@ -806,6 +971,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       this.startLegendWatch(view)
       void this.estimatePanel()
     }
+    // live page preview: redraw whenever anything that shows on the page changes
+    if (s.pagePreviewOn && this.pagePreviewSig() !== this.lastPreviewSig) this.queuePagePreview()
+    if (s.pagePreviewOn !== prevState.pagePreviewOn && !s.pagePreviewOn) this.setState({ pagePreviewUrl: '', pagePreviewNote: '' })
     if (s.jimuMapView !== prevState.jimuMapView && view && s.previewOn) {
       this.startPreviewWatch(view); this.updatePreview()
     }
@@ -849,8 +1017,22 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (s.seriesOpen !== prevState.seriesOpen ||
         s.seriesSizePct !== prevState.seriesSizePct ||
         s.seriesRows !== prevState.seriesRows || s.seriesCols !== prevState.seriesCols ||
+        s.seriesMode !== prevState.seriesMode || s.seriesLayerId !== prevState.seriesLayerId ||
+        s.seriesNameField !== prevState.seriesNameField || s.seriesScope !== prevState.seriesScope || s.seriesSortDesc !== prevState.seriesSortDesc ||
+        s.seriesScaleMode !== prevState.seriesScaleMode || s.seriesMargin !== prevState.seriesMargin ||
+        s.seriesFixedScale !== prevState.seriesFixedScale ||
+        s.scaleMode !== prevState.scaleMode || s.fixedScale !== prevState.fixedScale || s.locked !== prevState.locked ||
         s.format !== prevState.format || s.selectedLayoutId !== prevState.selectedLayoutId) {
       this.updateSeriesPreview()
+    }
+    // Inside the print area: the rectangle is the filter, so it is drawn and
+    // follows the map even when Show print area is off
+    const ddpNow = this.ddpFrameActive()
+    const ddpWas = !!prevState.seriesOpen && this.ctrl('series') && prevState.format === 'pdf' && prevState.seriesMode === 'features' && prevState.seriesScope === 'frame'
+    if (ddpNow !== ddpWas && view) {
+      if (ddpNow) { this.startPreviewWatch(view); this.updatePreview() }
+      else if (!s.previewOn) { this.clearPreview(); this.stopPreviewWatch() }
+      else this.updatePreview()
     }
     // a new context deserves a fresh suggestion
     if (s.legendHintDismissed && (
@@ -916,7 +1098,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   private queueEstimate = (): void => {
     if (this.legendWatchTimer) clearTimeout(this.legendWatchTimer)
-    this.legendWatchTimer = setTimeout(() => { void this.estimatePanel(); this.updateSeriesPreview() }, 400)
+    this.legendWatchTimer = setTimeout(() => {
+      void this.estimatePanel()
+      // the data-driven page layer list follows what is turned on
+      if (this.state.seriesOpen && this.seriesFeatures()) this.forceUpdate()
+      this.updateSeriesPreview(); this.queuePagePreview()
+    }, 400)
   }
 
   private stopLegendWatch = (): void => {
@@ -934,19 +1121,38 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         for (const h of this.legendLayerHandles) { try { h.remove() } catch (e) { /* noop */ } }
         this.legendLayerHandles = []
         try {
+          const w = (fn: () => any): void => {
+            try { this.legendLayerHandles.push(reactiveUtils.watch(fn, this.queueEstimate)) } catch (e) { /* not watchable */ }
+          }
           view.map.allLayers.forEach((l: any) => {
-            if (l && typeof l.watch === 'function') {
-              this.legendLayerHandles.push(l.watch('visible', this.queueEstimate))
+            if (!l) return
+            // visibility, and a filter set from Map Layers (or any widget),
+            // re-count the data-driven pages
+            w(() => l.visible)
+            w(() => l.definitionExpression)
+            // map image sublayers turn on and off on their own
+            if (l.type === 'map-image' && l.allSublayers && typeof l.allSublayers.forEach === 'function') {
+              l.allSublayers.forEach((sub: any) => {
+                if (!sub) return
+                w(() => sub.visible)
+                w(() => sub.definitionExpression)
+              })
             }
+          })
+          // layer view filters (display-only filters some widgets set)
+          w(() => {
+            const lvs: any = view.allLayerViews
+            const arr: any[] = lvs && lvs.toArray ? lvs.toArray() : []
+            return arr.map((lv: any) => (lv && lv.filter && lv.filter.where) || '').join('|') + '#' + (lvs ? lvs.length : 0)
           })
         } catch (e) { /* noop */ }
       }
       if (view && view.map && view.map.allLayers && typeof view.map.allLayers.on === 'function') {
         this.legendWatchHandles.push(view.map.allLayers.on('change', () => { bindLayers(); this.queueEstimate() }))
       }
-      if (view && typeof view.watch === 'function') {
+      if (view) {
         // series preview follows pan and zoom through the same debounce
-        this.legendWatchHandles.push(view.watch('extent', this.queueEstimate))
+        try { this.legendWatchHandles.push(reactiveUtils.watch(() => view.extent, this.queueEstimate)) } catch (e) { /* noop */ }
       }
       bindLayers()
     } catch (e) { /* watcher is best-effort */ }
@@ -1138,7 +1344,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const url = this.serviceUrl()
     if (!url) { this.setState({ error: (defaultMessages as any).svcNoUrl }); return }
     this.beacon?.action('print-service')
-    this.beginBusyClock(); this.setState({ busy: true, error: null, lastResult: null, status: (defaultMessages as any).svcSubmitting })
+    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, status: (defaultMessages as any).svcSubmitting })
     try {
       const fmt = this.state.format === 'aix' ? 'aix' : this.state.format
       const template = new PrintTemplate({
@@ -1183,6 +1389,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
    *  user on any WKID, not just the ones shipped in the table. Best-effort:
    *  anything unresolved leaves the token empty (Pro emptyStr semantics). */
   applyTextContext = async (view: any, options: RenderOptions): Promise<void> => {
+    this.applyConfigFlags(options)
     try {
       const sr: any = view.spatialReference
       const outWkid = options.outputWkid || 0
@@ -1197,6 +1404,21 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       const userName = u && (u.fullName || u.username)
       if (userName) options.user = String(userName)
     } catch (e) { /* tokens fall back to '' */ }
+  }
+
+  /** Builder switches that shape every export, single map and series alike.
+   *  Called from applyTextContext, which both export paths already run, so
+   *  a new switch can never reach one path and miss the other. Sparse
+   *  storage: legend scale filter and GeoPDF are on unless explicitly false;
+   *  the extent filter and keep-rotation are off unless explicitly true. */
+  applyConfigFlags = (options: RenderOptions): void => {
+    const c: any = this.cfg() || {}
+    options.legendScaleFilter = c.legendScaleFilter !== false
+    options.legendExtentFilter = c.legendExtentFilter === true
+    options.geoPdf = c.geoPdf !== false
+    options.pdfLayers = c.pdfLayers !== false
+    options.vectorLayers = c.vectorLayers === true
+    options.georefKeepRotation = c.georefKeepRotation === true
   }
 
   /* ---------------------------------------------------------------- */
@@ -1405,7 +1627,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       qr: !service, // the QR row is always shown on the pagx path
 
       selection: !service,
-      fonts: !service && this.ctrl('font')
+      fonts: !service && this.ctrl('font'),
+      geoPdf: !service && (this.cfg() as any).geoPdf !== false,
+      pdfLayers: !service && (this.cfg() as any).pdfLayers !== false,
+      vector: !service && (this.cfg() as any).vectorLayers === true,
+      pagePreview: !service && this.ctrl('pagePreview'),
+      keepRotation: (this.cfg() as any).georefKeepRotation === true
     }
   }
 
@@ -1442,7 +1669,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (!jimuMapView || !jimuMapView.view || !layout) return
 
     this.beacon?.action('export', this.state.format)
-    this.beginBusyClock(); this.setState({ busy: true, error: null, lastResult: null, status: 'Preparing…' })
+    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, status: 'Preparing…' })
     try {
       const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0 // 0 = auto (GPU-detected)
       const effLayout = this.state.dpi
@@ -1605,7 +1832,407 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     } catch (e) { return '' }
   }
 
+  /* ---------------------------------------------------------------- */
+  /* data-driven pages: one page per feature                          */
+  /* ---------------------------------------------------------------- */
+
+  /** Most feature pages one export makes (plus the index page), the same
+   *  31-page ceiling the grid series has, for memory and time. */
+  /** Map series guardrails from Settings: warn above `warn` map pages,
+   *  never more than `max` (index and legend pages not counted). */
+  seriesLimits = (): { warn: number, max: number, mode: 'block' | 'first' } => {
+    const c: any = this.cfg()
+    const max = Math.max(1, Math.min(200, Math.round(Number(c.seriesMaxPages) || 50)))
+    const warn = Math.max(1, Math.min(max, Math.round(Number(c.seriesWarnPages) || 20)))
+    return { warn, max, mode: c.seriesLimitMode === 'first' ? 'first' : 'block' }
+  }
+
+  /** Map pages the series would make before any limit (0 while unknown). */
+  seriesSheetCount = (): number => {
+    if (this.seriesFeatures()) return this.featCache ? this.featCache.total : 0
+    const r = Math.max(1, Math.min(8, parseInt(this.state.seriesRows, 10) || 1))
+    const c = Math.max(1, Math.min(8, parseInt(this.state.seriesCols, 10) || 1))
+    return r * c
+  }
+
+  /** Over the limit and the export must not run. */
+  seriesBlocked = (): boolean => {
+    const L = this.seriesLimits()
+    const n = this.seriesSheetCount()
+    if (n <= L.max) return false
+    return !(this.seriesFeatures() && L.mode === 'first')
+  }
+
+  /** Rough time and file size for a series, for the large-job warning. */
+  seriesCost = (sheets: number): { time: string, mb: number } => {
+    const dpi = Number(this.state.dpi) || Number((this.getSelectedLayout() as any)?.dpi) || 200
+    const k = Math.max(0.3, (dpi / 200) * (dpi / 200))
+    const ov = this.seriesFeatures() && this.state.showOverview && !!(this.getSelectedLayout() as any)?.overview?.enabled
+    const sec = sheets * (6 * Math.max(0.6, dpi / 200)) * (ov ? 1.8 : 1) + 10
+    const mb = Math.max(1, Math.round(sheets * 1.2 * k * (ov ? 1.25 : 1)))
+    const time = sec < 90 ? Math.round(sec / 10) * 10 + ' s' : Math.round(sec / 60) + ' min'
+    return { time, mb }
+  }
+
+  /** The guardrail line under the series settings: nothing, a large-job
+   *  warning, a first-N notice, or the over-limit stop. */
+  renderSeriesLimit = (messages: any): React.ReactNode => {
+    const L = this.seriesLimits()
+    const n = this.seriesSheetCount()
+    if (!n) return null
+    const feats = this.seriesFeatures()
+    if (n > L.max) {
+      if (feats && L.mode === 'first') {
+        return <Alert type='warning' withIcon style={{ width: '100%' }} text={String(messages.seriesOverFirst).replace('{n}', String(n)).replace(/\{max\}/g, String(L.max)) + (this.featUnsorted ? ' ' + messages.seriesUnsorted : '')} />
+      }
+      return <Alert type='error' withIcon style={{ width: '100%' }} text={String(feats ? messages.seriesOverFeat : messages.seriesOverGrid).replace('{n}', String(n)).replace(/\{max\}/g, String(L.max))} />
+    }
+    if (n > L.warn) {
+      const c = this.seriesCost(n)
+      return <Alert type='warning' withIcon style={{ width: '100%' }} text={String(messages.seriesWarnLarge).replace('{n}', String(n)).replace('{t}', c.time).replace('{mb}', String(c.mb))} />
+    }
+    return null
+  }
+
+  private featCache: { key: string, feats: FeaturePageInput[], total: number } | null = null
+  private featSeq = 0
+
+  seriesFeatures = (): boolean => this.state.seriesMode === 'features'
+
+  /** A map series (either kind) is set up for the next PDF export. */
+  seriesActive = (): boolean => !!this.state.seriesOpen && this.ctrl('series') && this.state.format === 'pdf'
+
+  /** Data-driven pages limited to the print area rectangle. */
+  ddpFrameActive = (): boolean => this.seriesActive() && this.seriesFeatures() && this.state.seriesScope === 'frame'
+
+  /** Add a page token to the map title (with a space when needed). */
+  insertTitleToken = (tok: string): void => {
+    const cur = String(this.state.title || '')
+    const next = cur ? (/\s$/.test(cur) ? cur + tok : cur + ' ' + tok) : tok
+    this.setState({ title: next })
+  }
+
+  /** Title helpers shown under Map title while a series is set up: page
+   *  tokens to insert and how page 1's title will read. */
+  renderSeriesTitleHelp = (messages: any, layout: any): React.ReactNode => {
+    if (!this.seriesActive()) return null
+    const feats = this.seriesFeatures()
+    const layer = feats ? this.featLayer() : null
+    const fields = feats ? this.featFieldList(layer) : []
+    const first: any = feats && this.featCache && this.featCache.feats.length ? this.featCache.feats[0] : null
+    const n = feats ? (this.featCache ? Math.min(this.featCache.total, this.seriesLimits().max) : 0) : this.seriesSheetCount()
+    let sample = ''
+    try {
+      sample = seriesPageTitle(this.state.title || (layout && layout.name) || 'Map', 0, Math.max(1, n || 1),
+        { name: first ? first.name : (feats ? '' : undefined), fields: first ? first.fields : undefined }, feats)
+    } catch (e) { sample = '' }
+    return (
+      <div className='pd-row' role='group' aria-label={messages.seriesTitleTokens}>
+        <div className='pd-inline' style={{ flexWrap: 'wrap', gap: 4 }}>
+          <span className='pd-desc'>{messages.seriesTitleTokens}</span>
+          {feats && (
+            <Button size='sm' type='tertiary' onClick={() => this.insertTitleToken('{pageName}')}>{messages.seriesTokName}</Button>
+          )}
+          <Button size='sm' type='tertiary' onClick={() => this.insertTitleToken('{page} of {pages}')}>{messages.seriesTokNumber}</Button>
+          {feats && fields.length > 0 && (
+            <Select size='sm' style={{ width: 130 }} aria-label={messages.seriesTokField} value=''
+              onChange={(e: any) => { if (e.target.value) this.insertTitleToken('{field:' + e.target.value + '}') }}>
+              <option value=''>{messages.seriesTokField}</option>
+              {fields.map(f => <option key={f.name} value={f.name}>{f.alias}</option>)}
+            </Select>
+          )}
+        </div>
+        {sample && <div className='pd-desc' aria-live='polite'>{String(messages.seriesTitleSample).replace('{t}', sample)}</div>}
+        <div className='pd-desc'>{feats ? messages.seriesTitleHintFeat : messages.seriesTitleHintGrid}</div>
+      </div>
+    )
+  }
+
+  /** Feature layers from the map's own layer list that are turned on (the
+   *  layer and every group above it) and can be queried for pages, at any depth:
+   *  layers inside group layers (nested groups included) and the leaf
+   *  sublayers of map image services (their group sublayers are walked, not
+   *  listed). Titles carry the group path, e.g. "Utilities / Water / Mains".
+   *  Ids are unique per entry: a map image sublayer is "<service id>::<sublayer id>". */
+  featureLayerList = (): Array<{ id: string, title: string, layer: any }> => {
+    const out: Array<{ id: string, title: string, layer: any }> = []
+    try {
+      const view: any = this.state.jimuMapView && this.state.jimuMapView.view
+      const map: any = view && view.map
+      const toArr = (c: any): any[] => (c ? (c.toArray ? c.toArray() : Array.from(c)) : [])
+      const FEATURE = ['feature', 'geojson', 'csv', 'ogc-feature', 'wfs', 'subtype-group']
+      const titleOf = (n: any): string => (n && n.title !== undefined && n.title !== null && String(n.title)) || ''
+      // Walk the map's operational layers the way the layer list shows them
+      // (top first). Basemap layers are never reached, listMode 'hide' drops
+      // a layer and everything in it, 'hide-children' drops what is in it,
+      // and anything turned off (or under a group that is off) is skipped.
+      const walkSubs = (svc: any, subs: any[], path: string[]): void => {
+        for (const sub of subs) {
+          if (!sub || sub.visible === false || sub.listMode === 'hide') continue
+          const kids = toArr(sub.sublayers)
+          const here = path.concat(titleOf(sub) || String(sub.id))
+          if (kids.length) {
+            if (sub.listMode !== 'hide-children') walkSubs(svc, kids, here)
+            continue
+          }
+          if (typeof sub.queryFeatures !== 'function') continue
+          const sj: any = sub.sourceJSON
+          if (sj && sj.type && String(sj.type) !== 'Feature Layer') continue
+          if (sub.capabilities && sub.capabilities.operations && sub.capabilities.operations.supportsQuery === false) continue
+          out.push({ id: String(svc.id) + '::' + String(sub.id), title: here.join(' / '), layer: sub })
+        }
+      }
+      const walk = (layers: any[], path: string[]): void => {
+        for (const l of layers.slice().reverse()) {
+          if (!l || l.visible === false || l.listMode === 'hide') continue
+          const type = String(l.type)
+          const here = path.concat(titleOf(l) || String(l.id))
+          if (type === 'group') {
+            if (l.listMode !== 'hide-children') walk(toArr(l.layers), here)
+            continue
+          }
+          if (type === 'map-image') {
+            if (l.listMode !== 'hide-children') walkSubs(l, toArr(l.sublayers), here)
+            continue
+          }
+          if (FEATURE.indexOf(type) < 0 || typeof l.queryFeatures !== 'function') continue
+          out.push({ id: String(l.id), title: here.join(' / '), layer: l })
+        }
+      }
+      if (map) walk(toArr(map.layers), [])
+    } catch (e) { /* none */ }
+    return out
+  }
+
+  /** The chosen page layer's list entry (first one when none is chosen). */
+  featEntry = (): { id: string, title: string, layer: any } | null => {
+    const list = this.featureLayerList()
+    return list.find(x => x.id === this.state.seriesLayerId) || list[0] || null
+  }
+
+  featLayer = (): any => {
+    const hit = this.featEntry()
+    return hit ? hit.layer : null
+  }
+
+  /** Layers in unopened groups (and map image sublayers) are not loaded
+   *  until something asks, so their fields are empty: load the chosen one
+   *  once, then redraw the panel with its fields. */
+  private featLoadAsked = new Set<any>()
+  private ensureFeatLoaded = (layer: any): void => {
+    if (!layer || layer.loaded || typeof layer.load !== 'function' || this.featLoadAsked.has(layer)) return
+    this.featLoadAsked.add(layer)
+    Promise.resolve(layer.load()).then(() => { this.featCache = null; this.forceUpdate(); this.updateSeriesPreview() }).catch(() => { /* not loadable */ })
+  }
+
+  /** Fields that make sensible page names (and sort keys). */
+  /** Fields offered as the page name: only the ones published as visible.
+   *  When the layer carries field settings (the web map's popup field list,
+   *  which is where the map service or Map Viewer field visibility lives),
+   *  only fields marked visible are offered, in that order and with those
+   *  labels. Layers with no field settings offer every attribute field.
+   *  Shape and geometry-size fields are never offered. */
+  featFieldList = (layer: any): Array<{ name: string, alias: string }> => {
+    const ok = ['string', 'integer', 'small-integer', 'big-integer', 'long', 'double', 'single', 'oid', 'date', 'date-only', 'guid', 'global-id']
+    try {
+      const fields: any[] = ((layer && layer.fields) || []).filter((f: any) => f && ok.indexOf(String(f.type)) >= 0)
+      const shapeish = (n: string): boolean => /^(shape|shape[._]{1,2}(area|len|length)|st_area\(.*\)|st_length\(.*\))$/i.test(n)
+      const byName = new Map<string, any>()
+      for (const f of fields) byName.set(String(f.name).toLowerCase(), f)
+      const pt: any = layer && layer.popupTemplate
+      const infos: any[] = pt && pt.fieldInfos ? (pt.fieldInfos.toArray ? pt.fieldInfos.toArray() : Array.from(pt.fieldInfos)) : []
+      const real = infos.filter((fi: any) => fi && fi.fieldName && !/^(expression|relationships)\//i.test(String(fi.fieldName)))
+      if (real.length) {
+        const out: Array<{ name: string, alias: string }> = []
+        const seen = new Set<string>()
+        for (const fi of real) {
+          if (fi.visible === false) continue
+          const f = byName.get(String(fi.fieldName).toLowerCase())
+          if (!f || shapeish(String(f.name)) || seen.has(String(f.name))) continue
+          seen.add(String(f.name))
+          out.push({ name: String(f.name), alias: String(fi.label || f.alias || f.name) })
+        }
+        if (out.length) return out
+      }
+      return fields
+        .filter((f: any) => !shapeish(String(f.name)))
+        .map((f: any) => ({ name: String(f.name), alias: String(f.alias || f.name) }))
+    } catch (e) { return [] }
+  }
+
+  /** The chosen name field if it is offered, else the display field, else
+   *  the first offered field, else the object id. */
+  featNameField = (layer: any): string => {
+    const names = this.featFieldList(layer).map(f => f.name)
+    if (this.state.seriesNameField && names.indexOf(this.state.seriesNameField) >= 0) return this.state.seriesNameField
+    if (layer && layer.displayField && names.indexOf(layer.displayField) >= 0) return String(layer.displayField)
+    return String(names[0] || (layer && layer.objectIdField) || '')
+  }
+
+  /** Attribute values as printed text: coded-value domains show their
+   *  description, dates their local date. */
+  private fmtAttrs = (layer: any, attrs: any): Record<string, string> => {
+    const out: Record<string, string> = {}
+    const fields: any[] = (layer && layer.fields) || []
+    for (const k of Object.keys(attrs || {})) {
+      const v = attrs[k]
+      if (v === null || v === undefined) { out[k] = ''; continue }
+      try {
+        const dom: any = typeof layer.getFieldDomain === 'function' ? layer.getFieldDomain(k) : null
+        if (dom && dom.type === 'coded-value' && typeof dom.getName === 'function') {
+          const nm = dom.getName(v)
+          if (nm !== null && nm !== undefined && nm !== '') { out[k] = String(nm); continue }
+        }
+      } catch (e) { /* raw value */ }
+      const f = fields.find((x: any) => x && x.name === k)
+      out[k] = f && f.type === 'date' && typeof v === 'number' ? new Date(v).toLocaleDateString() : String(v)
+    }
+    return out
+  }
+
+  /** Cache key: what decides WHICH features become pages. Scale and
+   *  margin only re-lay the pages, so they are not part of it. */
+  /** Filters on the page layer beyond its definition expression, as SQL
+   *  where clauses: the layer view filter and the EB data source's current
+   *  query (what Map Layers, Filter and Query widgets set). Best-effort;
+   *  anything not readable is skipped. */
+  featFilterWheres = (view: any, layer: any): string[] => {
+    const out: string[] = []
+    const add = (w: any): void => {
+      const t = typeof w === 'string' ? w.trim() : ''
+      if (!t || t === '1=1' || out.indexOf(t) >= 0) return
+      if (layer && typeof layer.definitionExpression === 'string' && layer.definitionExpression.trim() === t) return
+      out.push(t)
+    }
+    try {
+      const lvs: any = view && view.allLayerViews
+      const arr: any[] = lvs ? (lvs.toArray ? lvs.toArray() : Array.from(lvs)) : []
+      const lv = arr.find((v: any) => v && v.layer === layer)
+      if (lv && lv.filter && lv.filter.where) add(lv.filter.where)
+    } catch (e) { /* no layer view filter */ }
+    try {
+      const jmv: any = this.state.jimuMapView
+      const jlv: any = jmv && typeof jmv.getJimuLayerViewByAPILayer === 'function' ? jmv.getJimuLayerViewByAPILayer(layer) : null
+      const ds: any = jlv && (typeof jlv.getLayerDataSource === 'function' ? jlv.getLayerDataSource() : jlv.layerDataSource)
+      const qp: any = ds && typeof ds.getCurrentQueryParams === 'function' ? ds.getCurrentQueryParams() : null
+      if (qp && qp.where) add(qp.where)
+    } catch (e) { /* no data source filter */ }
+    return out
+  }
+
+  featKey = (view: any, layer: any): string => {
+    let ext = ''
+    if (this.state.seriesScope === 'frame') {
+      try { const g = this.printAreaPolygon(view); ext = 'f:' + (g ? g.rings[0].map((p: number[]) => Math.round(p[0]) + ' ' + Math.round(p[1])).join(',') : '?') } catch (e) { ext = '?' }
+    } else if (this.state.seriesScope !== 'all') {
+      try { const e = view.extent; ext = [e.xmin, e.ymin, e.xmax, e.ymax].map((v: number) => Math.round(v)).join(',') } catch (e) { ext = '?' }
+    }
+    const entry = this.featEntry()
+    return [(entry && entry.layer === layer) ? entry.id : (layer && layer.id), this.state.seriesScope, this.featNameField(layer), this.state.seriesSortDesc ? 'desc' : 'asc', (layer && layer.definitionExpression) || '', this.featFilterWheres(view, layer).join(' AND '), ext].join('|')
+  }
+
+  /** Query the page features: in the current view or the whole layer,
+   *  honoring the layer's own filter, sorted by the name field, capped. */
+  fetchFeaturePages = async (view: any, layer: any): Promise<{ feats: FeaturePageInput[], total: number }> => {
+    if (typeof layer.load === 'function') await layer.load()
+    this.featUnsorted = false
+    const CAP = this.seriesLimits().max
+    const nameField = this.featNameField(layer)
+    const q: any = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
+    if (!q.where) q.where = '1=1'
+    // honor every filter the map shows: the layer's own definition
+    // expression (applied by the layer itself), a layer view filter, and the
+    // Experience Builder data source filter (Map Layers, Filter, Query ...)
+    const extra = this.featFilterWheres(view, layer)
+    if (extra.length) q.where = ['(' + q.where + ')'].concat(extra.map(w => '(' + w + ')')).join(' AND ')
+    if (this.state.seriesScope === 'frame') {
+      // only features inside the print area (the rectangle on the map)
+      const g = this.printAreaPolygon(view)
+      q.geometry = g ? new Polygon(g) : view.extent
+      q.spatialRelationship = 'intersects'
+    } else if (this.state.seriesScope !== 'all') { q.geometry = view.extent; q.spatialRelationship = 'intersects' }
+    q.returnGeometry = true
+    q.outFields = ['*']
+    q.outSpatialReference = view.spatialReference
+    let total = 0
+    try { total = Number(await layer.queryFeatureCount(q)) || 0 } catch (e) { /* count optional */ }
+    // one extra so an over-limit layer is detected even when the count
+    // query fails
+    q.num = CAP + 1
+    let res: any
+    try {
+      if (nameField) q.orderByFields = [nameField + (this.state.seriesSortDesc ? ' DESC' : ' ASC')]
+      res = await layer.queryFeatures(q)
+    } catch (e) {
+      // some sources cannot sort server-side: sort here instead (then the
+      // "first N" over the limit are not strictly the first by name)
+      q.orderByFields = null
+      res = await layer.queryFeatures(q)
+      this.featUnsorted = true
+    }
+    const list: any[] = (res && res.features) || []
+    const feats: FeaturePageInput[] = []
+    for (const f of list) {
+      const g: any = f && f.geometry
+      if (!g) continue
+      let ex: any = g.extent
+      if (!ex && isFinite(g.x) && isFinite(g.y)) ex = { xmin: g.x, xmax: g.x, ymin: g.y, ymax: g.y }
+      if (!ex) continue
+      const fields = this.fmtAttrs(layer, f.attributes)
+      feats.push({
+        xmin: ex.xmin, ymin: ex.ymin, xmax: ex.xmax, ymax: ex.ymax,
+        name: nameField ? (fields[nameField] || '') : '',
+        fields,
+        geoms: this.overlayGeoms(g).map(x => x.g)
+      })
+    }
+    if (nameField) {
+      // keep a stable, human order even when the service ignored orderBy
+      const dir = this.state.seriesSortDesc ? -1 : 1
+      feats.sort((a, b) => dir * String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' }))
+    }
+    // the extra feature only proves the layer is over the limit
+    const found = Math.max(total, list.length)
+    return { feats: feats.slice(0, CAP), total: found }
+  }
+
+  refreshFeaturePages = async (): Promise<void> => {
+    const view: any = this.state.jimuMapView && this.state.jimuMapView.view
+    const layer = this.featLayer()
+    if (!view || !layer) { this.featCache = null; this.setState({ featCount: 0, featLoading: false }); return }
+    const key = this.featKey(view, layer)
+    if (this.featCache && this.featCache.key === key) return
+    const seq = ++this.featSeq
+    if (!this.state.featLoading) this.setState({ featLoading: true })
+    try {
+      const r = await this.fetchFeaturePages(view, layer)
+      if (seq !== this.featSeq) return
+      this.featCache = { key, feats: r.feats, total: r.total }
+      this.setState({ featCount: r.total, featLoading: false }, () => this.updateSeriesPreview())
+    } catch (e) {
+      if (seq !== this.featSeq) return
+      this.featCache = { key, feats: [], total: 0 }
+      this.setState({ featCount: 0, featLoading: false })
+    }
+  }
+
+  /** Page tiles for the fetched features at a frame size. */
+  featTilesFor = (view: any, fw: number, fh: number, feats: FeaturePageInput[]): any[] => {
+    const mpu = metersPerMapUnit(view.scale, view.resolution)
+    const fixed = Math.max(0, parseInt(String(this.state.seriesFixedScale).replace(/[^0-9]/g, ''), 10) || 0)
+    return featurePageTiles(feats, fw, fh, mpu, {
+      mode: this.state.seriesScaleMode === 'fixed' && fixed > 0 ? 'fixed' : 'fit',
+      marginPct: Math.max(0, Math.min(200, parseFloat(this.state.seriesMargin) || 0)),
+      fixedScale: fixed,
+      pointScale: fixed > 0 ? fixed : 1200
+    })
+  }
+
   seriesPageCount = (): number => {
+    if (this.seriesFeatures()) {
+      const n = this.featCache ? Math.min(this.featCache.total, this.seriesLimits().max) : 0
+      return n > 0 ? n + 1 : 0
+    }
     const r = Math.max(1, Math.min(8, parseInt(this.state.seriesRows, 10) || 1))
     const c = Math.max(1, Math.min(8, parseInt(this.state.seriesCols, 10) || 1))
     return r * c + 1
@@ -1616,9 +2243,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const layout = this.getSelectedLayout()
     const view: any = jimuMapView && jimuMapView.view
     if (!view || !layout) return
-    if (this.seriesPageCount() > 31) return
-    this.beacon?.action('export-series')
-    this.beginBusyClock(); this.setState({ busy: true, error: null, status: 'Preparing series\u2026' })
+    if (this.seriesBlocked()) return
+    this.beacon?.action(this.seriesFeatures() ? 'export-series-features' : 'export-series')
+    this.beginBusyClock(); this.seriesSheetStart = 0; this.seriesSheetsDone = 0; this.seriesCancelled = false
+    this.setState({ busy: true, error: null, note: '', status: 'Preparing series\u2026', seriesStep: { done: 0, total: 1, kind: 'prep', page: 0, pageCount: 0 } })
     try {
       const mfEl: any = (layout.elements || []).find((e: any) => e.type === 'mapFrame')
       const ext = view.extent
@@ -1638,7 +2266,29 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       // initial estimate from the preview's effective frame; the export
       // refines it through retile once the panel is computed exactly
       const mfEst: any = this.effFrameOf() || mfEl
-      const first = tilesFor(mfEst.wIn, mfEst.hIn)
+      // data-driven pages: fresh query at export time, never the preview cache
+      let featTotal = 0
+      let featTilesFor: ((fw: number, fh: number) => { tiles: any[], scaleDenom: number }) | null = null
+      if (this.seriesFeatures()) {
+        const layer = this.featLayer()
+        if (!layer) throw new Error((defaultMessages as any).seriesNoLayer)
+        this.setState({ status: (defaultMessages as any).seriesFetching })
+        const r = await this.fetchFeaturePages(view, layer)
+        featTotal = r.total
+        if (this.seriesCancelled) throw new Error('SERIES_CANCELLED')
+        if (!r.feats.length) throw new Error((defaultMessages as any).seriesNoFeatures)
+        // the fresh count can differ from the panel's (data edits, filters):
+        // hold the limit here too
+        const L = this.seriesLimits()
+        if (r.total > L.max && L.mode !== 'first') {
+          throw new Error(String((defaultMessages as any).seriesOverFeat).replace('{n}', String(r.total)).replace(/\{max\}/g, String(L.max)))
+        }
+        featTilesFor = (fw: number, fh: number) => {
+          const t2 = this.featTilesFor(view, fw, fh, r.feats)
+          return { tiles: t2, scaleDenom: Math.max(...t2.map((t: any) => Number(t.scale) || 0)) }
+        }
+      }
+      const first = featTilesFor ? featTilesFor(mfEst.wIn, mfEst.hIn) : tilesFor(mfEst.wIn, mfEst.hIn)
       let tiles = first.tiles
       const scaleDenom = first.scaleDenom
       const options: RenderOptions = {}
@@ -1656,7 +2306,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       const cfgLogo = (this.props.config as any)?.defaultLogo
       if (cfgLogo) options.defaultLogo = cfgLogo
       options.includeLegend = this.state.includeLegend
-      options.showOverview = false
+      // data-driven pages get a locator overview per page (main Overview
+      // switch); grid series print their key map instead
+      options.showOverview = this.seriesFeatures() ? this.state.showOverview : false
       options.showGrid = this.state.showGrid
       if (this.state.legendPositionOv) options.legendPositionOverride = this.state.legendPositionOv
       if ((this.cfg() as any).legendWidgetId) options.legendWidgetId = String((this.cfg() as any).legendWidgetId)
@@ -1666,6 +2318,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       // the export reports the exact legend panel back, so the live series
       // grid preview matches the shrunken frame precisely from then on
       options.onPanelComputed = (panel) => { this.lastPanel = panel }
+      options.isCancelled = () => this.seriesCancelled
       const family = this.state.fontFamily || (this.props.config as any)?.defaultFontFamily || ''
       const customs = this.customFontList()
       if (family.indexOf('custom:') === 0) {
@@ -1684,36 +2337,46 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       await this.collectViewDecorations(view, options)
       const effLayout = this.state.dpi ? { ...layout, dpi: Number(this.state.dpi) } : layout
       const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0
-      const name = (this.buildFileName(layout) || 'map-series').replace(/\.pdf$/i, '') + '-series.pdf'
+      const name = (this.buildFileName(layout) || 'map-series').replace(/\.pdf$/i, '') + (featTilesFor ? '-pages.pdf' : '-series.pdf')
+      const cap = this.seriesLimits().max
       const result = await renderSeries(
         view, effLayout, this.state.title || layout.name || 'Map', name, maxImagePx,
         {
           tiles,
           scaleDenom,
+          kind: featTilesFor ? 'features' : 'grid',
           retile: (fw: number, fh: number) => {
-            const rt = tilesFor(fw, fh)
+            const rt = featTilesFor ? featTilesFor(fw, fh) : tilesFor(fw, fh)
             tiles = rt.tiles // progress highlight follows the final grid
             return rt
           }
         }, options,
         (msg: string) => {
           this.setState({ status: msg })
-          const pm = /page (\d+) of (\d+)/i.exec(msg || '')
+          const pm = /^Exporting page (\d+) of (\d+)/i.exec(msg || '')
           if (pm) this.highlightSeriesTile(tiles, parseInt(pm[1], 10))
-        }
+        },
+        this.onSeriesStep
       )
       this.setState({
         busy: false,
         status: '',
+        seriesStep: null,
         results: this.pushResult({
           name: result.fileName,
           url: result.url,
-          meta: result.pages + ' pages \u00b7 ' + result.sizeKb + ' KB' + (result.warning ? ' \u00b7 ' + result.warning : '')
+          meta: result.pages + ' pages \u00b7 ' + result.sizeKb + ' KB' +
+            (featTotal > cap ? ' \u00b7 ' + String((defaultMessages as any).seriesCapped || '').replace('{cap}', String(cap)).replace('{n}', String(featTotal)) : '') +
+            (result.warning ? ' \u00b7 ' + result.warning : '')
         })
       }, () => this.updateSeriesPreview())
     } catch (err: any) {
-      this.beacon?.error(err, 'export-series')
-      this.setState({ busy: false, status: '', error: (err && err.message) || 'Series export failed.' }, () => this.updateSeriesPreview())
+      if (!(err && err.message === 'SERIES_CANCELLED')) this.beacon?.error(err, 'export-series')
+      const cancelled = !!(err && err.message === 'SERIES_CANCELLED')
+      this.setState({ busy: false, status: '', seriesStep: null, note: cancelled ? String((defaultMessages as any).seriesCancelledNote || '') : '', error: cancelled ? null : ((err && err.message) || 'Series export failed.') }, () => {
+        this.updateSeriesPreview()
+
+      })
     }
   }
 
@@ -1781,6 +2444,17 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .pd-q-busyline { display: flex; align-items: center; gap: 7px; }
     .pd-q-barwrap { margin: 5px 2px 2px; height: 5px; border-radius: 3px; background: var(--ref-palette-neutral-400, #e2e2e2); overflow: hidden; }
     .pd-q-bar { height: 100%; background: var(--sys-color-primary-main, #076fe5); border-radius: 3px; transition: width 0.5s ease; }
+    .pd-sp-head { font-weight: 600; }
+    .pd-sp-actions { display: flex; justify-content: flex-end; margin-top: 2px; }
+    .pd-sp-track { display: flex; gap: 2px; margin: 6px 2px 3px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--ref-palette-neutral-400, #e2e2e2); }
+    .pd-sp-seg { flex: 1 1 0; min-width: 2px; background: var(--ref-palette-neutral-400, #e2e2e2); }
+    .pd-sp-seg.is-done { background: var(--sys-color-primary-main, #076fe5); }
+    .pd-sp-seg.is-active { background: var(--sys-color-primary-light, #7fb2f0); animation: pd-sp-pulse 1.2s ease-in-out infinite; }
+    .pd-sp-fill { display: block; height: 100%; background: var(--sys-color-primary-main, #076fe5); transition: width 0.5s ease; }
+    .pd-sp-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--ref-palette-neutral-1000, #6a6a6a); padding: 0 2px; }
+    .pd-sp-sub { margin-top: 2px; font-size: 10px; color: var(--ref-palette-neutral-1000, #6a6a6a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+    @keyframes pd-sp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    @media (prefers-reduced-motion: reduce) { .pd-sp-seg.is-active { animation: none; } .pd-sp-fill { transition: none; } }
     .pd-q-slow { margin-top: 4px; font-size: 10px; color: var(--ref-palette-neutral-1000, #6a6a6a); font-style: italic; }
     .pd-busy-banner { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--sys-color-primary-dark, #0a5dc2); }
     .pd-range { flex: 1 1 auto; min-width: 90px; accent-color: var(--sys-color-primary-main, #076fe5); }
@@ -1871,6 +2545,185 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   /** The export dock: pinned beneath the scrolling options so the Export
    *  button and the job queue stay visible even with Advanced options
    *  expanded. Shared by service and pagx modes. */
+  /* ---------------------------------------------------------------- */
+  /* live page preview                                                */
+  /* ---------------------------------------------------------------- */
+
+  private previewPageTimer: any = null
+  private previewPageRunning = false
+  private previewPageAgain = false
+  private lastPreviewSig = ''
+
+  /** Everything the page shows that lives in widget state. A change here
+   *  (or a pan/zoom, via the extent watcher) redraws the preview. */
+  pagePreviewSig = (): string => {
+    const s: any = this.state
+    return [s.selectedLayoutId, s.title, s.author, s.copyright, s.includeLegend, s.showGrid, s.showOverview,
+      s.legendPositionOv, s.gridTypeOv, s.naStyle, s.sbStyle, s.sbUnits, s.sbUnits2, s.fontFamily, s.qrOn,
+      s.scaleMode, s.fixedScale, s.locked, s.mapOnly, s.includeSelection, s.outWkid].join('|')
+  }
+
+  queuePagePreview = (): void => {
+    if (!this.state.pagePreviewOn) return
+    if (this.previewPageTimer) clearTimeout(this.previewPageTimer)
+    this.previewPageTimer = setTimeout(() => { void this.runPagePreview() }, 700)
+  }
+
+  /** Options for the preview: the same page-shaping choices the export
+   *  uses, minus anything that only matters to the file (georeference,
+   *  KMZ, custom font files, capture limits). */
+  private buildPreviewOptions = async (view: any): Promise<RenderOptions> => {
+    const options: RenderOptions = {}
+    if (this.state.naStyle) options.northArrowStyle = this.state.naStyle as any
+    if (this.state.sbStyle) options.scaleBarStyle = this.state.sbStyle as any
+    if (this.state.sbUnits) options.scaleBarUnits = this.state.sbUnits as any
+    if (this.state.sbUnits2 && (this.state.sbStyle === 'doubleAlternating' || this.state.sbStyle === 'hollowDouble')) options.scaleBarUnits2 = this.state.sbUnits2 as any
+    const cfgLogo = (this.props.config as any)?.defaultLogo
+    if (cfgLogo) options.defaultLogo = cfgLogo
+    if (this.meEnabled()) {
+      if (this.state.locked && this.lockedCenter && this.lockedScale) {
+        options.scaleMode = 'fixed'; options.fixedScale = this.lockedScale; options.lockedCenter = this.lockedCenter
+      } else {
+        options.scaleMode = this.state.scaleMode as any
+        if (this.state.scaleMode === 'fixed') options.fixedScale = Number(this.state.fixedScale) || undefined
+      }
+    }
+    if (this.state.qrOn) {
+      const qu = this.qrSafeUrl()
+      if (qu) { (options as any).qrUrl = qu; (options as any).qrCaption = (defaultMessages as any).qrCaption || 'Scan for interactive map' }
+    }
+    if (this.state.author) options.author = this.state.author
+    if (this.state.copyright) options.copyright = this.state.copyright
+    if ((this.props.config as any)?.includeAttribution !== false) options.attribution = this.captureAttribution(view)
+    options.includeLegend = this.state.includeLegend
+    options.showOverview = this.state.showOverview
+    options.showGrid = this.state.showGrid
+    if (this.state.legendPositionOv) options.legendPositionOverride = this.state.legendPositionOv
+    if (this.state.gridTypeOv) options.gridTypeOverride = this.state.gridTypeOv
+    if (this.outSREnabled() && parseInt(this.state.outWkid, 10) > 0) options.outputWkid = parseInt(this.state.outWkid, 10)
+    if (this.meMapOnly() && this.state.mapOnly) options.mapOnly = true
+    const family = this.state.fontFamily || (this.props.config as any)?.defaultFontFamily || ''
+    if (family && family.indexOf('custom') !== 0) options.fontFamily = family as any
+    await this.applyTextContext(view, options)
+    // selection outline, in the LIVE view's system (the preview is not reprojected)
+    const out = options.outputWkid
+    delete options.outputWkid
+    try { await this.collectViewDecorations(view, options) } catch (e) { /* no selection */ }
+    if (out) options.outputWkid = out
+    return options
+  }
+
+  runPagePreview = async (): Promise<void> => {
+    if (!this.state.pagePreviewOn || !this.uiVisible) return
+    if (this.previewPageRunning) { this.previewPageAgain = true; return }
+    const view: any = this.state.jimuMapView && this.state.jimuMapView.view
+    const layout = this.getSelectedLayout()
+    if (!view || !layout || this.state.busy || this.printSource() === 'service') return
+    this.previewPageRunning = true
+    this.lastPreviewSig = this.pagePreviewSig()
+    if (!this.state.pagePreviewBusy) this.setState({ pagePreviewBusy: true })
+    try {
+      const options = await this.buildPreviewOptions(view)
+      let rows: any[] = []
+      if (this.state.includeLegend) {
+        try {
+          const dom = findLegendDom(String((this.cfg() as any).legendWidgetId || '') || undefined)
+          if (dom) rows = await harvestLegendDom(dom)
+        } catch (e) { rows = [] }
+      }
+      const r = await renderPagePreview(view, layout, this.state.title || layout.name || 'Map', options, rows, 640)
+      const m: any = defaultMessages
+      const note = String(m.pagePreviewScale || '1:{scale}').replace('{scale}', r.printedScale.toLocaleString()) +
+        (r.notes.length ? ' \u00b7 ' + r.notes.join(' \u00b7 ') : '')
+      this.setState({ pagePreviewUrl: r.dataUrl, pagePreviewNote: note, pagePreviewBusy: false })
+    } catch (e: any) {
+      this.setState({ pagePreviewBusy: false, pagePreviewNote: (defaultMessages as any).pagePreviewFailed })
+    } finally {
+      this.previewPageRunning = false
+      if (this.previewPageAgain) { this.previewPageAgain = false; this.queuePagePreview() }
+    }
+  }
+
+  /** Series panel body for data-driven pages. */
+  renderFeaturePagesPanel = (messages: any): React.ReactNode => {
+    const layers = this.featureLayerList()
+    const entry = this.featEntry()
+    const layer = entry ? entry.layer : null
+    this.ensureFeatLoaded(layer)
+    const fields = this.featFieldList(layer)
+    const cap = this.seriesLimits().max
+    const total = this.featCache ? this.featCache.total : null
+    let estimate: string
+    if (!layers.length) estimate = messages.seriesNoLayer
+    else if (this.state.featLoading || total === null) estimate = messages.seriesFetching
+    else if (total === 0) estimate = messages.seriesNoFeatures
+    else if (total > cap) estimate = String(messages.seriesFeatFound).replace('{n}', String(total))
+    else estimate = String(messages.seriesFeatEstimate).replace('{f}', String(total)).replace('{n}', String(total + 1))
+    return (
+      <React.Fragment>
+        <div className='pd-desc'>{messages.seriesFeatHint}</div>
+        {layers.length > 0 && (
+        <React.Fragment>
+        <div className='pd-row'>
+          <Label className='pd-label' id={this.uid('slayer') + '-lbl'}>{messages.seriesLayer}</Label>
+          <Select size='sm' aria-labelledby={this.uid('slayer') + '-lbl'} value={(entry && entry.id) || ''}
+            onChange={(e: any) => this.setState({ seriesLayerId: e.target.value, seriesNameField: '' })}>
+            {layers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+          </Select>
+        </div>
+        <div className='pd-row'>
+          <Label className='pd-label' id={this.uid('sname') + '-lbl'}>{messages.seriesNameField}</Label>
+          <Select size='sm' aria-labelledby={this.uid('sname') + '-lbl'} value={this.featNameField(layer)}
+            onChange={(e: any) => this.setState({ seriesNameField: e.target.value })}>
+            {fields.map(f => <option key={f.name} value={f.name}>{f.alias}</option>)}
+          </Select>
+          <div className='pd-desc'>{messages.seriesNameHint}</div>
+        </div>
+        <div className='pd-row pd-inline'>
+          <Label className='pd-label' id={this.uid('ssort') + '-lbl'}>{messages.seriesOrder}</Label>
+          <Select size='sm' aria-labelledby={this.uid('ssort') + '-lbl'} value={this.state.seriesSortDesc ? 'desc' : 'asc'} style={{ width: 120 }}
+            onChange={(e: any) => this.setState({ seriesSortDesc: e.target.value === 'desc' })}>
+            <option value='asc'>{messages.seriesOrderAsc}</option>
+            <option value='desc'>{messages.seriesOrderDesc}</option>
+          </Select>
+        </div>
+        <div className='pd-row'>
+          <Label className='pd-label' id={this.uid('sscope') + '-lbl'}>{messages.seriesScope}</Label>
+          <Select size='sm' aria-labelledby={this.uid('sscope') + '-lbl'} value={this.state.seriesScope}
+            onChange={(e: any) => this.setState({ seriesScope: e.target.value }, () => this.updatePreview())}>
+            <option value='view'>{messages.seriesScopeView}</option>
+            <option value='frame'>{messages.seriesScopeFrame}</option>
+            <option value='all'>{messages.seriesScopeAll}</option>
+          </Select>
+          <div className='pd-desc'>{this.state.seriesScope === 'frame' ? messages.seriesScopeFrameHint : this.state.seriesScope === 'all' ? messages.seriesScopeAllHint : messages.seriesScopeViewHint}</div>
+        </div>
+        <div className='pd-row pd-inline'>
+          <Label className='pd-label' id={this.uid('sscale') + '-lbl'}>{messages.seriesPageScale}</Label>
+          <Select size='sm' aria-labelledby={this.uid('sscale') + '-lbl'} value={this.state.seriesScaleMode} style={{ width: 120 }}
+            onChange={(e: any) => this.setState({ seriesScaleMode: e.target.value })}>
+            <option value='fit'>{messages.seriesScaleFit}</option>
+            <option value='fixed'>{messages.seriesScaleFixed}</option>
+          </Select>
+          {this.state.seriesScaleMode === 'fixed'
+            ? (<React.Fragment>
+                <span className='pd-desc'>1:</span>
+                <TextInput size='sm' style={{ width: 90 }} aria-label={messages.seriesScaleFixed}
+                  value={this.state.seriesFixedScale} onChange={(e) => this.setState({ seriesFixedScale: e.target.value })} />
+              </React.Fragment>)
+            : (<React.Fragment>
+                <TextInput size='sm' style={{ width: 56 }} aria-label={messages.seriesMargin}
+                  value={this.state.seriesMargin} onChange={(e) => this.setState({ seriesMargin: e.target.value })} />
+                <span className='pd-desc'>{messages.seriesMargin}</span>
+              </React.Fragment>)}
+        </div>
+        </React.Fragment>
+        )}
+        <div className='pd-desc' role='status' aria-live='polite'>{estimate}</div>
+        {this.renderSeriesLimit(messages)}
+      </React.Fragment>
+    )
+  }
+
   renderExportDock = (messages: any): React.ReactNode => {
     const hasQueue = this.state.busy || !!this.state.error || this.state.results.length > 0
     return (
@@ -1882,7 +2735,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             aria-busy={this.state.busy}
             aria-describedby={!this.state.jimuMapView ? this.uid('export-desc') : undefined}
             disabled={this.state.busy || !this.state.jimuMapView ||
-              (this.state.seriesOpen && this.state.format === 'pdf' && this.seriesPageCount() > 31)}
+              (this.state.seriesOpen && this.state.format === 'pdf' && this.ctrl('series') &&
+                (this.seriesBlocked() || (this.seriesFeatures() && (this.state.featLoading || this.seriesPageCount() === 0))))}
             onClick={this.onExport}
           >
             {this.state.busy
@@ -1896,7 +2750,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           <span id={this.uid('export-desc')} className='pd-sr-only'>{messages.exportNoMap}</span>
         )}
         {this.state.busy && !!this.state.status && (
-          <div className='pd-busy-banner' role='status' aria-live='polite'>{this.state.status}</div>
+          // a map series shows its own progress row (with one live headline)
+          <div className='pd-busy-banner' role='status' aria-live={this.state.seriesStep ? 'off' : 'polite'}>{this.state.status}</div>
         )}
         <div role='alert' aria-live='assertive'>
           {this.state.error && (
@@ -1905,8 +2760,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             </div>
           )}
         </div>
+        {this.state.note && !this.state.busy && (
+          <div className='pd-desc' role='status' aria-live='polite' style={{ marginTop: 6 }}>{this.state.note}</div>
+        )}
         {hasQueue && (
-          <div className='pd-queue' role='status' aria-live='polite'>
+          <div className='pd-queue' role='status' aria-live={this.state.busy ? 'off' : 'polite'}>
             <div className='pd-q-head'>
               <span className='pd-q-title'>
                 {messages.resultsLabel}
@@ -1923,6 +2781,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               {this.state.busy && (() => {
                 const elapsed = Math.max(0, Math.round((Date.now() - this.busyStart) / 1000))
                 const mm = Math.floor(elapsed / 60); const ss = String(elapsed % 60).padStart(2, '0')
+                if (this.state.seriesStep) return this.renderSeriesProgress(this.state.seriesStep, messages, mm + ':' + ss)
                 const m = /page (\d+) of (\d+)/i.exec(this.state.status || '')
                 const frac = m ? Math.min(0.97, (parseInt(m[1], 10) - 1) / (parseInt(m[2], 10) + 1)) : -1
                 return (
@@ -1930,7 +2789,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                     <div className='pd-q-busyline'>
                       <Loading type={LoadingType.Donut} width={14} height={14} />
                       <span className='pd-q-name'>{this.state.status || messages.exporting}</span>
-                      <span className='pd-q-meta'>{mm}:{ss}</span>
+                      <span className='pd-q-meta' aria-hidden='true'>{mm}:{ss}</span>
                     </div>
                     {frac >= 0 && (
                       <div className='pd-q-barwrap' aria-hidden='true'>
@@ -2139,6 +2998,27 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               {layout && <div id={this.uid('layout-desc')} className='pd-desc'>{this.describeLayout(layout)}</div>}
             </div>
 
+            {this.ctrl('pagePreview') && !(this.state.seriesOpen && this.state.format === 'pdf' && this.ctrl('series')) && (
+            <React.Fragment>
+              <div className='pd-row pd-inline'>
+                <Label className='pd-label' id={this.uid('pprev') + '-lbl'}>{messages.pagePreviewLabel}</Label>
+                <Switch aria-labelledby={this.uid('pprev') + '-lbl'} checked={this.state.pagePreviewOn}
+                  onChange={(e: any) => this.setState({ pagePreviewOn: !!(e.target && e.target.checked) }, () => { if (this.state.pagePreviewOn) void this.runPagePreview() })} />
+              </div>
+              {this.state.pagePreviewOn && (
+                <PagePreview
+                  url={this.state.pagePreviewUrl}
+                  busy={this.state.pagePreviewBusy}
+                  note={this.state.pagePreviewNote}
+                  alt={messages.pagePreviewAlt}
+                  loadingText={messages.pagePreviewLoading}
+                  updatingText={messages.pagePreviewUpdating}
+                  aspect={layout ? layout.pageWidthIn / layout.pageHeightIn : 0}
+                  captionId={this.uid('pprev-cap')} />
+              )}
+            </React.Fragment>
+            )}
+
             {this.ctrl('title') && (
             <div className='pd-row'>
               <Label className='pd-label' id={this.uid('title') + '-lbl'}>{messages.titleLabel}</Label>
@@ -2152,6 +3032,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                   aria-label={messages.titleLabel}
                 />
               </Tooltip>
+              {this.renderSeriesTitleHelp(messages, layout)}
             </div>
             )}
 
@@ -2193,6 +3074,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                     </Select>
                   </Tooltip>
                 </div>
+              )}
+              {this.seriesActive() && (
+                <div className='pd-desc'>{this.seriesFeatures() && this.state.seriesScope === 'frame' ? messages.seriesScaleNoteFrame : messages.seriesScaleNote}</div>
               )}
               {this.state.scaleMode === 'fixed' && (
                 <div className='pd-row'>
@@ -2354,6 +3238,16 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               </div>
               {this.state.seriesOpen && (
               <React.Fragment>
+              <div className='pd-row'>
+                <Label className='pd-label' id={this.uid('smode') + '-lbl'}>{messages.seriesMode}</Label>
+                <Select size='sm' aria-labelledby={this.uid('smode') + '-lbl'} value={this.state.seriesMode}
+                  onChange={(e: any) => this.setState({ seriesMode: e.target.value })}>
+                  <option value='grid'>{messages.seriesModeGrid}</option>
+                  <option value='features'>{messages.seriesModeFeatures}</option>
+                </Select>
+              </div>
+              {!this.seriesFeatures() && (
+              <React.Fragment>
               <div className='pd-desc'>{messages.seriesHint}</div>
               <div className='pd-row pd-inline'>
                 <Label className='pd-label' id={this.uid('srows') + '-lbl'}>{messages.seriesRows}</Label>
@@ -2372,10 +3266,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 <span className='pd-desc' style={{ minWidth: 34 }}>{(parseInt(this.state.seriesSizePct, 10) || 100)}%</span>
               </div>
               <div className='pd-desc'>
-                {this.seriesPageCount() > 31
-                  ? messages.seriesTooMany
-                  : messages.seriesEstimate.replace('{n}', String(this.seriesPageCount()))}
+                {messages.seriesEstimate.replace('{n}', String(this.seriesSheetCount() + 1))}
               </div>
+              {this.renderSeriesLimit(messages)}
+              </React.Fragment>
+              )}
+              {this.seriesFeatures() && this.renderFeaturePagesPanel(messages)}
               </React.Fragment>
               )}
             </React.Fragment>

@@ -16,6 +16,7 @@
  */
 import MapView from 'esri/views/MapView'
 import SpatialReference from 'esri/geometry/SpatialReference'
+import Extent from 'esri/geometry/Extent'
 import { metersPerMapUnit, extentFitScale, resolvePrintedScale, printExtent, PrintScaleMode } from './scaleMath'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
 import { loadArcGISJSAPIModules } from 'jimu-arcgis'
@@ -26,6 +27,7 @@ import {
     TextEl, ScaleBarEl, LegendEl, MapFrameEl, PictureEl, NorthArrowEl, LineEl, OverviewConfig, GridConfig, LegendConfig, LegendPatchSize
 } from '../../config'
 import { Drawer, PdfDrawer, CanvasDrawer, SvgDrawer, splitText } from './drawing'
+import { VectorLayerData, vectorEligibility, queryVectorFeatures, drawVectorLayer, drawVectorLabels, pageTransform, LabelBoard, pictureUrls } from './vectorLayers'
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const UPNG = require('upng-js')
@@ -130,9 +132,37 @@ export interface RenderOptions {
     pageNumber?: number
     pageCount?: number
     pageName?: string
+    /** Internal: map series cancel check, asked before each page. */
+    isCancelled?: () => boolean
+    /** Internal: data-driven page attributes for {field:NAME}. */
+    pageFields?: Record<string, string>
+    /** Internal: the data-driven page's own feature, drawn as a distinct
+     *  outline (capture SR). */
+    pageFeatureGeometries?: SelectionGeometry[]
     /** Drop legend entries for layers whose visible scale range excludes the
      *  printed scale (default on). Title-matched; unmatched rows are kept. */
     legendScaleFilter?: boolean
+    /** Drop legend entries for layers with NO features inside the printed
+     *  area (one count query per queryable layer; default off). Title
+     *  matched like the scale filter; layers that cannot be queried, or
+     *  whose query fails or times out, are always kept. */
+    legendExtentFilter?: boolean
+    /** Write GeoPDF coordinates into each PDF map frame (default on). */
+    geoPdf?: boolean
+    /** Draw eligible feature layers as true vectors in PDF / SVG output
+     *  instead of pixels (experimental, default off). */
+    vectorLayers?: boolean
+    /** Internal: layer ids to hide in the capture view (drawn as vectors). */
+    vectorExcludeIds?: string[]
+    /** Internal: queried vector layers, bottom to top. */
+    vectorData?: VectorLayerData[]
+    /** Put each part of the page (map, grid, selection, legend, text...) in
+     *  its own toggleable layer in PDF and SVG output (default on). */
+    pdfLayers?: boolean
+    /** Georeferenced map-only rasters keep the view rotation (rotated world
+     *  file, GeoTIFF ModelTransformationTag, rotated KMZ quad) instead of
+     *  being captured north-up. Default off. */
+    georefKeepRotation?: boolean
     /** Selected feature geometries, in the CAPTURE spatial reference, drawn
      *  as a cased-outline highlight over the map. The capture shares the
      *  live MAP but not the live VIEW, and a selection highlight lives on
@@ -145,6 +175,19 @@ export interface RenderOptions {
 }
 
 export interface RenderProgress { (message: string): void }
+
+/** Structured map series progress: one step per printed page (map sheets,
+ *  then the index page, then any legend pages), plus the final save. `done`
+ *  counts finished steps; `total` can grow once the legend page count is
+ *  known. `page` is the 1-based sheet being worked on (0 when not a sheet). */
+export interface SeriesStep {
+    done: number
+    total: number
+    kind: 'prep' | 'sheet' | 'index' | 'legend' | 'save'
+    page: number
+    pageCount: number
+    name?: string
+}
 
 export interface RenderResult {
     fileName: string
@@ -230,6 +273,9 @@ export interface TextTokens {
     pageNumber?: number
     pageCount?: number
     pageName?: string
+    /** Data-driven page: the page feature's formatted attributes, for
+     *  {field:NAME} (matched case-insensitively). */
+    fields?: Record<string, string>
     /** Clock used for {date}/{time}; defaults to now (injectable for tests). */
     now?: Date
 }
@@ -503,16 +549,28 @@ function strokeClippedPath (
  *  many geometries landed inside the frame. Pure/exported for tests. */
 export function drawSelectionOverlay (
     d: Drawer,
-    cap: { groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number } },
+    cap: { groundExtent?: { xmin: number, ymin: number, xmax: number, ymax: number }, affine?: GroundAffine, widthPx?: number, heightPx?: number, rotation?: number },
     mf: { xIn: number, yIn: number, wIn: number, hIn: number },
     geoms: SelectionGeometry[],
     color: [number, number, number] = [0, 255, 255],
     widthPt = 2
 ): number {
-    const ext = cap.groundExtent
-    if (!ext || !geoms || !geoms.length) return 0
-    if (!(ext.xmax > ext.xmin) || !(ext.ymax > ext.ymin)) return 0
-    const { px, py } = groundToPage(ext, mf)
+    if (!geoms || !geoms.length) return 0
+    let px: (x: number) => number
+    let py: (y: number) => number
+    // a rotated capture maps through its pixel affine (x and y both depend
+    // on both ground coordinates), so map points, not axes
+    let T: ((x: number, y: number) => [number, number]) | null = null
+    if (cap.rotation && cap.affine) T = pageTransform(cap as any, mf)
+    if (T) {
+        px = () => 0; py = () => 0
+    } else {
+        const ext = cap.groundExtent
+        if (!ext || !(ext.xmax > ext.xmin) || !(ext.ymax > ext.ymin)) return 0
+        const g2p = groundToPage(ext, mf)
+        px = g2p.px; py = g2p.py
+    }
+    const P = (p: number[]): [number, number] => T ? T(p[0], p[1]) : [px(p[0]), py(p[1])]
     const box = { x: mf.xIn * PT_PER_IN, y: mf.yIn * PT_PER_IN, w: mf.wIn * PT_PER_IN, h: mf.hIn * PT_PER_IN }
     let drawn = 0
 
@@ -526,16 +584,16 @@ export function drawSelectionOverlay (
         for (const g of geoms) {
             if (g.kind === 'polygon' && g.rings) {
                 for (const ring of g.rings) {
-                    strokeClippedPath(d, ring.map(p => [px(p[0]), py(p[1])] as [number, number]), box, true)
+                    strokeClippedPath(d, ring.map(p => P(p)), box, true)
                 }
                 if (pass === 1) drawn++
             } else if (g.kind === 'polyline' && g.paths) {
                 for (const path of g.paths) {
-                    strokeClippedPath(d, path.map(p => [px(p[0]), py(p[1])] as [number, number]), box, false)
+                    strokeClippedPath(d, path.map(p => P(p)), box, false)
                 }
                 if (pass === 1) drawn++
             } else if (g.kind === 'point' && typeof g.x === 'number' && typeof g.y === 'number') {
-                const cx = px(g.x); const cy = py(g.y)
+                const pc = P([g.x, g.y]); const cx = pc[0]; const cy = pc[1]
                 if (cx >= box.x && cx <= box.x + box.w && cy >= box.y && cy <= box.y + box.h) {
                     d.circle(cx, cy, 5 + (pass === 0 ? 0.8 : 0), 'S')
                     if (pass === 1) drawn++
@@ -721,6 +779,14 @@ export function resolveToken (name: string, tk: TextTokens): string | null {
         case 'pageWidth': return tk.pageWidthIn ? String(Math.round(tk.pageWidthIn * 100) / 100) : ''
         case 'pageHeight': return tk.pageHeightIn ? String(Math.round(tk.pageHeightIn * 100) / 100) : ''
         case 'pageUnits': return tk.pageWidthIn ? 'Inches' : ''
+        case 'field': {
+            // page feature attribute; empty (so emptyStr applies) when the
+            // page has no feature or the field is missing
+            const want = parts.slice(1).join(':').trim().toLowerCase()
+            const f = tk.fields || {}
+            for (const k of Object.keys(f)) if (k.toLowerCase() === want) return f[k] == null ? '' : String(f[k])
+            return ''
+        }
         case 'pageNumber': return String(tk.pageNumber || 1)
         case 'pageCount': return String(tk.pageCount || 1)
         case 'pageName': return tk.pageName || String(tk.pageNumber || 1)
@@ -865,26 +931,290 @@ export function worldFileText (
     return [c.A, c.D, c.B, c.E, c.C, c.F].map(fmt).join('\n') + '\n'
 }
 
+/* ---- pixel-to-ground affine (north-up AND rotated captures) ---- */
+
+/** Pixel-EDGE affine transform of a raster: ground X = a*col + b*row + c and
+ *  Y = d*col + e*row + f, where (col, row) = (0, 0) is the top-left CORNER
+ *  of the raster and (W, H) its bottom-right corner. North-up rasters have
+ *  b = d = 0. Pure/exported. */
+export interface GroundAffine { a: number, b: number, c: number, d: number, e: number, f: number }
+
+/** Affine for a north-up raster of W x H pixels covering `ext` exactly. */
+export function affineFromExtent (
+    W: number, H: number,
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number }
+): GroundAffine {
+    return {
+        a: (ext.xmax - ext.xmin) / W, b: 0, c: ext.xmin,
+        d: 0, e: -(ext.ymax - ext.ymin) / H, f: ext.ymax
+    }
+}
+
+/** Affine for a W x H capture centred on (cx, cy) at `res` ground units per
+ *  pixel, with MapView rotation `rotationDeg` (the SDK's clockwise rotation
+ *  of north relative to the top of the view: at 90, north points right).
+ *  Screen right is ground (cos t, sin t) and screen down is (sin t, -cos t).
+ *  Pure/exported. */
+export function affineFromCenter (
+    W: number, H: number, cx: number, cy: number, res: number, rotationDeg: number
+): GroundAffine {
+    const t = (Number(rotationDeg) || 0) * Math.PI / 180
+    const cs = Math.cos(t), sn = Math.sin(t)
+    const a = res * cs, b = res * sn, d = res * sn, e = -res * cs
+    return { a, b, c: cx - a * W / 2 - b * H / 2, d, e, f: cy - d * W / 2 - e * H / 2 }
+}
+
+export function affineApply (aff: GroundAffine, col: number, row: number): [number, number] {
+    return [aff.a * col + aff.b * row + aff.c, aff.d * col + aff.e * row + aff.f]
+}
+
+/** True when the transform has no rotation term (world-file B/D are 0). */
+export function affineIsNorthUp (aff: GroundAffine): boolean {
+    const s = Math.max(Math.abs(aff.a), Math.abs(aff.e), 1e-300)
+    return Math.abs(aff.b) <= s * 1e-9 && Math.abs(aff.d) <= s * 1e-9
+}
+
+/** Re-express an affine for the same ground footprint at a different pixel
+ *  size (the page raster can be encoded at a different DPI than the
+ *  capture). Pure/exported. */
+export function affineRescale (aff: GroundAffine, fromW: number, fromH: number, toW: number, toH: number): GroundAffine {
+    const kx = fromW / toW, ky = fromH / toH
+    return { a: aff.a * kx, b: aff.b * ky, c: aff.c, d: aff.d * kx, e: aff.e * ky, f: aff.f }
+}
+
+export interface GroundCorners {
+    ul: [number, number]
+    ur: [number, number]
+    lr: [number, number]
+    ll: [number, number]
+}
+
+/** Ground coordinates of the four raster corners. */
+export function affineCorners (aff: GroundAffine, W: number, H: number): GroundCorners {
+    return {
+        ul: affineApply(aff, 0, 0), ur: affineApply(aff, W, 0),
+        lr: affineApply(aff, W, H), ll: affineApply(aff, 0, H)
+    }
+}
+
+/** Axis-aligned bounds of the raster footprint (the rotated rectangle's
+ *  envelope). */
+export function affineBounds (aff: GroundAffine, W: number, H: number): { xmin: number, ymin: number, xmax: number, ymax: number } {
+    const c = affineCorners(aff, W, H)
+    const xs = [c.ul[0], c.ur[0], c.lr[0], c.ll[0]]
+    const ys = [c.ul[1], c.ur[1], c.lr[1], c.ll[1]]
+    return { xmin: Math.min(...xs), ymin: Math.min(...ys), xmax: Math.max(...xs), ymax: Math.max(...ys) }
+}
+
+/** ESRI world file (A, D, B, E, C, F) from an affine: A/D are the x/y step
+ *  per column, B/E per row, C/F the centre of the top-left pixel. Rotation
+ *  terms are written as-is, so a rotated map georeferences in Pro, QGIS and
+ *  GDAL without resampling. Pure/exported. */
+export function worldFileTextAffine (aff: GroundAffine): string {
+    const fmt = (n: number): string => {
+        const s = n.toFixed(Math.abs(n) < 1 ? 12 : 8)
+        return s.replace(/0+$/, '').replace(/\.$/, '.0')
+    }
+    const [C, F] = affineApply(aff, 0.5, 0.5)
+    return [aff.a, aff.d, aff.b, aff.e, C, F].map(v => fmt(Math.abs(v) < 1e-15 ? 0 : v)).join('\n') + '\n'
+}
+
 /** Write the world file (and, when WKT is known, a .prj) beside a raster
- *  export. Best-effort: any failure is swallowed so the raster still
- *  downloads. Returns the world-file name written, or null. */
+ *  export. `aff` must already be in the OUTPUT raster's pixel units.
+ *  Best-effort: any failure is swallowed so the raster still downloads.
+ *  Returns the world-file name written, or null. */
 function emitGeoSidecars (
     baseName: string, format: string,
-    W: number, H: number,
-    ext: { xmin: number, ymin: number, xmax: number, ymax: number },
+    aff: GroundAffine,
     wkt?: string
 ): string | null {
     try {
         const ext3 = worldFileExt(format)
-        if (!ext3 || !(W > 0) || !(H > 0) || !(ext.xmax > ext.xmin) || !(ext.ymax > ext.ymin)) return null
+        if (!ext3 || !(Math.abs(aff.a) + Math.abs(aff.b) > 0) || !(Math.abs(aff.d) + Math.abs(aff.e) > 0)) return null
         const stem = baseName.replace(/\.[^.]+$/, '')
-        const wf = worldFileText(W, H, ext)
+        const wf = worldFileTextAffine(aff)
         downloadBlob(new Blob([wf], { type: 'text/plain' }), stem + '.' + ext3)
         if (wkt && wkt.trim()) {
             downloadBlob(new Blob([wkt.trim() + '\n'], { type: 'text/plain' }), stem + '.prj')
         }
         return stem + '.' + ext3
     } catch (e) { return null }
+}
+
+/* ------------------------------------------------------------------ */
+/* GeoPDF (ISO 32000 geospatial Measure dictionary)                     */
+/* ------------------------------------------------------------------ */
+
+/* A GeoPDF here is an ordinary PDF whose page dictionary carries a /VP
+ * (viewport) array. Each viewport ties a rectangle of the page (the map
+ * frame) to the ground through a /Measure /GEO dictionary: four control
+ * points given both as unit-square positions inside the rectangle (/LPTS)
+ * and as latitude/longitude (/GPTS), plus the coordinate system (/GCS) as
+ * an EPSG code and/or WKT. This is the Adobe geospatial extension adopted
+ * into ISO 32000-2, read by Avenza Maps (blue dot), Acrobat's Geospatial
+ * Location tool, GDAL/QGIS and ArcGIS Pro. No dependency: the dictionary
+ * is plain text written into the page object through jsPDF's putPage hook. */
+
+/** PDF literal string, escaped. Non-printable and non-ASCII characters are
+ *  dropped (WKT and viewport names are ASCII in practice). Pure/exported. */
+export function pdfLiteral (s: string): string {
+    return '(' + String(s == null ? '' : s)
+        .replace(/[^\x20-\x7e]/g, '')
+        .replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)') + ')'
+}
+
+/** A WKID that is also a real EPSG coordinate system code (EPSG CRS codes
+ *  sit below 32768; Esri-authority codes such as 102100 do not). */
+export function isEpsgCrsCode (wkid: number): boolean {
+    const w = Math.round(Number(wkid) || 0)
+    return w >= 2000 && w < 32768
+}
+
+export interface GeoPdfSpec {
+    /** Map frame in PDF user space (points, origin BOTTOM-left): x1 y1 x2 y2. */
+    bboxPt: [number, number, number, number]
+    /** Frame corners as [lon, lat] in the geographic system of the GCS. */
+    corners: { ll: [number, number], ul: [number, number], ur: [number, number], lr: [number, number] }
+    wkid?: number
+    wkt?: string | null
+    geographic?: boolean
+    /** Preferred linear display unit. */
+    linearUnit?: 'M' | 'FT'
+    name?: string
+}
+
+/** Build one /Viewport dictionary. Pure/exported for tests. */
+export function buildGeoPdfViewport (spec: GeoPdfSpec): string {
+    const num = (v: number, dp: number): string => {
+        const t = (Math.abs(v) < 1e-15 ? 0 : v).toFixed(dp)
+        return t.indexOf('.') >= 0 ? t.replace(/0+$/, '').replace(/\.$/, '') : t
+    }
+    const [x1, y1, x2, y2] = spec.bboxPt
+    const wkid = canonicalWkid(Math.round(Number(spec.wkid) || 0))
+    const wkt = looksLikeWkt(spec.wkt || '') ? String(spec.wkt).trim() : ''
+    const wktGeo = wkt ? isGeographicWkt(wkt) : undefined
+    const geographic = typeof wktGeo === 'boolean' ? wktGeo : !!spec.geographic
+    const parts: string[] = []
+    if (wkt) parts.push('/WKT ' + pdfLiteral(wkt))
+    if (isEpsgCrsCode(wkid)) parts.push('/EPSG ' + wkid)
+    let gcs: string
+    if (parts.length) {
+        gcs = '<< /Type /' + (geographic ? 'GEOGCS' : 'PROJCS') + ' ' + parts.join(' ') + ' >>'
+    } else {
+        // Coordinate system unknown: fall back to WGS84 lat/long. The GPTS
+        // are lat/long anyway, so positions stay right; only the displayed
+        // coordinate system differs from the map's.
+        gcs = '<< /Type /GEOGCS /EPSG 4326 /WKT ' + pdfLiteral(KNOWN_ESRI_WKT[4326]) + ' >>'
+    }
+    const c = spec.corners
+    // GPTS pairs are LATITUDE then LONGITUDE, in the same order as LPTS
+    const gpts = [c.ll, c.ul, c.ur, c.lr].map(p => num(p[1], 10) + ' ' + num(p[0], 10)).join(' ')
+    const unit = spec.linearUnit === 'FT' ? '/FT' : '/M'
+    const area = spec.linearUnit === 'FT' ? '/SQFT' : '/SQM'
+    return '<< /Type /Viewport /Name ' + pdfLiteral(spec.name || 'Map') +
+        ' /BBox [' + [x1, y1, x2, y2].map(v => num(v, 4)).join(' ') + ']' +
+        ' /Measure << /Type /Measure /Subtype /GEO' +
+        ' /Bounds [0 0 0 1 1 1 1 0]' +
+        ' /GPTS [' + gpts + ']' +
+        ' /LPTS [0 0 0 1 1 1 1 0]' +
+        ' /GCS ' + gcs +
+        ' /PDU [' + unit + ' ' + area + ' /DEG] >> >>'
+}
+
+/** Declare PDF 1.7 when the document uses geospatial or optional-content
+ *  features (jsPDF writes 1.3 by default; both features postdate it). */
+function markPdf17 (doc: any): void {
+    try {
+        const p = doc && doc.__private__
+        if (p && typeof p.setPdfVersion === 'function') p.setPdfVersion('1.7')
+    } catch (e) { /* header stays 1.3; readers accept the features anyway */ }
+}
+
+/** Hook a jsPDF document so chosen pages get a /VP array. Returns the
+ *  function that queues a viewport for a page number, or null when this
+ *  jsPDF build exposes no putPage hook (the PDF is then written plain). */
+export function installGeoPdfWriter (doc: any): ((pageNumber: number, viewport: string) => void) | null {
+    try {
+        const internal = doc && doc.internal
+        const ev = internal && internal.events
+        if (!ev || typeof ev.subscribe !== 'function' || typeof internal.write !== 'function') return null
+        const byPage = new Map<number, string[]>()
+        ev.subscribe('putPage', (data: any) => {
+            const list = data ? byPage.get(Number(data.pageNumber)) : undefined
+            if (list && list.length) internal.write('/VP [' + list.join(' ') + ']')
+        })
+        return (pageNumber: number, viewport: string): void => {
+            const list = byPage.get(pageNumber) || []
+            list.push(viewport)
+            byPage.set(pageNumber, list)
+        }
+    } catch (e) { return null }
+}
+
+/** Project ground points (capture SR) to WGS84 [lon, lat]. Web Mercator
+ *  and WGS84 are closed-form; anything else goes through the SDK
+ *  projection engine WITHOUT a datum transformation, so for NAD83-based
+ *  systems the numbers are NAD83 lat/long, which is exactly what a GeoPDF
+ *  GCS on that datum expects. Null when any point cannot be resolved. */
+export async function groundPointsToWgs84 (
+    pts: Array<[number, number]>,
+    projection: 'webMercator' | 'geographic' | 'projected' | undefined,
+    capWkid: number
+): Promise<Array<[number, number]> | null> {
+    if (!pts.length) return []
+    if (projection === 'geographic') return pts.map(p => [p[0], p[1]] as [number, number])
+    if (projection === 'webMercator') return pts.map(p => [mercXToLon(p[0]), mercYToLat(p[1])] as [number, number])
+    if (!(capWkid > 0)) return null
+    const projector = await getProjector()
+    if (!projector) return null
+    const PointCls: any = projector.Point
+    const capSR = new SpatialReference({ wkid: capWkid })
+    const wgs = new SpatialReference({ wkid: 4326 })
+    const out: Array<[number, number]> = []
+    for (const p of pts) {
+        try {
+            const r: any = projector.project(new PointCls({ x: p[0], y: p[1], spatialReference: capSR }), wgs)
+            if (!r || !isFinite(r.x) || !isFinite(r.y)) return null
+            out.push([r.x, r.y])
+        } catch (e) { return null }
+    }
+    return out
+}
+
+/** Queue the GeoPDF viewport for one page's map frame. Best-effort: returns
+ *  false (and the page stays a plain PDF) whenever the capture has no
+ *  transform or the corners cannot be placed on the globe. */
+export async function addGeoPdfViewport (
+    put: ((pageNumber: number, viewport: string) => void) | null,
+    pageNumber: number,
+    pageHPt: number,
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number },
+    cap: CaptureResult,
+    opts: RenderOptions
+): Promise<boolean> {
+    try {
+        if (!put || !cap.affine || !(cap.widthPx > 0) || !(cap.heightPx > 0)) return false
+        const g = affineCorners(cap.affine, cap.widthPx, cap.heightPx)
+        const ll = await groundPointsToWgs84([g.ll, g.ul, g.ur, g.lr], cap.projection, cap.wkid || 0)
+        if (!ll || ll.length !== 4) return false
+        if (ll.some(p => Math.abs(p[1]) > 90 || Math.abs(p[0]) > 540)) return false
+        const x1 = mf.xIn * PT_PER_IN
+        const x2 = (mf.xIn + mf.wIn) * PT_PER_IN
+        const y1 = pageHPt - (mf.yIn + mf.hIn) * PT_PER_IN
+        const y2 = pageHPt - mf.yIn * PT_PER_IN
+        const wkt = opts.srWkt || opts.georefWkt || null
+        const unitText = String(opts.srUnit || '') + ' ' + String(wkt || '').slice(-120)
+        put(pageNumber, buildGeoPdfViewport({
+            bboxPt: [x1, y1, x2, y2],
+            corners: { ll: ll[0], ul: ll[1], ur: ll[2], lr: ll[3] },
+            wkid: cap.wkid,
+            wkt,
+            geographic: cap.projection === 'geographic',
+            linearUnit: /foot|feet/i.test(unitText) ? 'FT' : 'M',
+            name: 'Map'
+        }))
+        return true
+    } catch (e) { return false }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1105,7 +1435,7 @@ function dataUrlToBytes(dataUrl: string) {
 /* offscreen high-resolution map capture                               */
 /* ------------------------------------------------------------------ */
 
-interface CaptureResult {
+export interface CaptureResult {
     dataUrl: string
     widthPx: number
     heightPx: number
@@ -1127,6 +1457,14 @@ interface CaptureResult {
     wkid?: number
     /** Capture center in the capture SR (dynamic text {coord:center...}). */
     center?: { x: number, y: number }
+    /** Pixel-to-ground transform of the capture (capture pixels, capture
+     *  SR). Present for rotated captures too, which is what lets a rotated
+     *  map carry GeoPDF coordinates, a rotated world file, or a GeoTIFF
+     *  ModelTransformationTag. */
+    affine?: GroundAffine
+    /** Layer ids actually hidden in the capture view, so they are drawn as
+     *  vectors (never twice, never zero times). */
+    vectorHidden?: string[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -1413,6 +1751,65 @@ export function drawSeriesPageNumber(
  *  the frame aspect and the printed scale stays uniform. Corner-overlay
  *  legends keep the previous behavior (page 1 only); 'secondPage'
  *  appends dedicated legend pages after the index, as single map does. */
+/** One page of a map series. Grid series use one scale for every page;
+ *  data-driven pages carry their own scale, name, attribute values and the
+ *  page feature's geometry (view SR). */
+export interface SeriesPageTile {
+    page: number
+    row: number
+    col: number
+    xmin: number
+    ymin: number
+    xmax: number
+    ymax: number
+    centerX: number
+    centerY: number
+    scale?: number
+    name?: string
+    fields?: Record<string, string>
+    geoms?: SelectionGeometry[]
+}
+
+/** Series vectors, step 1 (before a sheet's capture): plan the sheet and
+ *  mark the layers to hide. Returns null when vectors are off. */
+async function planSeriesVectors (
+    view: MapView, fw: number, fh: number, layout: PrintLayout, opts: RenderOptions, onProgress: RenderProgress
+): Promise<{ data: VectorLayerData[], raster: Array<{ title: string, reason: string }> } | null> {
+    if (opts.vectorLayers !== true) return null
+    const plan = await planVectorLayers(view, fw, fh, layout, { ...opts, _quietVector: true } as any, onProgress)
+    opts.vectorExcludeIds = plan.data.length ? plan.data.map(v => v.id) : undefined
+    return plan
+}
+
+/** Series vectors, step 2 (after the capture): draw only what the capture
+ *  really hid, and collect every raster fallback once for the warning. */
+function finishSeriesVectors (
+    plan: { data: VectorLayerData[], raster: Array<{ title: string, reason: string }> } | null,
+    cap: CaptureResult, opts: RenderOptions, raster: Map<string, string>
+): void {
+    if (!plan) return
+    const hidden = new Set(cap.vectorHidden || [])
+    opts.vectorData = plan.data.filter(v => hidden.has(v.id))
+    for (const v of plan.data) if (!hidden.has(v.id)) raster.set(v.title, 'could not be hidden in the capture')
+    for (const r of plan.raster) if (!raster.has(r.title)) raster.set(r.title, r.reason)
+}
+
+/** Title text for one series page: {page} {pages} {pageName} and
+ *  {field:NAME}. Pure/exported. */
+export function seriesPageTitle (title: string, i: number, n: number, t: { name?: string, fields?: Record<string, string> }, features: boolean): string {
+    const raw = String(title || '')
+    const hasPageTok = /\{page\}|\{pageName\}|\{field:[^}]*\}/.test(raw)
+    let out = raw
+        .replace(/\{page\}/g, String(i + 1))
+        .replace(/\{pages\}/g, String(n))
+        .replace(/\{pageName\}/g, String(t.name || ''))
+        .replace(/\{field:([^}]*)\}/g, (_m, f: string) => resolveToken('field:' + f, { title: '', printedScale: 0, fields: t.fields }) || '')
+    if (!hasPageTok) {
+        out += features && t.name ? '  (' + t.name + ')' : '  (' + (i + 1) + ' of ' + n + ')'
+    }
+    return out
+}
+
 export async function renderSeries(
     view: MapView,
     layout: PrintLayout,
@@ -1420,21 +1817,28 @@ export async function renderSeries(
     fileName: string,
     maxImagePx: number,
     series: {
-        tiles: Array<{ page: number, row: number, col: number, xmin: number, ymin: number, xmax: number, ymax: number, centerX: number, centerY: number }>,
+        tiles: SeriesPageTile[],
         scaleDenom: number,
+        /** 'features' = data-driven pages: per-page scale, no neighbor
+         *  arrows or key map (the pages do not form a grid). */
+        kind?: 'grid' | 'features',
         /** Regenerate tiles for the EFFECTIVE map frame (inches). Called
          *  once the legend panel (if any) has resized the frame, so the
          *  grid the pages print always matches the frame they print in. */
         retile?: (frameWIn: number, frameHIn: number) => {
-            tiles: Array<{ page: number, row: number, col: number, xmin: number, ymin: number, xmax: number, ymax: number, centerX: number, centerY: number }>,
+            tiles: SeriesPageTile[],
             scaleDenom: number
         }
     },
     options: RenderOptions,
-    onProgress: RenderProgress
+    onProgress: RenderProgress,
+    onStep?: (step: SeriesStep) => void
 ): Promise<{ url: string, fileName: string, sizeKb: number, pages: number, warning?: string }> {
     let tiles = series.tiles || []
     if (!tiles.length) throw new Error('Map series has no pages. Adjust the area or scale.')
+    const checkCancel = (): void => {
+        if (options.isCancelled && options.isCancelled()) throw new Error('SERIES_CANCELLED')
+    }
     let scaleDenom = series.scaleDenom
     // per-export legend position override, exactly as renderLayout applies it
     let useLayout: PrintLayout = layout
@@ -1450,6 +1854,11 @@ export async function renderSeries(
         compress: true
     })
     const pd = new PdfDrawer(doc)
+    // GeoPDF: every map sheet and the index page carry their own viewport
+    const putGeo = options.geoPdf !== false ? installGeoPdfWriter(doc) : null
+    let geoPages = 0
+    const layered = options.pdfLayers !== false && pd.enableLayers()
+    if (putGeo || layered) markPdf17(doc)
     pd.setFontFamily(options.fontFamily || 'sans')
     if (options.customFont) {
         await registerPdfFont(doc, options.customFont.name, options.customFont.url, options.customFont.boldUrl)
@@ -1464,12 +1873,25 @@ export async function renderSeries(
     if (wantLegend) {
         try {
             legendRows = await buildLegendRows(view as any, 200, onProgress, (options as any).legendWidgetId)
+            checkCancel()
             // every series page prints at one uniform scale: drop layers
             // that do not draw at it (they would be legend-only ghosts)
-            if (options.legendScaleFilter !== false && scaleDenom > 0) {
+            if (options.legendScaleFilter !== false && scaleDenom > 0 && series.kind !== 'features') {
                 const before = legendRows.length
                 legendRows = filterLegendRowsByScale(legendRows, collectLayerScaleRanges(view as any), scaleDenom)
                 if (legendRows.length < before) onProgress('Legend: hid ' + (before - legendRows.length) + ' row(s) not drawn at 1:' + Math.round(scaleDenom).toLocaleString() + '.')
+            }
+            // one legend serves every sheet: judge "in the print area" against
+            // the whole series envelope, so a layer on any page stays listed
+            if (options.legendExtentFilter === true && tiles.length) {
+                let exmin = Infinity; let eymin = Infinity; let exmax = -Infinity; let eymax = -Infinity
+                for (const t of tiles) {
+                    exmin = Math.min(exmin, t.xmin); eymin = Math.min(eymin, t.ymin)
+                    exmax = Math.max(exmax, t.xmax); eymax = Math.max(eymax, t.ymax)
+                }
+                if (isFinite(exmin) && exmax > exmin && eymax > eymin) {
+                    legendRows = await applyLegendExtentFilter(view as any, legendRows, { xmin: exmin, ymin: eymin, xmax: exmax, ymax: eymax }, onProgress)
+                }
             }
         } catch (e) { legendRows = [] }
     }
@@ -1531,42 +1953,89 @@ export async function renderSeries(
         } catch (e) { /* keep the provided tiles */ }
     }
     const warnings: string[] = []
+    const vectorRaster = new Map<string, string>()
     const n = tiles.length
     // Panel and pagx-authored legends are page furniture: every sheet gets
     // them, like ArcGIS Pro map series. Corner overlays cover map content,
     // so they keep the page-1-only behavior.
-    const rowsForPage = (i: number): LegendRow[] =>
-        (panelPlacement || hasLegendEl) ? legendRows : (i === 0 && !legendSecondPage ? legendRows : [])
+    const isFeatures = series.kind === 'features'
+    // data-driven pages print at their own scales: judge the scale filter
+    // page by page instead of once for the whole series
+    const pageRanges = isFeatures && options.legendScaleFilter !== false
+        ? (() => { try { return collectLayerScaleRanges(view as any) } catch (e) { return [] } })()
+        : []
+    const rowsForPage = (i: number): LegendRow[] => {
+        const base = (panelPlacement || hasLegendEl) ? legendRows : (i === 0 && !legendSecondPage ? legendRows : [])
+        const sc = Number(tiles[i] && tiles[i].scale) || 0
+        return base.length && pageRanges.length && sc > 0 ? filterLegendRowsByScale(base, pageRanges, sc) : base
+    }
+    // sheets + index page + save; legend pages join once they are counted
+    let stepTotal = n + 2
+    const step = (st: SeriesStep): void => { if (onStep) { try { onStep(st) } catch (e) { /* UI only */ } } }
     for (let i = 0; i < n; i++) {
+        checkCancel()
         const t = tiles[i]
         onProgress('Exporting page ' + (i + 1) + ' of ' + n + '\u2026')
+        step({ done: i, total: stepTotal, kind: 'sheet', page: i + 1, pageCount: n, name: t.name ? String(t.name) : undefined })
         const tileOpts: RenderOptions = {
             ...options,
             scaleMode: 'fixed' as any,
-            fixedScale: scaleDenom,
+            fixedScale: Number(t.scale) > 0 ? Number(t.scale) : scaleDenom,
             lockedCenter: { x: t.centerX, y: t.centerY } as any,
             includeLegend: rowsForPage(i).length ? options.includeLegend : false,
             // Pro map-series page tokens: {pageNumber} {pageCount} {pageName}
             pageNumber: i + 1,
             pageCount: n,
-            pageName: String((t as any).page || (i + 1))
+            pageName: t.name ? String(t.name) : String((t as any).page || (i + 1)),
+            pageFields: t.fields,
+            pageFeatureGeometries: t.geoms && t.geoms.length ? t.geoms : undefined
         }
+        // vector feature layers: planned per sheet (each sheet has its own
+        // extent and scale), hidden in that sheet's capture, drawn on top
+        const tilePlan = await planSeriesVectors(view, mf0.wIn, mf0.hIn, useLayout, tileOpts, onProgress)
         const cap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, useLayout, maxImagePx, tileOpts, onProgress)
+        finishSeriesVectors(tilePlan, cap, tileOpts, vectorRaster)
         if (cap.warning && warnings.indexOf(cap.warning) < 0) warnings.push(cap.warning)
+        // data-driven pages: a locator overview per page (centered on that
+        // page's feature) when the layout has one and it is switched on.
+        // Grid series keep their key map instead.
+        let pageOpts: RenderOptions = tileOpts
+        const ovCfgS: any = (useLayout as any).overview
+        checkCancel()
+        if (isFeatures && ovCfgS && ovCfgS.enabled && options.showOverview !== false && !(options as any).mapOnly) {
+            try {
+                const box = overviewBoxIn(mf0, ovCfgS)
+                const mult = Number(ovCfgS.scaleMultiplier) > 0 ? Number(ovCfgS.scaleMultiplier) : 10
+                const ovScale = Number(ovCfgS.fixedScale) > 0 ? Number(ovCfgS.fixedScale) : cap.printedScale * mult
+                onProgress('Rendering overview map for page ' + (i + 1) + '\u2026')
+                const ovCap = await captureMapHiRes(
+                    view, box.wIn, box.hIn,
+                    { ...useLayout, dpi: Math.min(useLayout.dpi || 96, 150) },
+                    Math.min(maxImagePx || 2048, 2048),
+                    { ...tileOpts, maxWaitMs: 15000, scaleMode: 'fixed' as any, fixedScale: ovScale, lockedCenter: { x: t.centerX, y: t.centerY } as any, vectorExcludeIds: undefined },
+                    onProgress)
+                pageOpts = { ...tileOpts, overview: { cap: ovCap, box, indicator: overviewIndicatorIn(box, mf0.wIn, mf0.hIn, cap.printedScale, ovScale), cfg: ovCfgS } } as any
+            } catch (e) { /* the page prints without its overview */ }
+        }
         if (i > 0) doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
-        const pageTitle = (title || useLayout.name || 'Map')
-            .replace(/\{page\}/g, String(i + 1))
-            .replace(/\{pages\}/g, String(n)) +
-            (/\{page\}/.test(title || '') ? '' : '  (' + (i + 1) + ' of ' + n + ')')
-        await composePage(pd, useLayout, cap, rowsForPage(i), pageTitle, tileOpts)
-        drawSeriesAdjacency(pd, useLayout, t as any, tiles as any, options.legendBox ? [options.legendBox] : undefined)
-        drawSeriesKeymap(pd, useLayout, tiles as any, t.page)
+        const pageTitle = seriesPageTitle(title || useLayout.name || 'Map', i, n, t, isFeatures)
+        await composePage(pd, useLayout, cap, rowsForPage(i), pageTitle, pageOpts)
+        if (putGeo && await addGeoPdfViewport(putGeo, i + 1, pageH, mf0, cap, tileOpts)) geoPages++
+        pd.beginLayer(PAGE_LAYERS.series)
+        if (!isFeatures) {
+            drawSeriesAdjacency(pd, useLayout, t as any, tiles as any, options.legendBox ? [options.legendBox] : undefined)
+            drawSeriesKeymap(pd, useLayout, tiles as any, t.page)
+        }
         drawSeriesPageNumber(pd, useLayout, i + 1, n, options.legendPanelOuter)
+        pd.endLayer()
+        step({ done: i + 1, total: stepTotal, kind: 'sheet', page: i + 1, pageCount: n, name: t.name ? String(t.name) : undefined })
     }
     // index page: the whole series envelope with tile outlines and numbers.
     // It uses the same effective frame (and legend panel, when active) as
     // every other page, so the document composes uniformly end to end.
+    checkCancel()
     onProgress('Creating index page\u2026')
+    step({ done: n, total: stepTotal, kind: 'index', page: 0, pageCount: n })
     let xmin = Infinity; let ymin = Infinity; let xmax = -Infinity; let ymax = -Infinity
     for (const t of tiles) { xmin = Math.min(xmin, t.xmin); ymin = Math.min(ymin, t.ymin); xmax = Math.max(xmax, t.xmax); ymax = Math.max(ymax, t.ymax) }
     const padX = (xmax - xmin) * 0.05; const padY = (ymax - ymin) * 0.05
@@ -1586,6 +2055,7 @@ export async function renderSeries(
         // give tiles a generous settle budget, and if the capture still comes
         // back blank white, wait for the basemap and try once more
         ; (idxOpts as any).maxWaitMs = Math.max(Number((idxOpts as any).maxWaitMs) || 0, 45000)
+    const idxPlan = await planSeriesVectors(view, mf0.wIn, mf0.hIn, useLayout, idxOpts, onProgress)
     let idxCap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, useLayout, maxImagePx, idxOpts, onProgress)
     try {
         if (await captureLooksBlank(idxCap.dataUrl)) {
@@ -1594,11 +2064,21 @@ export async function renderSeries(
             idxCap = await captureMapHiRes(view, mf0.wIn, mf0.hIn, useLayout, maxImagePx, idxOpts, onProgress)
         }
     } catch (e) { /* retry is best-effort */ }
+    finishSeriesVectors(idxPlan, idxCap, idxOpts, vectorRaster)
+    if (vectorRaster.size) {
+        const why = Array.from(vectorRaster.entries()).map(([t, r]) => t + ' (' + r + ')').join(', ')
+        warnings.push('Printed as pixels: ' + why + '.')
+    }
     doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
     await composePage(pd, useLayout, idxCap, idxHasLegend ? legendRows : [], (title || useLayout.name || 'Map') + '  (Index)', idxOpts)
+    pd.beginLayer(PAGE_LAYERS.series)
     drawIndexOverlay(pd, useLayout, idxCap as any, tiles)
+    pd.endLayer()
+    if (putGeo && await addGeoPdfViewport(putGeo, n + 1, pageH, mf0, idxCap, idxOpts)) geoPages++
+    if (putGeo) onProgress('GeoPDF: ' + geoPages + ' of ' + (n + 1) + ' map pages georeferenced.')
     // 'secondPage' placement: dedicated legend pages after the index,
     // exactly like the single-map PDF export
+    step({ done: n + 1, total: stepTotal, kind: 'index', page: 0, pageCount: n })
     let legendPageCount = 0
     if (legendSecondPage && legendRows.length) {
         const margin = 0.5
@@ -1609,15 +2089,23 @@ export async function renderSeries(
             legendCfg,
             (t2, f2) => { pd.setFont('normal', f2); return pd.textWidth(t2) }
         )
+        stepTotal = n + 1 + legendPages.length + 1
         for (let pi = 0; pi < legendPages.length; pi++) {
             onProgress('Composing legend page ' + (pi + 1) + ' of ' + legendPages.length + '\u2026')
+            step({ done: n + 1 + pi, total: stepTotal, kind: 'legend', page: pi + 1, pageCount: legendPages.length })
             doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
+            pd.beginLayer(PAGE_LAYERS.legend)
             await drawLegendPage(pd, useLayout.pageWidthIn, useLayout.pageHeightIn, legendPages[pi], legendCfg)
+            pd.endLayer()
         }
         legendPageCount = legendPages.length
     }
+    checkCancel()
+    onProgress('Saving PDF\u2026')
+    step({ done: stepTotal - 1, total: stepTotal, kind: 'save', page: 0, pageCount: n })
     const blob: Blob = doc.output('blob')
     const url = downloadBlob(blob, fileName)
+    step({ done: stepTotal, total: stepTotal, kind: 'save', page: 0, pageCount: n })
     return {
         url,
         fileName,
@@ -2002,6 +2490,21 @@ async function captureMapHiRes(
         } as any)
 
         await tmp.when()
+        // vector layers: hide them in THIS view only (layerView.visible),
+        // never on the shared layer, so the live map is untouched
+        const vectorHidden: string[] = []
+        for (const id of (opts.vectorExcludeIds || [])) {
+            try {
+                const lyr: any = (tmp.map as any).findLayerById(id)
+                if (!lyr) continue
+                const lv: any = await Promise.race([
+                    (tmp as any).whenLayerView(lyr),
+                    new Promise(resolve => setTimeout(() => resolve(null), 8000))
+                ])
+                if (lv) { lv.visible = false; vectorHidden.push(String(id)) }
+            } catch (e) { /* stays raster */ }
+        }
+        const hiddenSet = new Set(vectorHidden)
         await Promise.race([
             reactiveUtils.whenOnce(() => !!tmp && !tmp.updating),
             new Promise(resolve => setTimeout(resolve, Number((opts as any).maxWaitMs) > 0 ? Number((opts as any).maxWaitMs) : 45000))
@@ -2085,6 +2588,18 @@ async function captureMapHiRes(
                 extSnapshot = { xmin: e0.xmin, ymin: e0.ymin, xmax: e0.xmax, ymax: e0.ymax }
             }
         } catch (e) { /* snapshot best-effort */ }
+        // centre + resolution at the SAME moment: with the container at capW
+        // CSS px and the screenshot at capW px, one CSS pixel is one capture
+        // pixel, so resolution is the ground size of a capture pixel. This
+        // is what georeferences a ROTATED capture (the extent alone cannot).
+        let resSnapshot = 0
+        let centerSnapshot: { x: number, y: number } | null = null
+        try {
+            const r0 = Number((tmp as any).resolution)
+            if (r0 > 0 && isFinite(r0)) resSnapshot = r0
+            const c0: any = (tmp as any).center
+            if (c0 && isFinite(c0.x) && isFinite(c0.y)) centerSnapshot = { x: c0.x, y: c0.y }
+        } catch (e) { /* snapshot best-effort */ }
         const renderAt = async (renderScale: number, shotOpts: any): Promise<any> => {
             const css = cssFor(renderScale)
             if (Math.abs(css.w - capW) > 1 || Math.abs(css.h - capH) > 1 ||
@@ -2107,7 +2622,7 @@ async function captureMapHiRes(
             try {
                 const all: any = (tmp.map as any).allLayers
                 const arrL: any[] = all && all.toArray ? all.toArray() : []
-                for (const l of arrL) { if (l && l.type !== 'group') leaves.push(l) }
+                for (const l of arrL) { if (l && l.type !== 'group' && !hiddenSet.has(String(l.id))) leaves.push(l) }
             } catch (e) { /* classification best-effort */ }
             const symbolLayers = leaves.filter(l => SYMBOL_LAYER_TYPES.has(String(l.type)))
             const rasterLayers = leaves.filter(l => !SYMBOL_LAYER_TYPES.has(String(l.type)))
@@ -2180,18 +2695,29 @@ async function captureMapHiRes(
             const gx = printExtent(center.x, center.y, mpuLive, frameWIn, frameHIn, printedScale)
             ground = { xmin: gx.xmin, ymin: gx.ymin, xmax: gx.xmax, ymax: gx.ymax }
         }
+        const capRot = (() => {
+            if ((opts as any).forceNorthUp) return 0 // georeferenced captures are north-up
+            const raw = liveView.rotation || 0
+            const norm = ((raw % 360) + 360) % 360
+            return (norm < 0.05 || norm > 359.95) ? 0 : raw
+        })()
+        let affine: GroundAffine | undefined
+        try {
+            if (capRot === 0 && ground) {
+                affine = affineFromExtent(capW, capH, ground)
+            } else if (capRot !== 0 && centerSnapshot && resSnapshot > 0) {
+                affine = affineFromCenter(capW, capH, centerSnapshot.x, centerSnapshot.y, resSnapshot, capRot)
+            }
+        } catch (e) { /* no transform: georeferenced outputs are skipped */ }
         return {
             dataUrl: shot.dataUrl,
             widthPx: capW,
             heightPx: capH,
             printedScale,
             effectiveDpi,
-            rotation: (() => {
-                if ((opts as any).forceNorthUp) return 0 // georeferenced captures are north-up
-                const raw = liveView.rotation || 0
-                const norm = ((raw % 360) + 360) % 360
-                return (norm < 0.05 || norm > 359.95) ? 0 : raw
-            })(),
+            rotation: capRot,
+            affine,
+            vectorHidden,
             warning,
             groundExtent: ground,
             projection: (capWkid === 3857 || capWkid === 102100 || capWkid === 102113)
@@ -2631,13 +3157,25 @@ export function filterLegendRowsByScale (rows: LegendRow[], ranges: LayerScaleRa
     if (!rows.length || !ranges.length || !(scale > 0)) return rows
     const byTitle = new Map<string, LayerScaleRange>()
     for (const r of ranges) byTitle.set(r.title.toLowerCase(), r)
+    return dropLegendSections(rows, (label: string) => {
+        const rng = byTitle.get(label)
+        return !!rng && !visibleAtScale(rng, scale)
+    })
+}
+
+/** Shared legend pruning. A 'layer' or 'heading' row whose trimmed,
+ *  lower-cased label satisfies `shouldDrop` is removed together with its
+ *  nested rows (items, notes and deeper-indented layers) up to the next row
+ *  at the same or shallower indent; a group heading left empty is removed
+ *  too. Pure/exported. */
+export function dropLegendSections (rows: LegendRow[], shouldDrop: (label: string) => boolean): LegendRow[] {
+    if (!rows.length) return rows
     const out: LegendRow[] = []
     let i = 0
     while (i < rows.length) {
         const row = rows[i]
         const isHead = row.kind === 'layer' || row.kind === 'heading'
-        const rng = isHead ? byTitle.get(String(row.label || '').trim().toLowerCase()) : undefined
-        if (rng && !visibleAtScale(rng, scale)) {
+        if (isHead && shouldDrop(String(row.label || '').trim().toLowerCase())) {
             const depth = Number(row.indent) || 0
             i++
             while (i < rows.length) {
@@ -2653,19 +3191,154 @@ export function filterLegendRowsByScale (rows: LegendRow[], ranges: LayerScaleRa
     }
     // A group heading left with nothing under it is noise: drop it. Layer
     // rows are kept even when childless (single-symbol layers carry their
-    // swatch on the layer row itself).
-    const cleaned: LegendRow[] = []
-    for (let k = 0; k < out.length; k++) {
+    // swatch on the layer row itself). Walked from the END so a parent
+    // group whose only child was an emptied sub-group is judged against
+    // what actually survives, not against the sub-group about to go.
+    const kept: LegendRow[] = []
+    for (let k = out.length - 1; k >= 0; k--) {
         const r = out[k]
         if (r.kind === 'heading') {
             const depth = Number(r.indent) || 0
-            const nx = out[k + 1]
+            const nx = kept[kept.length - 1]
             const nxHead = !!nx && (nx.kind === 'layer' || nx.kind === 'heading')
             if (!nx || (nxHead && (Number(nx.indent) || 0) <= depth)) continue
         }
-        cleaned.push(r)
+        kept.push(r)
     }
-    return cleaned
+    return kept.reverse()
+}
+
+/* ---- legend: hide layers with nothing inside the printed area ---- */
+
+/** Drop legend sections whose title is in `emptyTitles` (lower-cased).
+ *  Pure/exported. */
+export function filterLegendRowsByTitles (rows: LegendRow[], emptyTitles: Set<string>): LegendRow[] {
+    if (!rows.length || !emptyTitles || !emptyTitles.size) return rows
+    return dropLegendSections(rows, (label: string) => emptyTitles.has(label))
+}
+
+/** Layer types whose features can be counted with a spatial query. */
+const COUNTABLE_LAYER_TYPES = new Set(['feature', 'csv', 'geojson', 'ogc-feature', 'wfs', 'subtype-group', 'oriented-imagery'])
+
+/** Titles of layers that have NO features inside `ext`. One count query per
+ *  queryable, visible layer (FeatureLayer-like layers and map-image
+ *  sublayers), run in parallel with a per-query timeout. A title is only
+ *  reported empty when EVERY layer sharing it returned a count of 0: a
+ *  failure, a timeout, or a layer that cannot be queried (tiles, imagery)
+ *  counts as "has features", so the legend never loses an entry on doubt.
+ *  Honors each layer's definition expression through createQuery(). */
+export async function collectEmptyLayerTitles (
+    view: MapView,
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number },
+    spatialReference: any,
+    timeoutMs = 8000
+): Promise<{ empty: Set<string>, queried: number }> {
+    const verdict = new Map<string, boolean>() // title -> "keep"
+    const jobs: Array<Promise<void>> = []
+    let queried = 0
+    const mark = (title: any, keep: boolean): void => {
+        const t = String(title || '').trim().toLowerCase()
+        if (!t) return
+        verdict.set(t, (verdict.get(t) || false) || keep)
+    }
+    let geom: any = null
+    try {
+        geom = new Extent({ xmin: ext.xmin, ymin: ext.ymin, xmax: ext.xmax, ymax: ext.ymax, spatialReference })
+    } catch (e) { return { empty: new Set<string>(), queried: 0 } }
+    const countIn = (target: any): void => {
+        queried++
+        jobs.push((async () => {
+            try {
+                const q: any = typeof target.createQuery === 'function'
+                    ? target.createQuery()
+                    : { where: target.definitionExpression || '1=1' }
+                q.geometry = geom
+                q.spatialRelationship = 'intersects'
+                q.returnGeometry = false
+                // the timeout RESOLVES to a sentinel and is cleared, so a slow
+                // layer never leaves an unhandled rejection or a live timer
+                let timer: any = null
+                const TIMED_OUT = {}
+                const n = await Promise.race([
+                    target.queryFeatureCount(q),
+                    new Promise(resolve => { timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs) })
+                ]).finally(() => { if (timer) clearTimeout(timer) })
+                mark(target.title, n === TIMED_OUT || !(Number(n) === 0))
+            } catch (e) { mark(target.title, true) }
+        })())
+    }
+    const walkSub = (sub: any): void => {
+        if (!sub || sub.visible === false) return
+        const kids: any[] = sub.sublayers ? (sub.sublayers.toArray ? sub.sublayers.toArray() : Array.from(sub.sublayers)) : []
+        if (kids.length) {
+            mark(sub.title, true) // group sublayer: judged by its children
+            for (const k of kids) walkSub(k)
+        } else if (typeof sub.queryFeatureCount === 'function') {
+            countIn(sub)
+        } else {
+            mark(sub.title, true)
+        }
+    }
+    try {
+        const all: any = (view.map as any).allLayers
+        const layers: any[] = all ? (all.toArray ? all.toArray() : Array.from(all)) : []
+        for (const l of layers) {
+            if (!l || l.visible === false) continue
+            if (l.type === 'group') { mark(l.title, true); continue }
+            if (COUNTABLE_LAYER_TYPES.has(String(l.type)) && typeof l.queryFeatureCount === 'function') {
+                countIn(l)
+            } else if ((l.type === 'map-image' || l.type === 'tile') && l.sublayers) {
+                mark(l.title, true)
+                const subs: any[] = l.sublayers.toArray ? l.sublayers.toArray() : Array.from(l.sublayers)
+                for (const sl of subs) walkSub(sl)
+            } else {
+                mark(l.title, true)
+            }
+        }
+    } catch (e) { /* best-effort */ }
+    await Promise.all(jobs)
+    const empty = new Set<string>()
+    verdict.forEach((keep, t) => { if (!keep) empty.add(t) })
+    return { empty, queried }
+}
+
+/** Ground footprint of the print BEFORE capture, in the live view's SR
+ *  (same centre and scale rules as captureMapHiRes). A rotated print
+ *  returns the envelope of the rotated frame. */
+export function estimatePrintExtent (
+    view: MapView, frameWIn: number, frameHIn: number, layout: PrintLayout, opts: RenderOptions
+): { xmin: number, ymin: number, xmax: number, ymax: number } | null {
+    try {
+        const scale = estimatePrintedScale(view, frameWIn, frameHIn, layout, opts)
+        const mpu = metersPerMapUnit(view.scale, view.resolution)
+        const c: any = opts.lockedCenter && typeof opts.lockedCenter.x === 'number' ? opts.lockedCenter : view.center
+        if (!c || !(scale > 0) || !(mpu > 0)) return null
+        const px = printExtent(c.x, c.y, mpu, frameWIn, frameHIn, scale)
+        const rot = (opts as any).forceNorthUp ? 0 : (Number(view.rotation) || 0)
+        if (!rot) return { xmin: px.xmin, ymin: px.ymin, xmax: px.xmax, ymax: px.ymax }
+        const t = rot * Math.PI / 180
+        const hw = (Math.abs(px.widthMU * Math.cos(t)) + Math.abs(px.heightMU * Math.sin(t))) / 2
+        const hh = (Math.abs(px.widthMU * Math.sin(t)) + Math.abs(px.heightMU * Math.cos(t))) / 2
+        return { xmin: c.x - hw, ymin: c.y - hh, xmax: c.x + hw, ymax: c.y + hh }
+    } catch (e) { return null }
+}
+
+/** Run the extent filter on built legend rows. Never throws; reports what
+ *  it hid through onProgress. */
+async function applyLegendExtentFilter (
+    view: MapView, rows: LegendRow[],
+    ext: { xmin: number, ymin: number, xmax: number, ymax: number } | null,
+    onProgress: RenderProgress
+): Promise<LegendRow[]> {
+    if (!rows.length || !ext) return rows
+    try {
+        onProgress('Legend: checking which layers have features in the print area…')
+        const { empty } = await collectEmptyLayerTitles(view, ext, view.spatialReference)
+        if (!empty.size) return rows
+        const out = filterLegendRowsByTitles(rows, empty)
+        if (out.length < rows.length) onProgress('Legend: hid ' + (rows.length - out.length) + ' row(s) with no features in the print area.')
+        return out
+    } catch (e) { return rows }
 }
 
 /** Printed-scale estimate BEFORE capture (same rule captureMapHiRes uses;
@@ -4330,6 +5003,20 @@ export function buildGraticuleGeometry(
             g.crosses.push({ x1In: px, y1In: py - crossLen / 2, x2In: px, y2In: py + crossLen / 2 })
         }
     }
+    if (cfg.cornerLabels === true) {
+        // corners carry the exact position, one step finer than the grid
+        // interval (down to whole seconds)
+        const fine = Math.max(1 / 3600, Math.min(step / 60, 1 / 60))
+        const at = (x: number, y: number): string[] => {
+            const ll = toGeo(x, y)
+            if (!ll || !isFinite(ll[0]) || !isFinite(ll[1])) return []
+            return [fmtGeoLabel(ll[1], fine, 'lat'), fmtGeoLabel(ll[0], fine, 'lon')]
+        }
+        addGridCornerLabels(g, mf, cfg, {
+            tl: at(ext.xmin, ext.ymax), tr: at(ext.xmax, ext.ymax),
+            bl: at(ext.xmin, ext.ymin), br: at(ext.xmax, ext.ymin)
+        })
+    }
     return g
 }
 
@@ -4347,7 +5034,45 @@ export function fmtGeoLabel(deg: number, intervalDeg: number, axis: 'lon' | 'lat
 }
 
 export interface GridLine { x1In: number, y1In: number, x2In: number, y2In: number }
-export interface GridLabel { text: string, xIn: number, yIn: number, edge: 'top' | 'bottom' | 'left' | 'right' }
+export interface GridLabel {
+    text: string
+    xIn: number
+    yIn: number
+    edge: 'top' | 'bottom' | 'left' | 'right' | 'corner'
+    /** Corner labels only: which neatline corner, and the stacked lines. */
+    corner?: 'tl' | 'tr' | 'bl' | 'br'
+    lines?: string[]
+}
+
+/** Pro-style corner labels: each neatline corner gets its full coordinate
+ *  (two stacked lines). Edge labels that would collide with a corner label
+ *  are dropped, since the corner already states that position more
+ *  precisely. Mutates g. Pure/exported. */
+export function addGridCornerLabels (
+    g: GridGeometry,
+    mf: { xIn: number, yIn: number, wIn: number, hIn: number },
+    cfg: GridConfig,
+    lines: { tl: string[], tr: string[], bl: string[], br: string[] }
+): void {
+    const size = cfg.labelSizePt > 0 ? cfg.labelSizePt : 7
+    const longest = Math.max(1, ...[lines.tl, lines.tr, lines.bl, lines.br].map(l => Math.max(0, ...l.map(t => t.length))))
+    // clearance along each edge: the corner block's width (horizontal
+    // edges) or its two-line height (vertical edges), plus a margin
+    const clearX = (longest * size * 0.55 + size) / PT_PER_IN
+    const clearY = (size * 2.6 + size) / PT_PER_IN
+    const x0 = mf.xIn, x1 = mf.xIn + mf.wIn, y0 = mf.yIn, y1 = mf.yIn + mf.hIn
+    g.labels = g.labels.filter(lb => {
+        if (lb.edge === 'top' || lb.edge === 'bottom') return lb.xIn - x0 > clearX && x1 - lb.xIn > clearX
+        if (lb.edge === 'left' || lb.edge === 'right') return lb.yIn - y0 > clearY && y1 - lb.yIn > clearY
+        return true
+    })
+    const put = (corner: 'tl' | 'tr' | 'bl' | 'br', xIn: number, yIn: number, l: string[]): void => {
+        const clean = l.filter(t => !!t)
+        if (clean.length) g.labels.push({ text: clean.join(' '), xIn, yIn, edge: 'corner', corner, lines: clean })
+    }
+    put('tl', x0, y0, lines.tl); put('tr', x1, y0, lines.tr)
+    put('bl', x0, y1, lines.bl); put('br', x1, y1, lines.br)
+}
 export interface GridGeometry { lines: GridLine[], crosses: GridLine[], ticks: GridLine[], labels: GridLabel[] }
 
 /** Pure geometry builder for graticule / measured grids (rotation 0).
@@ -4415,6 +5140,14 @@ export function buildGridGeometry(
             g.crosses.push({ x1In: x.pageX, y1In: y.pageY - crossLen / 2, x2In: x.pageX, y2In: y.pageY + crossLen / 2 })
         }
     }
+    if (cfg.cornerLabels === true) {
+        const f = (v: number): string => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+        const at = (x: number, y: number): string[] => [f(y) + ' N', f(x) + ' E']
+        addGridCornerLabels(g, mf, cfg, {
+            tl: at(ext.xmin, ext.ymax), tr: at(ext.xmax, ext.ymax),
+            bl: at(ext.xmin, ext.ymin), br: at(ext.xmax, ext.ymin)
+        })
+    }
     return g
 }
 
@@ -4471,9 +5204,39 @@ function drawGrid(d: Drawer, geom: GridGeometry, cfg: GridConfig): void {
         const pad = 3 // pt
         d.setFont('normal', size)
         const inside = cfg.labelsInside !== false
+        const halo = (text: string, tx: number, baseline: number, align: 'left' | 'center' | 'right'): void => {
+            d.setTextColor(lc[0], lc[1], lc[2])
+            if (typeof d.haloText === 'function') {
+                d.haloText(text, tx, baseline, align, [255, 255, 255], Math.max(1.2, size * 0.11))
+            } else {
+                const tw = d.textWidth(text)
+                const bx = align === 'center' ? tx - tw / 2 : align === 'right' ? tx - tw : tx
+                d.setFill(255, 255, 255)
+                d.rect(bx - 2, baseline - size, tw + 4, size + 3, 'F')
+                d.text(text, tx, baseline, align)
+            }
+        }
         for (const lb of geom.labels) {
             const x = lb.xIn * PT_PER_IN
             const y = lb.yIn * PT_PER_IN
+            if (lb.edge === 'corner') {
+                // stacked block anchored on the neatline corner: inside sits
+                // in the map corner; outside sits in the top/bottom margin,
+                // flush with the frame's side edge, so it needs no side
+                // margin and never overprints the frame
+                const lines = lb.lines && lb.lines.length ? lb.lines : [lb.text]
+                const lead = size * 1.15
+                const isLeft = lb.corner === 'tl' || lb.corner === 'bl'
+                const isTop = lb.corner === 'tl' || lb.corner === 'tr'
+                const align: 'left' | 'right' = isLeft ? 'left' : 'right'
+                const tx = inside ? (isLeft ? x + pad : x - pad) : x
+                const blockH = lead * (lines.length - 1)
+                let first: number
+                if (inside) first = isTop ? y + pad + size : y - pad - size * 0.3 - blockH
+                else first = isTop ? y - pad - blockH : y + pad + size
+                lines.forEach((t, k) => halo(t, tx, first + k * lead, align))
+                continue
+            }
             let tx = x
             let baseline = y
             let align: 'left' | 'center' | 'right' = 'center'
@@ -4648,6 +5411,23 @@ export async function getPointProjector (
     }
 }
 
+/** Layer names for PDF optional content and SVG layer groups. Order of
+ *  first use sets the order a reader lists them in. */
+export const PAGE_LAYERS = {
+    map: 'Map',
+    grid: 'Grid',
+    selection: 'Selection',
+    pageFeature: 'Page feature',
+    frame: 'Map frame',
+    overview: 'Overview map',
+    legend: 'Legend',
+    northScale: 'North arrow and scale bar',
+    text: 'Text',
+    graphics: 'Graphics',
+    qr: 'QR code',
+    series: 'Map series'
+} as const
+
 export function getMapFrame(layout: PrintLayout): MapFrameEl {
     const mf = (layout.elements || []).find(e => e.type === 'mapFrame') as MapFrameEl
     if (!mf) throw new Error('Layout has no map frame element. Re-import the .pagx.')
@@ -4692,8 +5472,12 @@ export async function composePage(
         wkid: cap.wkid, srWkt: opts.srWkt, srUnit: opts.srUnit,
         center: cap.center, groundExtent: cap.groundExtent, projection: cap.projection,
         toWgs84,
-        pageNumber: opts.pageNumber, pageCount: opts.pageCount, pageName: opts.pageName
+        pageNumber: opts.pageNumber, pageCount: opts.pageCount, pageName: opts.pageName,
+        fields: opts.pageFields
     }
+    // PDF / SVG layers: each part of the page goes into a named layer. A
+    // no-op on raster backends and when layers are switched off.
+    const layer = (name: string): void => { if (typeof d.beginLayer === 'function') d.beginLayer(name) }
     for (const raw of (layout.elements || [])) {
         const el = raw as LayoutElement
         switch (el.type) {
@@ -4703,7 +5487,24 @@ export async function composePage(
                 const y = mf.yIn * PT_PER_IN
                 const w = mf.wIn * PT_PER_IN
                 const h = mf.hIn * PT_PER_IN
+                layer(PAGE_LAYERS.map)
                 await d.image(cap.dataUrl, layout.imageFormat === 'png' ? 'PNG' : 'JPEG', x, y, w, h)
+                // true vector feature layers, bottom to top, each in its own
+                // PDF / SVG layer named after the map layer
+                if (opts.vectorData && opts.vectorData.length && (cap.affine || cap.groundExtent)) {
+                    for (const vl of opts.vectorData) {
+                        layer(vl.title || 'Feature layer')
+                        try { drawVectorLayer(d, cap, mf, vl) } catch (e) { /* best-effort */ }
+                    }
+                    // labels on top of every layer's geometry, deconflicted
+                    // across layers on one board (like the SDK's engine)
+                    const board: LabelBoard = { boxes: [] }
+                    for (const vl of opts.vectorData) {
+                        if (!vl.labels || !vl.labels.length) continue
+                        layer((vl.title || 'Feature layer') + ' labels')
+                        try { drawVectorLabels(d, cap, mf, vl, board) } catch (e) { /* best-effort */ }
+                    }
+                }
                 // Settings-defined grid/graticule over the map, under the border.
                 const gridCfg = layout.grid
                 if (gridCfg && gridCfg.enabled && opts.showGrid !== false && cap.rotation === 0 &&
@@ -4711,17 +5512,27 @@ export async function composePage(
                     const geom = opts.gridGeomOverride || (gridCfg.type === 'reference'
                         ? buildReferenceGrid(mf, Number(gridCfg.refCols) || 4, Number(gridCfg.refRows) || 4, gridCfg.labels !== false)
                         : buildGridGeometry(cap, mf, gridCfg))
-                    if (geom) drawGrid(d, geom, gridCfg)
+                    if (geom) { layer(PAGE_LAYERS.grid); drawGrid(d, geom, gridCfg) }
                 }
                 // Selection highlight: view-scoped, so the shared-map capture
                 // never contains it. Drawn over the map, under the neatline.
-                if (opts.selectionGeometries && opts.selectionGeometries.length && cap.rotation === 0) {
+                if (opts.selectionGeometries && opts.selectionGeometries.length && (cap.rotation === 0 || cap.affine)) {
+                    layer(PAGE_LAYERS.selection)
                     try {
                         drawSelectionOverlay(d, cap, mf, opts.selectionGeometries,
                             opts.selectionColor || [0, 255, 255], Number(opts.selectionWidthPt) || 2)
                     } catch (e) { /* overlay is best-effort; never lose the page */ }
                 }
+                // data-driven page: the page's own feature, heavier and orange
+                // so it reads as "this sheet is about THIS one"
+                if (opts.pageFeatureGeometries && opts.pageFeatureGeometries.length && (cap.rotation === 0 || cap.affine)) {
+                    layer(PAGE_LAYERS.pageFeature)
+                    try {
+                        drawSelectionOverlay(d, cap, mf, opts.pageFeatureGeometries, [230, 90, 0], 2.5)
+                    } catch (e) { /* best-effort */ }
+                }
                 if (mf.borderColor && mf.borderWidthPt > 0) {
+                    layer(PAGE_LAYERS.frame)
                     d.setStroke(mf.borderColor[0], mf.borderColor[1], mf.borderColor[2])
                     d.setLineWidth(mf.borderWidthPt)
                     d.rect(x, y, w, h, 'S')
@@ -4729,6 +5540,7 @@ export async function composePage(
                 // Settings-defined overview inset: zoomed-out capture in a
                 // corner of the map frame with an extent indicator.
                 if (opts.overview) {
+                    layer(PAGE_LAYERS.overview)
                     const ov = opts.overview
                     const bx = ov.box.xIn * PT_PER_IN
                     const by = ov.box.yIn * PT_PER_IN
@@ -4748,6 +5560,7 @@ export async function composePage(
                 break
             }
             case 'line': {
+                layer(PAGE_LAYERS.graphics)
                 const ln = el as LineEl
                 d.setStroke(ln.color[0], ln.color[1], ln.color[2])
                 d.setLineWidth(ln.widthPt)
@@ -4760,19 +5573,24 @@ export async function composePage(
                 break
             }
             case 'text':
+                layer(PAGE_LAYERS.text)
                 drawTextEl(d, el as TextEl, tokens)
                 break
             case 'northArrow':
+                layer(PAGE_LAYERS.northScale)
                 drawNorthArrowEl(d, el as NorthArrowEl, cap.rotation, opts.northArrowStyle || 'splitArrow')
                 break
             case 'scaleBar':
+                layer(PAGE_LAYERS.northScale)
                 drawScaleBarEl(d, el as ScaleBarEl, cap.printedScale, opts)
                 break
             case 'picture':
+                layer(PAGE_LAYERS.graphics)
                 await drawPictureEl(d, el as PictureEl, opts.defaultLogo)
                 break
             case 'legend':
                 {
+                    layer(PAGE_LAYERS.legend)
                     // The .pagx legend element carries the author's column
                     // count and title choice; let them fill in wherever the
                     // settings legend config did not specify, so a horizontal
@@ -4834,6 +5652,7 @@ export async function composePage(
                 // (Adjacent panels - opts.legendBox - fill their strip, so no
                 // anchoring is applied there.)
                 const bottomAnchor = !opts.legendBox && /^bottom/.test(String(lCfg.position || 'bottomLeft'))
+                layer(PAGE_LAYERS.legend)
                 const miss = await drawLegendEl(d, { type: 'legend', name: 'settingsLegend', xIn: box.xIn, yIn: box.yIn, wIn: box.wIn, hIn: box.hIn, maxItems: 0 } as LegendEl, legendRows, lCfg, !!opts.legendBox, bottomAnchor)
                 if (miss > 0) (opts as any)._legendTruncated = Math.max(Number((opts as any)._legendTruncated) || 0, miss)
             }
@@ -4845,6 +5664,7 @@ export async function composePage(
         try {
             const q = qrModules(String((opts as any).qrUrl))
             if (q) {
+                layer(PAGE_LAYERS.qr)
                 const mfq = getMapFrame(layout)
                 const qrSide = 0.62 * PT_PER_IN
                 const mod = qrSide / q.size
@@ -4900,6 +5720,7 @@ export async function composePage(
             const boxes = ((layout.elements || []) as any[])
                 .filter(e => e.type !== 'line' && typeof e.yIn === 'number' && e.hIn > 0)
             const bottomMost = boxes.length ? Math.max(...boxes.map(e => e.yIn + e.hIn)) : 0
+            layer(PAGE_LAYERS.text)
             d.setFont('normal', size)
             d.setTextColor(70, 70, 70)
             if (layout.pageHeightIn - bottomMost >= 0.12) {
@@ -4928,10 +5749,12 @@ export async function composePage(
     // the frame exactly where the layout author drew them.
     const outer = opts.legendPanelOuter
     if (outer && outer.color && outer.widthPt > 0) {
+        layer(PAGE_LAYERS.frame)
         d.setStroke(outer.color[0], outer.color[1], outer.color[2])
         d.setLineWidth(outer.widthPt)
         d.rect(outer.xIn * PT_PER_IN, outer.yIn * PT_PER_IN, outer.wIn * PT_PER_IN, outer.hIn * PT_PER_IN, 'S')
     }
+    if (typeof d.endLayer === 'function') d.endLayer()
 }
 
 /* ------------------------------------------------------------------ */
@@ -4963,6 +5786,7 @@ function ensureGeoTiffTagTypes (): void {
             tt[34736] = 12 // GeoDoubleParamsTag (DOUBLE)
             tt[34737] = 2  // GeoAsciiParamsTag (ASCII)
         }
+        if (tt && tt[34264] == null) tt[34264] = 12 // ModelTransformationTag (DOUBLE)
     } catch (e) { /* geo tags stay absent -> plain TIFF */ }
 }
 
@@ -4999,12 +5823,35 @@ export function geoTiffMeta (
     }
 }
 
-function encodeTiff(canvas: HTMLCanvasElement, geo?: { ext: { xmin: number, ymin: number, xmax: number, ymax: number }, wkid: number, geographic?: boolean } | null): Blob {
+/** GeoTIFF metadata from a pixel affine (output raster pixels). North-up
+ *  transforms use the classic ModelPixelScale + ModelTiepoint pair (exactly
+ *  what geoTiffMeta writes); a rotated transform writes the 4x4
+ *  ModelTransformationTag (34264) instead, which the GeoTIFF spec requires
+ *  whenever the raster is rotated relative to the model. Pure/exported. */
+export function geoTiffMetaAffine (
+    W: number, H: number, aff: GroundAffine, wkid: number, geographicHint?: boolean
+): Record<string, any> | null {
+    if (!(W > 0) || !(H > 0) || !(wkid > 0)) return null
+    const bounds = affineBounds(aff, W, H)
+    const base = geoTiffMeta(W, H, bounds, wkid, geographicHint)
+    if (!base) return null
+    if (affineIsNorthUp(aff)) return base
+    const meta: Record<string, any> = { t34735: base.t34735, t34737: base.t34737 }
+    meta.t34264 = [
+        aff.a, aff.b, 0, aff.c,
+        aff.d, aff.e, 0, aff.f,
+        0, 0, 0, 0,
+        0, 0, 0, 1
+    ]
+    return meta
+}
+
+function encodeTiff(canvas: HTMLCanvasElement, geo?: { aff: GroundAffine, wkid: number, geographic?: boolean } | null): Blob {
     const { data, w, h } = canvasRgba(canvas)
     let meta: Record<string, any> | undefined
     if (geo && geo.wkid > 0) {
         ensureGeoTiffTagTypes()
-        meta = geoTiffMeta(w, h, geo.ext, geo.wkid, geo.geographic) || undefined
+        meta = geoTiffMetaAffine(w, h, geo.aff, geo.wkid, geo.geographic) || undefined
     }
     const buf: ArrayBuffer = meta
         ? UTIF.encodeImage(data.buffer, w, h, meta)
@@ -5201,6 +6048,289 @@ const EXT: Record<OutputFormat, string> = {
     tiff: 'tif', eps: 'eps', svg: 'svg', svgz: 'svgz', aix: 'aix'
 }
 
+/* ------------------------------------------------------------------ */
+/* live page preview                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface PagePreviewResult {
+    dataUrl: string
+    widthPx: number
+    heightPx: number
+    printedScale: number
+    /** Things the preview does not show, for a one-line caption. */
+    notes: string[]
+}
+
+/** Where the print frame sits on the live view's screen, in CSS px. The
+ *  capture view uses the live view's rotation, so the printed map is
+ *  exactly the screen content inside an axis-aligned rectangle centred on
+ *  the print centre, sized ground / resolution. Pure/exported. */
+export function printFrameOnScreen (
+    centerScreen: { x: number, y: number },
+    groundW: number, groundH: number, resolution: number
+): { x: number, y: number, w: number, h: number } {
+    const w = groundW / resolution
+    const h = groundH / resolution
+    return { x: centerScreen.x - w / 2, y: centerScreen.y - h / 2, w, h }
+}
+
+/** Intersect a rectangle with the view (0..vw, 0..vh). Pure/exported. */
+export function clipToView (r: { x: number, y: number, w: number, h: number }, vw: number, vh: number): { x: number, y: number, w: number, h: number } | null {
+    const x0 = Math.max(0, r.x), y0 = Math.max(0, r.y)
+    const x1 = Math.min(vw, r.x + r.w), y1 = Math.min(vh, r.y + r.h)
+    if (x1 - x0 < 1 || y1 - y0 < 1) return null
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
+
+/** A fast, low-resolution picture of the whole printed page, for the live
+ *  preview in the panel. The map comes from a screenshot of the LIVE view
+ *  (no offscreen view, no tile loading), cut to the print frame, so it is
+ *  cheap enough to refresh on every pan. Everything else (legend, grid,
+ *  north arrow, scale bar, text, logos, QR, selection) is composed by the
+ *  same composePage the export uses. Areas of the frame outside the screen
+ *  show as gray. The overview inset is outlined, not captured. */
+export async function renderPagePreview (
+    liveView: MapView,
+    layout: PrintLayout,
+    title: string,
+    options: RenderOptions,
+    legendRows: LegendRow[],
+    maxPx = 640
+): Promise<PagePreviewResult> {
+    const notes: string[] = []
+    const mfSrc = getMapFrame(layout)
+    let useLayout: PrintLayout = layout
+    if (options.mapOnly) {
+        useLayout = ({ ...layout, pageWidthIn: mfSrc.wIn, pageHeightIn: mfSrc.hIn, elements: [{ ...mfSrc, xIn: 0, yIn: 0 }] } as PrintLayout)
+    }
+    if (options.legendPositionOverride && useLayout.legend && useLayout.legend.enabled) {
+        useLayout = { ...useLayout, legend: { ...useLayout.legend, position: options.legendPositionOverride as any } }
+    }
+    if (options.gridTypeOverride && useLayout.grid && useLayout.grid.enabled) {
+        useLayout = { ...useLayout, grid: { ...useLayout.grid, type: options.gridTypeOverride as any } }
+    }
+    let mf = getMapFrame(useLayout)
+    const hasLegendEl = (useLayout.elements || []).some(e => (e as LayoutElement).type === 'legend')
+    let rows: LegendRow[] = (!options.mapOnly && options.includeLegend !== false) ? (legendRows || []) : []
+    const lc = useLayout.legend
+    if (rows.length && lc && lc.enabled && !hasLegendEl && String(lc.position || '') === 'secondPage') {
+        notes.push('legend on additional pages')
+        rows = []
+    }
+    let opts: RenderOptions = { ...options, overview: undefined, gridGeomOverride: undefined, onPanelComputed: undefined }
+    // adjacent legend panel: the same shrink the export applies
+    if (rows.length && lc && lc.enabled && !hasLegendEl && String(lc.position || '').endsWith('Panel')) {
+        const others = (useLayout.elements || [])
+            .filter(e => (e as LayoutElement).type !== 'mapFrame' && (e as LayoutElement).type !== 'line')
+            .map(e => e as any)
+            .filter(e => typeof e.xIn === 'number' && e.wIn > 0 && e.hIn > 0)
+            .map(e => ({ xIn: e.xIn, yIn: e.yIn, wIn: e.wIn, hIn: e.hIn }))
+        const panel = computeLegendPanel(rows, mf, lc, others)
+        if (panel && panel.mapFrame.wIn > 1 && panel.mapFrame.hIn > 1 && panel.box.wIn > 0.9 && panel.box.hIn > 0.9) {
+            const orig = { xIn: mf.xIn, yIn: mf.yIn, wIn: mf.wIn, hIn: mf.hIn }
+            const border = mf
+            useLayout = {
+                ...useLayout,
+                elements: (useLayout.elements || []).map(e => (e as LayoutElement).type === 'mapFrame' ? ({ ...(e as MapFrameEl), ...panel.mapFrame } as MapFrameEl) : e)
+            }
+            mf = getMapFrame(useLayout)
+            opts = {
+                ...opts,
+                legendBox: panel.box,
+                legendPanelOuter: { ...orig, color: border.borderColor || null, widthPt: border.borderWidthPt > 0 ? border.borderWidthPt : 0 }
+            }
+        }
+    }
+    const scale = estimatePrintedScale(liveView, mf.wIn, mf.hIn, useLayout, opts)
+    if (rows.length && opts.legendScaleFilter !== false) {
+        try { rows = filterLegendRowsByScale(rows, collectLayerScaleRanges(liveView), scale) } catch (e) { /* keep */ }
+    }
+    const mpu = metersPerMapUnit(liveView.scale, liveView.resolution)
+    const c: any = liveView.center.clone()
+    if (opts.lockedCenter && typeof opts.lockedCenter.x === 'number') { c.x = opts.lockedCenter.x; c.y = opts.lockedCenter.y }
+    const pe = printExtent(c.x, c.y, mpu, mf.wIn, mf.hIn, scale)
+    const res = Number(liveView.resolution) || 1
+    const sc: any = liveView.toScreen(c)
+    const frameScreen = printFrameOnScreen({ x: Number(sc && sc.x), y: Number(sc && sc.y) }, pe.widthMU, pe.heightMU, res)
+    const vw = Number((liveView as any).width) || 0
+    const vh = Number((liveView as any).height) || 0
+    const pageDpi = Math.max(24, Math.min(150, maxPx / Math.max(useLayout.pageWidthIn, useLayout.pageHeightIn)))
+    const fw = Math.max(2, Math.round(mf.wIn * pageDpi))
+    const fh = Math.max(2, Math.round(mf.hIn * pageDpi))
+    // frame canvas: gray where the print reaches past the screen
+    const canvas = document.createElement('canvas')
+    canvas.width = fw; canvas.height = fh
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas 2D context unavailable.')
+    ctx.fillStyle = '#e4e7eb'
+    ctx.fillRect(0, 0, fw, fh)
+    const vis = clipToView(frameScreen, vw, vh)
+    if (vis) {
+        if (vis.w < frameScreen.w - 1 || vis.h < frameScreen.h - 1) notes.push('gray = outside the screen')
+        const kx = fw / frameScreen.w, ky = fh / frameScreen.h
+        const outW = Math.max(2, Math.round(vis.w * kx)), outH = Math.max(2, Math.round(vis.h * ky))
+        // only map layers: leaves out the on-map print-area outline and
+        // series outlines (view.graphics); the selection is re-drawn below
+        const leaves: any[] = []
+        try {
+            const all: any = (liveView.map as any).allLayers
+            const arr: any[] = all && all.toArray ? all.toArray() : []
+            for (const l of arr) if (l && l.type !== 'group') leaves.push(l)
+        } catch (e) { /* all layers */ }
+        const shot: any = await (liveView as any).takeScreenshot({
+            area: { x: Math.round(vis.x), y: Math.round(vis.y), width: Math.round(vis.w), height: Math.round(vis.h) },
+            width: outW, height: outH, format: 'png',
+            ...(leaves.length ? { layers: leaves } : {})
+        })
+        if (shot && shot.dataUrl) {
+            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+                const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error('preview image')); im.src = shot.dataUrl
+            })
+            ctx.drawImage(img, Math.round((vis.x - frameScreen.x) * kx), Math.round((vis.y - frameScreen.y) * ky), outW, outH)
+        }
+    } else {
+        notes.push('the print area is off the screen')
+    }
+    const liveWkid = Number((liveView.spatialReference as any)?.wkid) || 0
+    if (opts.outputWkid && opts.outputWkid > 0 && opts.outputWkid !== liveWkid) notes.push('shown in the map’s own coordinate system')
+    const rotRaw = ((Number(liveView.rotation) || 0) % 360 + 360) % 360
+    const rotation = (rotRaw < 0.05 || rotRaw > 359.95) ? 0 : Number(liveView.rotation) || 0
+    const ground = { xmin: pe.xmin, ymin: pe.ymin, xmax: pe.xmax, ymax: pe.ymax }
+    const cap: CaptureResult = {
+        dataUrl: canvas.toDataURL('image/png'),
+        widthPx: fw, heightPx: fh,
+        printedScale: scale,
+        effectiveDpi: pageDpi,
+        rotation,
+        groundExtent: rotation === 0 ? ground : undefined,
+        projection: (liveWkid === 3857 || liveWkid === 102100 || liveWkid === 102113) ? 'webMercator' : (liveWkid === 4326 ? 'geographic' : 'projected'),
+        wkid: liveWkid || undefined,
+        center: { x: c.x, y: c.y }
+    }
+    const g = useLayout.grid
+    if (g && g.enabled && opts.showGrid !== false && g.type === 'graticule' && cap.projection === 'projected') notes.push('graticule prints on export')
+    const drawer = new CanvasDrawer(useLayout.pageWidthIn * PT_PER_IN, useLayout.pageHeightIn * PT_PER_IN, pageDpi)
+    drawer.setFontFamily(opts.fontFamily || 'sans')
+    await composePage(drawer, { ...useLayout, imageFormat: 'png' }, cap, rows, title, { ...opts, georeference: false })
+    // overview inset: outline where it will print (capturing it would need
+    // the offscreen view the export uses)
+    const ov = useLayout.overview
+    if (ov && ov.enabled && opts.showOverview !== false && !opts.mapOnly) {
+        try {
+            const b = overviewBoxIn(mf, ov)
+            const k = pageDpi
+            const cx2 = drawer.canvas.getContext('2d')
+            if (cx2) {
+                cx2.fillStyle = 'rgba(255,255,255,0.75)'
+                cx2.fillRect(b.xIn * k, b.yIn * k, b.wIn * k, b.hIn * k)
+                cx2.strokeStyle = '#555'; cx2.lineWidth = 1
+                cx2.strokeRect(b.xIn * k, b.yIn * k, b.wIn * k, b.hIn * k)
+                cx2.fillStyle = '#555'; cx2.font = Math.max(8, Math.round(k * 0.12)) + 'px sans-serif'
+                cx2.textAlign = 'center'; cx2.textBaseline = 'middle'
+                cx2.fillText('Overview', (b.xIn + b.wIn / 2) * k, (b.yIn + b.hIn / 2) * k)
+            }
+        } catch (e) { /* best-effort */ }
+    }
+    return {
+        dataUrl: drawer.canvas.toDataURL('image/jpeg', 0.86),
+        widthPx: drawer.canvas.width,
+        heightPx: drawer.canvas.height,
+        printedScale: Math.round(scale),
+        notes
+    }
+}
+
+const _picCache = new Map<string, Promise<string | null>>()
+
+/** Picture-marker image -> PNG data URL at 4x its natural size (any web
+ *  image type, SVG included, becomes a PNG jsPDF can embed). Null on any
+ *  failure. Cached per url. */
+function pictureToPng (url: string): Promise<string | null> {
+    let p = _picCache.get(url)
+    if (!p) {
+        p = (async () => {
+            try {
+                const src = await urlToDataUrl(url)
+                if (!src) return null
+                const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+                    const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error('img')); im.src = src
+                })
+                const w = Math.max(1, Math.min(512, (img.naturalWidth || 32) * 4))
+                const h = Math.max(1, Math.min(512, (img.naturalHeight || 32) * 4))
+                const c = document.createElement('canvas'); c.width = w; c.height = h
+                const ctx = c.getContext('2d'); if (!ctx) return null
+                ctx.drawImage(img, 0, 0, w, h)
+                return c.toDataURL('image/png')
+            } catch (e) { return null }
+        })()
+        _picCache.set(url, p)
+        p.then(v => { if (v === null) _picCache.delete(url) })
+    }
+    return p
+}
+
+/** Decide which feature layers print as vectors and query them, BEFORE the
+ *  capture (the capture must know which layers to hide). Everything that
+ *  cannot be reproduced exactly stays raster, with the reason reported. */
+export async function planVectorLayers (
+    liveView: MapView, frameWIn: number, frameHIn: number, layout: PrintLayout, opts: RenderOptions,
+    onProgress: RenderProgress
+): Promise<{ data: VectorLayerData[], raster: Array<{ title: string, reason: string }> }> {
+    const data: VectorLayerData[] = []
+    const raster: Array<{ title: string, reason: string }> = []
+    try {
+        const scale = estimatePrintedScale(liveView, frameWIn, frameHIn, layout, opts)
+        const est = estimatePrintExtent(liveView, frameWIn, frameHIn, layout, opts)
+        if (!est) return { data, raster }
+        const padX = (est.xmax - est.xmin) * 0.03, padY = (est.ymax - est.ymin) * 0.03
+        const extent = new Extent({ xmin: est.xmin - padX, ymin: est.ymin - padY, xmax: est.xmax + padX, ymax: est.ymax + padY, spatialReference: liveView.spatialReference })
+        const reproj = !!(opts.outputWkid && opts.outputWkid > 0 && opts.outputWkid !== Number((liveView.spatialReference as any)?.wkid))
+        const outSR: any = reproj ? new SpatialReference({ wkid: Number(opts.outputWkid) }) : liveView.spatialReference
+        // generalize to a quarter point on paper: invisible, and it keeps
+        // parcels-scale PDFs small (skipped when reprojecting: different units)
+        const offset = reproj ? 0 : ((est.xmax - est.xmin) / Math.max(1, frameWIn * PT_PER_IN)) * 0.25
+        const viewHasTime = !!(liveView as any).timeExtent
+        const all: any = (liveView.map as any).allLayers
+        const layers: any[] = all ? (all.toArray ? all.toArray() : Array.from(all)) : []
+        const jobs: Array<Promise<void>> = []
+        const slots: Array<VectorLayerData | null> = []
+        for (const l of layers) {
+            const el: any = vectorEligibility(l, scale, viewHasTime)
+            if (!el.ok) {
+                if (!el.skip) raster.push({ title: String(l.title || l.id), reason: String(el.reason) })
+                continue
+            }
+            const idx = slots.length
+            slots.push(null)
+            jobs.push((async () => {
+                const r = await queryVectorFeatures(l, el.resolved, el.labels, extent, outSR, offset, 20000)
+                if (Array.isArray(r)) {
+                    const vl: VectorLayerData = { id: String(l.id), title: String(l.title || l.id), opacity: Number(l.opacity) >= 0 ? Number(l.opacity) : 1, features: r, labels: el.labels ? el.labels.specs : [] }
+                    // picture markers: every image must resolve, or the layer
+                    // stays raster (a missing symbol is worse than pixels)
+                    const urls = pictureUrls(vl)
+                    if (urls.length) {
+                        const images: Record<string, string> = {}
+                        for (const u of urls) {
+                            const png = await pictureToPng(u)
+                            if (!png) { raster.push({ title: vl.title, reason: 'picture marker image' }); return }
+                            images[u] = png
+                        }
+                        vl.images = images
+                    }
+                    slots[idx] = vl
+                } else {
+                    raster.push({ title: String(l.title || l.id), reason: r.reason })
+                }
+            })())
+        }
+        if (jobs.length && !(opts as any)._quietVector) onProgress('Vector layers: querying ' + jobs.length + ' layer(s)\u2026')
+        await Promise.all(jobs)
+        for (const sl of slots) if (sl) data.push(sl)
+    } catch (e) { /* everything stays raster */ }
+    return { data, raster }
+}
+
 export async function renderLayout(
     liveView: MapView,
     layout: PrintLayout,
@@ -5274,6 +6404,9 @@ export async function renderLayout(
             onProgress,
             options.legendWidgetId
         ).then(rows => applyScaleFilter(rows, estimatePrintedScale(liveView, mf.wIn, mf.hIn, useLayout, options)))
+            .then(rows => options.legendExtentFilter === true
+                ? applyLegendExtentFilter(liveView, rows, estimatePrintExtent(liveView, mf.wIn, mf.hIn, useLayout, options), onProgress)
+                : rows)
         : Promise.resolve([])
     // Second-page legends need a multi-page format: PDF keeps it; raster
     // and SVG formats fall back to a right panel with a note.
@@ -5334,10 +6467,32 @@ export async function renderLayout(
     // KMZ is captured north-up: the world file, the GeoTIFF tiepoint, and the
     // KMZ corner quad are all axis-aligned, so any (often accidental) view
     // rotation must be ignored for these captures.
-    if ((options.georeference || options.googleEarthKmz) && options.mapOnly) {
+    // Opt-in (Settings): keep the rotation instead, and georeference the
+    // rotated raster through its full affine transform.
+    if ((options.georeference || options.googleEarthKmz) && options.mapOnly && !options.georefKeepRotation) {
         options = { ...options, forceNorthUp: true }
     }
+    // true vector feature layers (PDF / SVG, north-up captures only)
+    let vectorPlan: { data: VectorLayerData[], raster: Array<{ title: string, reason: string }> } | null = null
+    if (options.vectorLayers === true && (format === 'pdf' || format === 'svg' || format === 'svgz')) {
+        // rotated maps too: drawing goes through the capture's affine
+        vectorPlan = await planVectorLayers(liveView, mf.wIn, mf.hIn, useLayout, options, onProgress)
+        if (vectorPlan.data.length) options = { ...options, vectorExcludeIds: vectorPlan.data.map(v => v.id) }
+    }
     const cap = await captureMapHiRes(liveView, mf.wIn, mf.hIn, useLayout, maxImagePx, options, onProgress)
+    if (vectorPlan) {
+        const hidden = new Set(cap.vectorHidden || [])
+        const drawn = vectorPlan.data.filter(v => hidden.has(v.id))
+        for (const v of vectorPlan.data) if (!hidden.has(v.id)) vectorPlan.raster.push({ title: v.title, reason: 'could not be hidden in the capture' })
+        options = { ...options, vectorData: drawn }
+        const nFeat = drawn.reduce((a, v) => a + v.features.length, 0)
+        const why = vectorPlan.raster.map(r => r.title + ' (' + r.reason + ')').join(', ')
+        onProgress('Vector: ' + drawn.length + ' layer(s), ' + nFeat.toLocaleString() + ' feature(s)' +
+            (vectorPlan.raster.length ? '; raster: ' + why : '') + '.')
+        if (vectorPlan.raster.length) {
+            cap.warning = (cap.warning ? cap.warning + ' ' : '') + 'Printed as pixels: ' + why + '.'
+        }
+    }
     if (!panelPlacement) legendRows = await legendRowsPromise
     // exact printed scale is known now: re-apply (idempotent when unchanged)
     if (legendRows.length && Math.abs(cap.printedScale - estimatePrintedScale(liveView, mf.wIn, mf.hIn, useLayout, options)) > 1) {
@@ -5442,6 +6597,9 @@ export async function renderLayout(
             compress: true
         })
         const pd = new PdfDrawer(doc)
+        const putGeo = options.geoPdf !== false ? installGeoPdfWriter(doc) : null
+        const layered = options.pdfLayers !== false && pd.enableLayers()
+        if (putGeo || layered) markPdf17(doc)
         pd.setFontFamily(options.fontFamily || 'sans')
         if (options.customFont) {
             onProgress('Loading font ' + options.customFont.name + '…')
@@ -5449,6 +6607,13 @@ export async function renderLayout(
             pd.setCustomFont(options.customFont.name)
         }
         await composePage(pd, useLayout, cap, legendRows, title, options)
+        if (putGeo) {
+            if (await addGeoPdfViewport(putGeo, 1, pageH, getMapFrame(useLayout), cap, options)) {
+                onProgress('GeoPDF: map frame georeferenced' + (cap.wkid ? ' (WKID ' + cap.wkid + ')' : '') + '.')
+            } else {
+                onProgress('GeoPDF skipped: the map corners could not be placed on the globe.')
+            }
+        }
         if (!options.mapOnly && options.includeLegend !== false && legendRows.length &&
             useLayout.legend && useLayout.legend.enabled &&
             String(useLayout.legend.position || '') === 'secondPage' &&
@@ -5464,13 +6629,17 @@ export async function renderLayout(
             for (let pi = 0; pi < legendPages.length; pi++) {
                 onProgress('Composing legend page ' + (pi + 1) + ' of ' + legendPages.length + '\u2026')
                 doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
+                pd.beginLayer(PAGE_LAYERS.legend)
                 await drawLegendPage(pd, useLayout.pageWidthIn, useLayout.pageHeightIn, legendPages[pi], useLayout.legend)
+                pd.endLayer()
             }
         }
+        if (layered) onProgress('PDF layers: ' + pd.layerNames().join(', ') + '.')
         const pdfBlob: Blob = doc.output('blob')
         lastUrl = downloadBlob(pdfBlob, outName); lastSize = pdfBlob.size
     } else if (format === 'svg' || format === 'svgz') {
         const drawer = new SvgDrawer(pageW, pageH)
+        if (options.pdfLayers !== false) drawer.enableLayers()
         drawer.setFontFamily(options.fontFamily || 'sans')
         if (options.customFont) {
             onProgress('Loading font ' + options.customFont.name + '…')
@@ -5511,8 +6680,8 @@ export async function renderLayout(
             case 'jpg': blob = new Blob([dataUrlToBytes(drawer.canvas.toDataURL('image/jpeg', 0.92))], { type: 'image/jpeg' }); break
             case 'gif': blob = encodeGif(drawer.canvas); break
             case 'tiff': blob = encodeTiff(drawer.canvas,
-                (options.georeference && options.mapOnly && cap.rotation === 0 && cap.groundExtent && (options.georefWkid || 0) > 0)
-                    ? { ext: cap.groundExtent, wkid: Number(options.georefWkid), geographic: typeof options.georefGeographic === 'boolean' ? options.georefGeographic : isGeographicWkt(options.georefWkt || options.srWkt) }
+                (options.georeference && options.mapOnly && cap.affine && (options.georefWkid || 0) > 0)
+                    ? { aff: affineRescale(cap.affine, cap.widthPx, cap.heightPx, drawer.canvas.width, drawer.canvas.height), wkid: Number(options.georefWkid), geographic: typeof options.georefGeographic === 'boolean' ? options.georefGeographic : isGeographicWkt(options.georefWkt || options.srWkt) }
                     : null)
                 break
             case 'eps': blob = encodeEps(drawer.canvas, pageW, pageH); break
@@ -5523,11 +6692,15 @@ export async function renderLayout(
         // corners are tied to WGS84 lon/lat via gx:LatLonQuad, so the overlay
         // drapes on the globe for ANY source coordinate system. Requires a
         // north-up capture with a known ground extent (forced above).
-        if (options.googleEarthKmz && options.mapOnly && cap.rotation === 0 && cap.groundExtent) {
+        if (options.googleEarthKmz && options.mapOnly && cap.affine) {
             onProgress('Georeferencing for Google Earth…')
             const liveWkid = Number((liveView.spatialReference as any)?.wkid) || 0
             const capWkid = (options.outputWkid && options.outputWkid > 0) ? Number(options.outputWkid) : liveWkid
-            const quad = await extentCornersToWgs84(cap.groundExtent, cap.projection, capWkid)
+            // corners from the capture's affine: a rotated map yields a rotated
+            // quad, which gx:LatLonQuad drapes exactly
+            const gc = affineCorners(cap.affine, cap.widthPx, cap.heightPx)
+            const q4 = await groundPointsToWgs84([gc.ll, gc.lr, gc.ur, gc.ul], cap.projection, capWkid)
+            const quad: LatLonQuad | null = q4 ? { ll: q4[0], lr: q4[1], ur: q4[2], ul: q4[3] } : null
             if (quad) {
                 const imgBytes = new Uint8Array(await blob.arrayBuffer())
                 const imgName = 'overlay.' + (format === 'jpg' ? 'jpg' : 'png')
@@ -5553,20 +6726,22 @@ export async function renderLayout(
         }
         lastUrl = downloadBlob(blob, outName); lastSize = blob.size
         // Georeference a MAP-ONLY raster: the image is the map edge to edge,
-        // so the capture's ground extent maps exactly onto the output pixels.
-        // Full layouts are skipped (the map is a sub-rectangle of the page)
-        // and rotated captures are skipped (world files are north-up only).
+        // so the capture's affine maps exactly onto the output pixels. Full
+        // layouts are skipped (the map is a sub-rectangle of the page). A
+        // rotated capture (Settings: keep rotation) carries its rotation
+        // terms in the world file, or a ModelTransformationTag in the TIFF.
         // TIFF carries a TRUE embedded GeoTIFF (handled above, no sidecar);
         // PNG/JPG/GIF get the world file + .prj instead.
         const embeddedGeoTiff = format === 'tiff' && options.georeference && options.mapOnly &&
-            cap.rotation === 0 && !!cap.groundExtent && (options.georefWkid || 0) > 0
+            !!cap.affine && (options.georefWkid || 0) > 0
+        const rotNote = cap.rotation !== 0 ? ', rotated ' + (Math.round(cap.rotation * 100) / 100) + '\u00b0' : ''
         if (embeddedGeoTiff) {
-            onProgress('Wrote GeoTIFF (coordinate system embedded, EPSG:' + options.georefWkid + ').')
-        } else if (options.georeference && options.mapOnly && cap.rotation === 0 &&
-            cap.groundExtent && worldFileExt(format)) {
-            const wf = emitGeoSidecars(outName, format, drawer.canvas.width, drawer.canvas.height,
-                cap.groundExtent, options.georefWkt)
-            if (wf) onProgress('Wrote world file ' + wf + (options.georefWkt ? ' + .prj' : '') + '.')
+            onProgress('Wrote GeoTIFF (coordinate system embedded, EPSG:' + options.georefWkid + rotNote + ').')
+        } else if (options.georeference && options.mapOnly && cap.affine && worldFileExt(format)) {
+            const wf = emitGeoSidecars(outName, format,
+                affineRescale(cap.affine, cap.widthPx, cap.heightPx, drawer.canvas.width, drawer.canvas.height),
+                options.georefWkt)
+            if (wf) onProgress('Wrote world file ' + wf + (options.georefWkt ? ' + .prj' : '') + rotNote + '.')
         }
     }
 

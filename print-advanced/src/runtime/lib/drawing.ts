@@ -54,6 +54,116 @@ export interface Drawer {
    * (Pro honors lockedAspectRatio; stretching distorts logos).
    */
   image (dataUrl: string, fmt: 'JPEG' | 'PNG', x: number, y: number, w: number, h: number, fit?: 'stretch' | 'contain', anchorH?: AnchorH, anchorV?: AnchorV): Promise<void>
+  /** Start drawing into a named layer (PDF optional content group, SVG
+   *  layer group). Optional capability: raster backends leave it out, and
+   *  a backend with layers switched off ignores the call. Layers do not
+   *  nest: a new begin closes the open layer first. */
+  beginLayer? (name: string): void
+  /** Close the open layer, if any. */
+  endLayer? (): void
+  /** Vector path: subpaths of page points; closed adds the closing segment.
+   *  evenOdd fills with the even-odd rule (polygon holes). Optional. */
+  path? (subpaths: Array<Array<[number, number]>>, closed: boolean, style: ShapeStyle, evenOdd?: boolean): void
+  /** Clip later drawing to a rectangle until restoreClip. Optional. */
+  clipRect? (x: number, y: number, w: number, h: number): void
+  /** Clip later drawing to a path (even-odd) until restoreClip. Optional. */
+  clipPath? (subpaths: Array<Array<[number, number]>>, evenOdd?: boolean): void
+  /** Text rotated about its baseline start (page degrees, y down, so a
+   *  positive angle turns clockwise), with an optional halo. Optional. */
+  textAngle? (str: string, x: number, y: number, angleDeg: number, halo: [number, number, number] | null, haloWidthPt: number): void
+  restoreClip? (): void
+  /** Fill and stroke opacity (0-1) for later shapes. Optional. */
+  setAlpha? (fill: number, stroke: number): void
+  /** Dash lengths in points, or null for solid. Optional. */
+  setDash? (dash: number[] | null): void
+}
+
+/** PDF literal string for a layer name (ASCII only, escaped). */
+function pdfLit (s: string): string {
+  return '(' + String(s || '').replace(/[^\x20-\x7e]/g, '')
+    .replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)') + ')'
+}
+
+/**
+ * PDF layers (optional content, ISO 32000 section 8.11) for a jsPDF
+ * document, written through jsPDF's own build events, so no dependency:
+ *  - page content: each layer's drawing is wrapped in `/OC /OCn BDC ... EMC`
+ *  - putResources: one `<< /Type /OCG /Name (...) >>` object per layer
+ *  - putXobjectDict: jsPDF publishes this INSIDE the page resources'
+ *    /XObject dictionary, immediately before writing its closing `>>`. The
+ *    handler closes /XObject itself and opens /Properties, whose entries
+ *    are then closed by jsPDF's own `>>`. The result is the standard
+ *    `/XObject << ... >> /Properties << /OC1 n 0 R ... >>`.
+ *  - putCatalog: /OCProperties with the layer order and all layers on.
+ * Acrobat, Avenza Maps, ArcGIS Pro and QGIS show these as toggleable layers.
+ */
+export class PdfLayers {
+  private readonly names: string[] = []
+  private objIds: number[] = []
+  private open = false
+  private current = ''
+  readonly ok: boolean
+
+  constructor (private readonly doc: any) {
+    let ok = false
+    try {
+      const internal = doc && doc.internal
+      const ev = internal && internal.events
+      if (ev && typeof ev.subscribe === 'function' && typeof internal.write === 'function' &&
+        typeof internal.newObject === 'function') {
+        const onXobjectDict = (): void => {
+          if (!this.objIds.length) return
+          internal.write('>>')
+          internal.write('/Properties <<')
+          this.objIds.forEach((id, i) => internal.write('/OC' + (i + 1) + ' ' + id + ' 0 R'))
+        }
+        let xoToken: any = null
+        ev.subscribe('putResources', () => {
+          this.objIds = this.names.map(n => {
+            const id = internal.newObject()
+            internal.write('<< /Type /OCG /Name ' + pdfLit(n) + ' >>')
+            internal.write('endobj')
+            return id
+          })
+          // The /Properties trick must run AFTER every other putXobjectDict
+          // handler (jsPDF's image plugin subscribes lazily, on the first
+          // addImage, and writes the /I0 entries from that same event).
+          // putResources fires after all drawing and just before the
+          // resource dictionary is written, so re-subscribing here always
+          // puts this handler last.
+          try { if (xoToken != null && typeof ev.unsubscribe === 'function') ev.unsubscribe(xoToken) } catch (e) { /* keep going */ }
+          xoToken = ev.subscribe('putXobjectDict', onXobjectDict)
+        })
+        ev.subscribe('putCatalog', () => {
+          if (!this.objIds.length) return
+          const refs = this.objIds.map(id => id + ' 0 R').join(' ')
+          internal.write('/OCProperties << /OCGs [' + refs + '] /D << /Name (Layers) /Order [' + refs + '] /ON [' + refs + '] /OFF [] /BaseState /ON >> >>')
+        })
+        ok = true
+      }
+    } catch (e) { ok = false }
+    this.ok = ok
+  }
+
+  /** Registered layer names, in first-use order. */
+  list (): string[] { return this.names.slice() }
+
+  begin (name: string): void {
+    if (!this.ok) return
+    if (this.open && this.current === name) return // same layer continues
+    this.end()
+    this.current = name
+    let i = this.names.indexOf(name)
+    if (i < 0) { this.names.push(name); i = this.names.length - 1 }
+    this.doc.internal.write('/OC /OC' + (i + 1) + ' BDC')
+    this.open = true
+  }
+
+  end (): void {
+    if (!this.ok || !this.open) return
+    this.doc.internal.write('EMC')
+    this.open = false
+  }
 }
 
 export type AnchorH = 'left' | 'center' | 'right'
@@ -163,6 +273,76 @@ export class PdfDrawer implements Drawer {
     this.text(str, x, y, align)
   }
   textWidth (str: string): number { return this.doc.getTextWidth(str) }
+  private layers: PdfLayers | null = null
+  /** Switch PDF layers on for this document (call once, before drawing). */
+  enableLayers (): boolean {
+    if (!this.layers) this.layers = new PdfLayers(this.doc)
+    return this.layers.ok
+  }
+  layerNames (): string[] { return this.layers ? this.layers.list() : [] }
+  beginLayer (name: string): void { if (this.layers) this.layers.begin(name) }
+  endLayer (): void { if (this.layers) this.layers.end() }
+  private n (v: number): string { return (Math.round(v * 100) / 100).toString() }
+  path (subpaths: Array<Array<[number, number]>>, closed: boolean, style: ShapeStyle, evenOdd = false): void {
+    const d: any = this.doc
+    const k = Number(d.internal.scaleFactor) || 1
+    const H = Number(d.internal.pageSize.getHeight())
+    const ops: string[] = []
+    for (const sp of subpaths) {
+      if (!sp || sp.length < 2) continue
+      ops.push(this.n(sp[0][0] * k) + ' ' + this.n((H - sp[0][1]) * k) + ' m')
+      for (let i = 1; i < sp.length; i++) ops.push(this.n(sp[i][0] * k) + ' ' + this.n((H - sp[i][1]) * k) + ' l')
+      if (closed) ops.push('h')
+    }
+    if (!ops.length) return
+    const eo = evenOdd ? '*' : ''
+    ops.push(style === 'F' ? 'f' + eo : style === 'FD' ? 'B' + eo : 'S')
+    d.internal.write(ops.join('\n'))
+  }
+  clipRect (x: number, y: number, w: number, h: number): void {
+    const d: any = this.doc
+    const k = Number(d.internal.scaleFactor) || 1
+    const H = Number(d.internal.pageSize.getHeight())
+    d.saveGraphicsState()
+    d.internal.write(this.n(x * k) + ' ' + this.n((H - y - h) * k) + ' ' + this.n(w * k) + ' ' + this.n(h * k) + ' re W n')
+  }
+  restoreClip (): void { (this.doc as any).restoreGraphicsState() }
+  clipPath (subpaths: Array<Array<[number, number]>>, evenOdd = true): void {
+    const d: any = this.doc
+    const k = Number(d.internal.scaleFactor) || 1
+    const H = Number(d.internal.pageSize.getHeight())
+    const ops: string[] = []
+    for (const sp of subpaths) {
+      if (!sp || sp.length < 3) continue
+      ops.push(this.n(sp[0][0] * k) + ' ' + this.n((H - sp[0][1]) * k) + ' m')
+      for (let i = 1; i < sp.length; i++) ops.push(this.n(sp[i][0] * k) + ' ' + this.n((H - sp[i][1]) * k) + ' l')
+      ops.push('h')
+    }
+    d.saveGraphicsState()
+    // an empty clip must still clip everything away, never nothing
+    d.internal.write(ops.length ? ops.join('\n') + (evenOdd ? ' W* n' : ' W n') : '0 0 0 0 re W n')
+  }
+  textAngle (str: string, x: number, y: number, angleDeg: number, halo: [number, number, number] | null, haloWidthPt: number): void {
+    const d: any = this.doc
+    // jsPDF angles are counter-clockwise in PDF space (y up): the page
+    // (y down) clockwise angle is the negation
+    const angle = -angleDeg
+    if (halo && haloWidthPt > 0) {
+      try {
+        d.setDrawColor(halo[0], halo[1], halo[2])
+        d.setLineWidth(haloWidthPt)
+        d.text(str, x, y, { angle, renderingMode: 'stroke' })
+      } catch (e) { /* halo best-effort */ }
+    }
+    d.text(str, x, y, { angle })
+  }
+  setAlpha (fill: number, stroke: number): void {
+    const d: any = this.doc
+    try { d.setGState(new d.GState({ opacity: fill, 'stroke-opacity': stroke })) } catch (e) { /* opaque */ }
+  }
+  setDash (dash: number[] | null): void {
+    try { (this.doc as any).setLineDashPattern(dash && dash.length ? dash : [], 0) } catch (e) { /* solid */ }
+  }
   async image (dataUrl: string, fmt: 'JPEG' | 'PNG', x: number, y: number, w: number, h: number, fit: 'stretch' | 'contain' = 'stretch', anchorH: AnchorH = 'center', anchorV: AnchorV = 'center'): Promise<void> {
     if (fit === 'contain') {
       try {
@@ -355,6 +535,31 @@ export class SvgDrawer implements Drawer {
   private textColor = 'rgb(0,0,0)'
   private family: DrawerFontFamily = 'sans'
 
+  private layersOn = false
+  private layerOpen = false
+  private layerName = ''
+  private readonly layerCounts = new Map<string, number>()
+  /** Switch SVG layer groups on (Inkscape and Illustrator read top-level
+   *  groups as layers). */
+  enableLayers (): boolean { this.layersOn = true; return true }
+  beginLayer (name: string): void {
+    if (!this.layersOn) return
+    if (this.layerOpen && this.layerName === name) return // same layer continues
+    this.endLayer()
+    this.layerName = name
+    const base = 'layer-' + (String(name || 'layer').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'layer')
+    const n = (this.layerCounts.get(base) || 0) + 1
+    this.layerCounts.set(base, n)
+    const id = n === 1 ? base : base + '-' + n
+    this.parts.push(`<g id="${id}" inkscape:groupmode="layer" inkscape:label="${esc(name)}">`)
+    this.layerOpen = true
+  }
+  endLayer (): void {
+    if (!this.layerOpen) return
+    this.parts.push('</g>')
+    this.layerOpen = false
+  }
+
   constructor (private readonly pageWPt: number, private readonly pageHPt: number) {
     const c = document.createElement('canvas')
     const ctx = c.getContext('2d')
@@ -365,11 +570,68 @@ export class SvgDrawer implements Drawer {
     )
   }
 
+  private fillA = 1
+  private strokeA = 1
+  private dash: number[] | null = null
+  private clipSeq = 0
+  private clipDepth = 0
   private styleAttr (style: ShapeStyle): string {
     const f = style === 'S' ? 'none' : this.fill
     const s = style === 'F' ? 'none' : this.stroke
     const sw = style === 'F' ? '' : ` stroke-width="${this.lw}" stroke-linecap="round" stroke-linejoin="round"`
-    return `fill="${f}" stroke="${s}"${sw}`
+    const fo = style !== 'S' && this.fillA < 1 ? ` fill-opacity="${+this.fillA.toFixed(3)}"` : ''
+    const so = style !== 'F' && this.strokeA < 1 ? ` stroke-opacity="${+this.strokeA.toFixed(3)}"` : ''
+    const da = style !== 'F' && this.dash && this.dash.length ? ` stroke-dasharray="${this.dash.map(v => +v.toFixed(2)).join(' ')}"` : ''
+    return `fill="${f}" stroke="${s}"${sw}${fo}${so}${da}`
+  }
+  setAlpha (fill: number, stroke: number): void { this.fillA = fill; this.strokeA = stroke }
+  setDash (dash: number[] | null): void { this.dash = dash && dash.length ? dash.slice() : null }
+  path (subpaths: Array<Array<[number, number]>>, closed: boolean, style: ShapeStyle, evenOdd = false): void {
+    const r = (v: number): string => (Math.round(v * 100) / 100).toString()
+    let dstr = ''
+    for (const sp of subpaths) {
+      if (!sp || sp.length < 2) continue
+      dstr += 'M' + r(sp[0][0]) + ' ' + r(sp[0][1])
+      for (let i = 1; i < sp.length; i++) dstr += 'L' + r(sp[i][0]) + ' ' + r(sp[i][1])
+      if (closed) dstr += 'Z'
+    }
+    if (!dstr) return
+    this.parts.push(`<path d="${dstr}"${evenOdd ? ' fill-rule="evenodd"' : ''} ${this.styleAttr(style)}/>`)
+  }
+  clipRect (x: number, y: number, w: number, h: number): void {
+    const id = 'pa-clip-' + (++this.clipSeq)
+    this.parts.push(`<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></clipPath><g clip-path="url(#${id})">`)
+    this.clipDepth++
+  }
+  clipPath (subpaths: Array<Array<[number, number]>>, evenOdd = true): void {
+    const r = (v: number): string => (Math.round(v * 100) / 100).toString()
+    let dstr = ''
+    for (const sp of subpaths) {
+      if (!sp || sp.length < 3) continue
+      dstr += 'M' + r(sp[0][0]) + ' ' + r(sp[0][1])
+      for (let i = 1; i < sp.length; i++) dstr += 'L' + r(sp[i][0]) + ' ' + r(sp[i][1])
+      dstr += 'Z'
+    }
+    const id = 'pa-clip-' + (++this.clipSeq)
+    this.parts.push(`<clipPath id="${id}"><path d="${dstr || 'M0 0Z'}"${evenOdd ? ' clip-rule="evenodd"' : ''}/></clipPath><g clip-path="url(#${id})">`)
+    this.clipDepth++
+  }
+  textAngle (str: string, x: number, y: number, angleDeg: number, halo: [number, number, number] | null, haloWidthPt: number): void {
+    const weight = this.font === 'bold' ? ' font-weight="bold"' : ''
+    const styleAttr = this.font === 'italic' ? ' font-style="italic"' : ''
+    const haloAttr = halo && haloWidthPt > 0
+      ? ` stroke="rgb(${halo[0]},${halo[1]},${halo[2]})" stroke-width="${haloWidthPt * 2}" stroke-linejoin="round" style="paint-order:stroke"`
+      : ''
+    this.parts.push(
+      `<text x="${x}" y="${y}" transform="rotate(${+angleDeg.toFixed(3)} ${x} ${y})" font-family='${this.cssFamily()}' font-size="${this.fontSize}"` +
+      `${weight}${styleAttr} fill="${this.textColor}"${haloAttr}>${esc(str)}</text>`
+    )
+  }
+  restoreClip (): void {
+    if (this.clipDepth <= 0) return
+    this.parts.push('</g>')
+    this.clipDepth--
+    this.fillA = 1; this.strokeA = 1; this.dash = null
   }
 
   setFill (r: number, g: number, b: number): void { this.fill = `rgb(${r},${g},${b})` }
@@ -439,8 +701,10 @@ export class SvgDrawer implements Drawer {
   }
 
   toSvg (): string {
+    this.endLayer()
     return `<?xml version="1.0" encoding="UTF-8"?>\n` +
       `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
+      `xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" ` +
       `width="${this.pageWPt}pt" height="${this.pageHPt}pt" viewBox="0 0 ${this.pageWPt} ${this.pageHPt}">\n` +
       this.parts.join('\n') + '\n</svg>'
   }

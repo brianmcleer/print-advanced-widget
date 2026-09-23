@@ -82,6 +82,8 @@ impossible (vector basemap tiles) and wins where it matters.
 
 ## 3. Public-Notice Exhibit Mode (synergy with mailing-labels-widget)
 
+Status: built in 1.13.0 testing, then dropped before release (2026-09-23) as too complex. Not shipped.
+
 Goal: planning staff produce the notice map AND the mailing labels from one
 buffer in one sitting.
 
