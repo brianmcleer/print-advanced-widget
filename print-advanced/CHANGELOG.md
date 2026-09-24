@@ -2,6 +2,12 @@
 
 Newest first. Every release bumps `manifest.json` and `package.json` together.
 
+## 1.14.1 (2026-09-24)
+
+- Panel order reworked so it reads top to bottom the way people print: Layout, Map title, then Page preview (now under the title it shows), then Export. Advanced options is organized into cards, each a labelled group for screen readers: Print area; Map series (a switch, Print as a map series (PDF), with a page count badge; turning it on sets Format to PDF); On the map (legend and its placement together, overview, grid with its type and style together, selection); Page text (author, copyright, QR code); Style (font, north arrow, scale bar); Output (format, DPI, coordinate system, map-only export, file name). The Esri print service path gets the same Page text then Output order. Page preview says when it is paused for a map series, and Show print area stays on (and says why) while data-driven pages use Inside the print area.
+- Every Advanced options card opens and closes from its heading (a real button, announced as expanded or collapsed), and each user's choice is remembered in their browser. Print area and On the map start open, the rest closed; the Map series card opens by itself while a series is switched on. A closed card still shows a one-line summary of what is set inside it (the scale, "Legend, Grid", the author, the font, "PDF, 300 DPI"). Admins set the starting positions under User controls (Advanced options cards open by default), and they round-trip through XML.
+- Settings order reworked to match: Map, Print source, Layouts (per layout: Selected layout, Map capture, Legend, Grid, Overview inset, Pictures), Export defaults (with Page text, On the map, Style and Output sub-headings), Output features (GeoPDF, PDF layers, vector layers, keep rotation, diagnostics), Map extent and scale, Map series limits, Available formats, User controls (now also holds Allow advanced options, Advanced open by default and Show help guide, in panel order), Fonts, Default logo, Import / export. Help text follows the new locations.
+
 ## 1.14.0 (2026-09-23)
 
 - Grid maxed out:

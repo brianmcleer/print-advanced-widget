@@ -95,6 +95,8 @@ interface State {
   /** per-user grid style over the layout's grid (JSON of Partial<GridConfig>; '' = layout) */
   gridStyleJson: string
   gridStyleOpen: boolean
+  /** per-user open/closed state of the Advanced options cards (JSON) */
+  cardsOpenJson: string
   legendHint: { level: 'tight' | 'cramped', count: number, missed: number, fontPt: number } | null
   legendHintDismissed: boolean
   legendPosUserSet: boolean
@@ -205,6 +207,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       gridTypeOv: '',
       gridStyleJson: '',
       gridStyleOpen: false,
+      cardsOpenJson: '',
       legendHint: null,
       legendHintDismissed: false,
       legendPosUserSet: false,
@@ -1193,7 +1196,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
    *  have to re-pick the same format, DPI, or styles on every visit.
    *  Stored per browser + widget instance; admin runtime defaults still
    *  seed first-time users, and saved picks win afterward. */
-  private static readonly PREF_KEYS = ['format', 'dpi', 'naStyle', 'sbStyle', 'sbUnits', 'sbUnits2', 'fontFamily', 'author', 'fileName', 'gridStyleJson'] as const
+  private static readonly PREF_KEYS = ['format', 'dpi', 'naStyle', 'sbStyle', 'sbUnits', 'sbUnits2', 'fontFamily', 'author', 'fileName', 'gridStyleJson', 'cardsOpenJson'] as const
   private prefSaveTimer: any = null
 
   prefStorageKey = (): string => 'print-advanced-prefs-' + String((this.props as any).id || 'w')
@@ -1905,6 +1908,94 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   private featSeq = 0
 
   seriesFeatures = (): boolean => this.state.seriesMode === 'features'
+
+  /* ---------------------------------------------------------------- */
+  /* Advanced options cards: open or closed, remembered per user      */
+  /* ---------------------------------------------------------------- */
+
+  /** Out of the box: the cards people touch on most prints start open. */
+  private static readonly CARD_DEFAULT_OPEN: Record<string, boolean> = {
+    area: true, series: false, onmap: true, text: false, style: false, output: false, svcout: true
+  }
+
+  cardsOpen = (): Record<string, boolean> => {
+    try { const v = this.state.cardsOpenJson ? JSON.parse(this.state.cardsOpenJson) : {}; return v && typeof v === 'object' ? v : {} } catch (e) { return {} }
+  }
+
+  /** The user's choice, else the admin default, else the built-in one. A
+   *  card with something switched on inside it (a running map series, a
+   *  data-driven pages setup) stays open so the setup is never hidden. */
+  cardOpen = (key: string): boolean => {
+    if (key === 'series' && this.seriesActive()) return true
+    const user = this.cardsOpen()
+    if (typeof user[key] === 'boolean') return user[key]
+    const admin: any = (this.cfg() as any).cardsOpen
+    if (admin && typeof admin[key] === 'boolean') return admin[key]
+    return (Widget as any).CARD_DEFAULT_OPEN[key] !== false
+  }
+
+  toggleCard = (key: string): void => {
+    const next = { ...this.cardsOpen(), [key]: !this.cardOpen(key) }
+    this.setState({ cardsOpenJson: JSON.stringify(next) })
+  }
+
+  /** One-line summary shown in a card header, so a closed card still tells
+   *  you what is set inside it. */
+  cardSummary = (key: string, messages: any, layout: any): string => {
+    const s: any = this.state
+    try {
+      if (key === 'area') return s.scaleReadout ? '1:' + Number(s.scaleReadout).toLocaleString() : ''
+      if (key === 'series') return this.seriesActive() ? String(messages.seriesPagesBadge).replace('{n}', String(this.seriesPageCount())) : messages.cardOff
+      if (key === 'onmap') {
+        const on: string[] = []
+        if (this.ctrl('legend') && layout && ((layout.elements && layout.elements.some((e: any) => e.type === 'legend')) || (layout.legend && layout.legend.enabled)) && s.includeLegend && !s.mapOnly) on.push(messages.cardLegend)
+        if (this.ctrl('overview') && layout && layout.overview && layout.overview.enabled && s.showOverview && !s.mapOnly) on.push(messages.cardOverview)
+        if (this.ctrl('grid') && layout && layout.grid && layout.grid.enabled && s.showGrid && !s.mapOnly) on.push(messages.cardGrid)
+        if (s.includeSelection) on.push(messages.cardSelection)
+        return on.length ? on.join(', ') : messages.cardNone
+      }
+      if (key === 'text') {
+        const parts: string[] = []
+        if (s.author) parts.push(s.author)
+        if (s.qrOn) parts.push(messages.cardQr)
+        return parts.join(', ')
+      }
+      if (key === 'style') {
+        const fam = s.fontFamily || (this.cfg() as any).defaultFontFamily || ''
+        if (!fam) return messages.layoutDefault
+        if (fam.indexOf('custom:') === 0) return fam.slice(7)
+        const f = FONT_FAMILIES.find((x: any) => x.value === fam)
+        return f ? f.label : fam
+      }
+      if (key === 'output' || key === 'svcout') {
+        const f = FORMAT_LABELS.find((x: any) => x.value === s.format)
+        // short form: the part in parentheses (PDF), else the whole label
+        const m = f ? /\(([^)]+)\)\s*$/.exec(f.label) : null
+        const parts: string[] = [m ? m[1] : (f ? f.label : String(s.format || '').toUpperCase())]
+        if (s.dpi) parts.push(s.dpi + ' DPI')
+        if (s.mapOnly) parts.push(messages.cardMapOnly)
+        return parts.join(' · ')
+      }
+    } catch (e) { /* summary is decoration */ }
+    return ''
+  }
+
+  /** Card header: a real button that opens and closes the card. */
+  cardHead = (key: string, title: string, messages: any, layout: any): React.ReactNode => {
+    const open = this.cardOpen(key)
+    const sum = this.cardSummary(key, messages, layout)
+    return (
+      <button type='button' className={'pd-card-btn' + (open ? '' : ' is-closed')}
+        aria-expanded={open} aria-controls={this.uid('cb-' + key)} id={this.uid('gh-' + key)}
+        onClick={() => this.toggleCard(key)}>
+        <span className='pd-card-left'>
+          {open ? <DownOutlined size={12} aria-hidden='true' /> : <RightOutlined size={12} aria-hidden='true' />}
+          <span className='pd-pa-title'>{title}</span>
+        </span>
+        {sum ? <span className='pd-pa-scale'>{sum}</span> : null}
+      </button>
+    )
+  }
 
   /* ---------------------------------------------------------------- */
   /* grid style (per user, over the layout's grid settings)            */
@@ -2671,6 +2762,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       background: var(--ref-palette-neutral-300, #ececec);
       border-radius: 10px; padding: 1px 8px; white-space: nowrap;
     }
+    .pd-card-btn { all: unset; box-sizing: border-box; display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 10px; border-radius: 3px; }
+    .pd-card-btn.is-closed { margin-bottom: 0; }
+    .pd-card-btn:hover .pd-pa-title { text-decoration: underline; }
+    .pd-card-btn:focus-visible { outline: 2px solid var(--sys-color-primary-main, #007ac2); outline-offset: 3px; }
+    .pd-card-left { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+    .pd-card-body > .pd-row:last-of-type { margin-bottom: 0; }
     .pd-pa-switch { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .pd-pa-switch .pd-label { margin-bottom: 0; }
     .pd-print-area .pd-row { margin-bottom: 10px; }
@@ -3078,6 +3175,28 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               </Tooltip>
             </div>
             )}
+            {this.ctrl('author') && (
+            <div className='pd-row'>
+              <Label className='pd-label' id={this.uid('svcauth') + '-lbl'}>{messages.authorLabel}</Label>
+              <Tooltip title={messages.authorTip} placement='top'>
+                <TextInput id={this.uid('svcauth')} aria-labelledby={this.uid('svcauth') + '-lbl'} size='sm'
+                  value={this.state.author} onChange={(e) => this.setState({ author: e.target.value })} />
+              </Tooltip>
+            </div>
+            )}
+            {this.ctrl('copyright') && (
+            <div className='pd-row'>
+              <Label className='pd-label' id={this.uid('svccopy') + '-lbl'}>{messages.copyrightLabel}</Label>
+              <Tooltip title={messages.copyrightTip} placement='top'>
+                <TextInput id={this.uid('svccopy')} aria-labelledby={this.uid('svccopy') + '-lbl'} size='sm'
+                  value={this.state.copyright} onChange={(e) => this.setState({ copyright: e.target.value })} />
+              </Tooltip>
+            </div>
+            )}
+            <div className='pd-print-area' role='group' aria-labelledby={this.uid('gh-svcout')}>
+              {this.cardHead('svcout', messages.groupOutput, messages, layout)}
+              {this.cardOpen('svcout') && (
+              <div id={this.uid('cb-svcout')} className='pd-card-body'>
             <div className='pd-row'>
               <Label className='pd-label' id={this.uid('svcfmt') + '-lbl'}>{messages.formatLabel}</Label>
               <Tooltip title={messages.formatTip} placement='top'>
@@ -3103,22 +3222,15 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 </Select>
               </Tooltip>
             </div>
-            {this.ctrl('author') && (
+            {this.outSREnabled() && (
             <div className='pd-row'>
-              <Label className='pd-label' id={this.uid('svcauth') + '-lbl'}>{messages.authorLabel}</Label>
-              <Tooltip title={messages.authorTip} placement='top'>
-                <TextInput id={this.uid('svcauth')} aria-labelledby={this.uid('svcauth') + '-lbl'} size='sm'
-                  value={this.state.author} onChange={(e) => this.setState({ author: e.target.value })} />
+              <Label className='pd-label' id={this.uid('svcwkid') + '-lbl'}>{messages.outSRLabel}</Label>
+              <Tooltip title={messages.outSRTip} placement='top'>
+                <TextInput size='sm' aria-labelledby={this.uid('svcwkid') + '-lbl'}
+                  placeholder={messages.outSRPh} value={this.state.outWkid}
+                  onChange={(e: any) => this.setState({ outWkid: (e.target.value || '').replace(/[^0-9]/g, '') })} />
               </Tooltip>
-            </div>
-            )}
-            {this.ctrl('copyright') && (
-            <div className='pd-row'>
-              <Label className='pd-label' id={this.uid('svccopy') + '-lbl'}>{messages.copyrightLabel}</Label>
-              <Tooltip title={messages.copyrightTip} placement='top'>
-                <TextInput id={this.uid('svccopy')} aria-labelledby={this.uid('svccopy') + '-lbl'} size='sm'
-                  value={this.state.copyright} onChange={(e) => this.setState({ copyright: e.target.value })} />
-              </Tooltip>
+              <div className='pd-desc'>{messages.outSRHint}</div>
             </div>
             )}
             <div className='pd-row pd-pa-switch'>
@@ -3135,17 +3247,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                   onChange={(e) => this.setState({ svcForceAttrs: e.target.checked })} />
               </Tooltip>
             </div>
-            {this.outSREnabled() && (
-            <div className='pd-row'>
-              <Label className='pd-label' id={this.uid('svcwkid') + '-lbl'}>{messages.outSRLabel}</Label>
-              <Tooltip title={messages.outSRTip} placement='top'>
-                <TextInput size='sm' aria-labelledby={this.uid('svcwkid') + '-lbl'}
-                  placeholder={messages.outSRPh} value={this.state.outWkid}
-                  onChange={(e: any) => this.setState({ outWkid: (e.target.value || '').replace(/[^0-9]/g, '') })} />
-              </Tooltip>
-              <div className='pd-desc'>{messages.outSRHint}</div>
+              </div>
+              )}
             </div>
-            )}
 
           </React.Fragment>
         )}
@@ -3170,7 +3274,24 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               {layout && <div id={this.uid('layout-desc')} className='pd-desc'>{this.describeLayout(layout)}</div>}
             </div>
 
-            {this.ctrl('pagePreview') && !(this.state.seriesOpen && this.state.format === 'pdf' && this.ctrl('series')) && (
+            {this.ctrl('title') && (
+            <div className='pd-row'>
+              <Label className='pd-label' id={this.uid('title') + '-lbl'}>{messages.titleLabel}</Label>
+              <Tooltip title={messages.titleTip} placement='top'>
+                <TextInput
+                  id={this.uid('title')} aria-labelledby={this.uid('title') + '-lbl'}
+                  size='sm'
+                  value={this.state.title}
+                  onChange={(e) => this.setState({ title: e.target.value })}
+                  placeholder={layout ? layout.name : ''}
+                  aria-label={messages.titleLabel}
+                />
+              </Tooltip>
+              {this.renderSeriesTitleHelp(messages, layout)}
+            </div>
+            )}
+
+            {this.ctrl('pagePreview') && !this.seriesActive() && (
             <React.Fragment>
               <div className='pd-row pd-inline'>
                 <Label className='pd-label' id={this.uid('pprev') + '-lbl'}>{messages.pagePreviewLabel}</Label>
@@ -3191,25 +3312,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             </React.Fragment>
             )}
 
-            {this.ctrl('title') && (
-            <div className='pd-row'>
-              <Label className='pd-label' id={this.uid('title') + '-lbl'}>{messages.titleLabel}</Label>
-              <Tooltip title={messages.titleTip} placement='top'>
-                <TextInput
-                  id={this.uid('title')} aria-labelledby={this.uid('title') + '-lbl'}
-                  size='sm'
-                  value={this.state.title}
-                  onChange={(e) => this.setState({ title: e.target.value })}
-                  placeholder={layout ? layout.name : ''}
-                  aria-label={messages.titleLabel}
-                />
-              </Tooltip>
-              {this.renderSeriesTitleHelp(messages, layout)}
-            </div>
+            {this.ctrl('pagePreview') && this.seriesActive() && (
+              <div className='pd-desc' role='status'>{messages.pagePreviewSeriesNote}</div>
             )}
 
-            {((this.props.config as any)?.showAdvancedOptions !== false) &&
-              (this.meEnabled() || this.ctrl('format') || this.ctrl('dpi') || this.ctrl('font') || this.ctrl('northArrow') || this.ctrl('scaleBar') || this.ctrl('fileName')) && (
+            {((this.props.config as any)?.showAdvancedOptions !== false) && (
               <div className='pd-adv-toggle'
                 role='button'
                 tabIndex={0}
@@ -3229,11 +3336,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             {((this.props.config as any)?.showAdvancedOptions !== false) && this.state.advOpen && (
             <div id={this.uid('adv')} role='group' aria-label={messages.advancedOptions}>
             {this.meEnabled() && (
-            <div className='pd-print-area'>
-              <div className='pd-pa-head'>
-                <span className='pd-pa-title'>{messages.printAreaLabel}</span>
-                {this.state.scaleReadout ? <span className='pd-pa-scale'>1:{this.state.scaleReadout.toLocaleString()}</span> : null}
-              </div>
+            <div className='pd-print-area' role='group' aria-labelledby={this.uid('gh-area')}>
+              {this.cardHead('area', messages.printAreaLabel, messages, layout)}
+              {this.cardOpen('area') && (
+              <div id={this.uid('cb-area')} className='pd-card-body'>
               {this.availableScaleModes().length > 1 && (
                 <div className='pd-row'>
                   <Label className='pd-label' id={this.uid('scalemode') + '-lbl'}>{messages.scaleModeLabel}</Label>
@@ -3273,11 +3379,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                   <Label className='pd-label' id={this.uid('preview') + '-lbl'}>{messages.showPreviewLabel}</Label>
                   <Tooltip title={messages.showPreviewTip} placement='top'>
                     <Switch aria-labelledby={this.uid('preview') + '-lbl'}
-                      checked={this.state.previewOn}
+                      checked={this.state.previewOn || this.ddpFrameActive()} disabled={this.ddpFrameActive()}
                       onChange={(e) => this.setState({ previewOn: e.target.checked, locked: e.target.checked ? this.state.locked : false })} />
                   </Tooltip>
                 </div>
               )}
+              {this.ddpFrameActive() && <div className='pd-desc'>{messages.showPreviewForced}</div>}
               {this.mapExtentCfg().showLock && this.state.previewOn && (
                 <div className='pd-row pd-pa-switch'>
                   <Label className='pd-label' id={this.uid('lock') + '-lbl'}>{messages.lockLabel}</Label>
@@ -3289,48 +3396,217 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 </div>
               )}
               {this.state.locked && <div className='pd-desc'>{messages.lockedNote}</div>}
+              </div>
+              )}
             </div>
             )}
-
-            {this.ctrl('format') && (
-            <div className='pd-row'>
-              <Label className='pd-label' id={this.uid('format') + '-lbl'}>{messages.formatLabel}</Label>
-              <Tooltip title={messages.formatTip} placement='top'>
-                <Select id={this.uid('format')} aria-labelledby={this.uid('format') + '-lbl'} size='sm' value={this.state.format}
-                  aria-describedby={(this.state.format === 'svg' || this.state.format === 'svgz' || this.state.format === 'eps') ? this.uid('format-desc') : undefined}
-                  onChange={(e: any) => this.setState({ format: e.target.value })}>
-                  {FORMAT_LABELS
-                    .filter(f => !f.disabled && this.formatAllowed(f.value))
-                    .map(f => (
-                      <option key={f.value} value={f.value} disabled={!!f.disabled}>{f.label}</option>
-                    ))}
+            {this.ctrl('series') && (
+            <div className='pd-print-area' role='group' aria-labelledby={this.uid('gh-series')}>
+              {this.cardHead('series', messages.groupSeries, messages, layout)}
+              {this.cardOpen('series') && (
+              <div id={this.uid('cb-series')} className='pd-card-body'>
+              <div className='pd-row pd-pa-switch'>
+                <Label className='pd-label' id={this.uid('sopen') + '-lbl'}>{messages.seriesSwitch}</Label>
+                <Tooltip title={messages.seriesSwitchTip} placement='top'>
+                  <Switch aria-labelledby={this.uid('sopen') + '-lbl'} checked={this.seriesActive()}
+                    onChange={(e: any) => {
+                      const on = !!(e.target && e.target.checked)
+                      this.setState(on ? { seriesOpen: true, format: 'pdf' } : { seriesOpen: false })
+                    }} />
+                </Tooltip>
+              </div>
+              {this.seriesActive() && (
+              <React.Fragment>
+              <div className='pd-row'>
+                <Label className='pd-label' id={this.uid('smode') + '-lbl'}>{messages.seriesMode}</Label>
+                <Select size='sm' aria-labelledby={this.uid('smode') + '-lbl'} value={this.state.seriesMode}
+                  onChange={(e: any) => this.setState({ seriesMode: e.target.value })}>
+                  <option value='grid'>{messages.seriesModeGrid}</option>
+                  <option value='features'>{messages.seriesModeFeatures}</option>
                 </Select>
-              </Tooltip>
-              {(this.state.format === 'svg' || this.state.format === 'svgz') &&
-                <div id={this.uid('format-desc')} className='pd-desc'>{messages.svgHint}</div>}
-              {this.state.format === 'eps' &&
-                <div id={this.uid('format-desc')} className='pd-desc'>{messages.epsHint}</div>}
+              </div>
+              {!this.seriesFeatures() && (
+              <React.Fragment>
+              <div className='pd-desc'>{messages.seriesHint}</div>
+              <div className='pd-row pd-inline'>
+                <Label className='pd-label' id={this.uid('srows') + '-lbl'}>{messages.seriesRows}</Label>
+                <TextInput id={this.uid('srows')} aria-labelledby={this.uid('srows') + '-lbl'} size='sm' style={{ width: 64 }}
+                  value={this.state.seriesRows} onChange={(e) => this.setState({ seriesRows: e.target.value })} />
+                <Label className='pd-label' id={this.uid('scols') + '-lbl'}>{messages.seriesCols}</Label>
+                <TextInput id={this.uid('scols')} aria-labelledby={this.uid('scols') + '-lbl'} size='sm' style={{ width: 64 }}
+                  value={this.state.seriesCols} onChange={(e) => this.setState({ seriesCols: e.target.value })} />
+              </div>
+              <div className='pd-row pd-inline'>
+                <Label className='pd-label' id={this.uid('ssize') + '-lbl'}>{messages.seriesSize}</Label>
+                <input type='range' className='pd-range' min={25} max={100} step={5}
+                  aria-labelledby={this.uid('ssize') + '-lbl'}
+                  value={Math.max(25, Math.min(100, parseInt(this.state.seriesSizePct, 10) || 100))}
+                  onChange={(e: any) => this.setState({ seriesSizePct: e.target.value })} />
+                <span className='pd-desc' style={{ minWidth: 34 }}>{(parseInt(this.state.seriesSizePct, 10) || 100)}%</span>
+              </div>
+              <div className='pd-desc'>
+                {messages.seriesEstimate.replace('{n}', String(this.seriesSheetCount() + 1))}
+              </div>
+              {this.renderSeriesLimit(messages)}
+              </React.Fragment>
+              )}
+              {this.seriesFeatures() && this.renderFeaturePagesPanel(messages)}
+              </React.Fragment>
+              )}
+              </div>
+              )}
             </div>
             )}
-
-            {this.ctrl('dpi') && (
+            <div className='pd-print-area' role='group' aria-labelledby={this.uid('gh-onmap')}>
+              {this.cardHead('onmap', messages.groupOnMap, messages, layout)}
+              {this.cardOpen('onmap') && (
+              <div id={this.uid('cb-onmap')} className='pd-card-body'>
+            {this.ctrl('legend') && layout && ((layout.elements && layout.elements.some(e => e.type === 'legend')) || (layout as any).legend?.enabled) && (
+            <div className='pd-row pd-pa-switch'>
+              <Label className='pd-label' id={this.uid('leg') + '-lbl'}>{messages.includeLegendLabel}</Label>
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.includeLegendTip} placement='top'>
+                <Switch aria-labelledby={this.uid('leg') + '-lbl'} disabled={this.state.mapOnly} checked={this.state.includeLegend}
+                  onChange={(e) => this.setState({ includeLegend: e.target.checked })} />
+              </Tooltip>
+            </div>
+            )}
+            {this.ctrl('legend') && layout && (layout as any).legend?.enabled && this.state.includeLegend && (
+            <div className='pd-row' data-testid='legendPosSelect'>
+              <Label className='pd-label' id={this.uid('legpos') + '-lbl'}>{messages.legendPositionLabel}</Label>
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.legendPositionTip} placement='top'>
+              <Select id={this.uid('legpos')} aria-labelledby={this.uid('legpos') + '-lbl'} size='sm' disabled={this.state.mapOnly} value={this.state.legendPositionOv}
+                onChange={(e: any) => this.setState({ legendPositionOv: e.target.value, legendPosUserSet: true, legendAutoPaged: false })}>
+                <option value=''>{messages.layoutDefaultOption}</option>
+                <option value='rightPanel'>{messages.legendPosRight}</option>
+                <option value='secondPage'>{messages.legendPosSecondPage}</option>
+                <option value='leftPanel'>{messages.legendPosLeft}</option>
+                <option value='bottomPanel'>{messages.legendPosBottom}</option>
+                <option value='topLeft'>{messages.legendPosTL}</option>
+                <option value='topRight'>{messages.legendPosTR}</option>
+                <option value='bottomLeft'>{messages.legendPosBL}</option>
+                <option value='bottomRight'>{messages.legendPosBR}</option>
+              </Select>
+              </Tooltip>
+            </div>
+            )}
+            {this.state.legendAutoPaged && this.state.legendPositionOv === 'secondPage' && this.state.includeLegend && !this.state.mapOnly && (
+            <div className='pd-row' role='status' aria-live='polite'>
+              <Alert type='info' text={messages.legendAutoPagedText} withIcon size='small' className='w-100'
+                aria-label={messages.legendAutoPagedText} />
+              <Button size='sm' type='tertiary'
+                onClick={() => this.setState({ legendPositionOv: '', legendAutoPaged: false, legendPosUserSet: true })}>
+                {messages.legendKeepBeside}
+              </Button>
+            </div>
+            )}
+            {(() => {
+              const h = this.state.legendHint
+              if (!h || this.state.legendHintDismissed || this.state.legendPositionOv === 'secondPage' ||
+                  !this.state.includeLegend || this.state.mapOnly) return null
+              const text = (h.level === 'cramped'
+                ? (h.missed > 0
+                    ? messages.legendHintMissed.replace('{count}', String(h.count)).replace('{missed}', String(h.missed))
+                    : messages.legendHintShrunk.replace('{count}', String(h.count)).replace('{font}', String(h.fontPt)))
+                : messages.legendHintMany.replace('{count}', String(h.count))) + ' ' + messages.legendHintSuffix
+              return (
+                <div className='pd-row' role='status' aria-live='polite'>
+                  <Alert type={h.level === 'cramped' ? 'warning' : 'info'} text={text} withIcon size='small' className='w-100'
+                    aria-label={text} />
+                  <div className='pd-hint-actions'>
+                    <Button size='sm' type='primary'
+                      onClick={() => this.setState({ legendPositionOv: 'secondPage', legendHint: null })}>
+                      {messages.legendUseSecondPage}
+                    </Button>
+                    <Button size='sm' type='tertiary'
+                      onClick={() => this.setState({ legendHintDismissed: true })}>
+                      {messages.legendHintDismiss}
+                    </Button>
+                  </div>
+                </div>
+              )
+            })()}
+            {this.ctrl('overview') && layout && (layout as any).overview?.enabled && (
+            <div className='pd-row pd-pa-switch'>
+              <Label className='pd-label' id={this.uid('ovw') + '-lbl'}>{messages.overviewToggleLabel}</Label>
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.overviewToggleTip} placement='top'>
+                <Switch aria-labelledby={this.uid('ovw') + '-lbl'} disabled={this.state.mapOnly} checked={this.state.showOverview}
+                  onChange={(e) => this.setState({ showOverview: e.target.checked })} />
+              </Tooltip>
+            </div>
+            )}
+            {this.ctrl('grid') && layout && (layout as any).grid?.enabled && (
+            <div className='pd-row pd-pa-switch'>
+              <Label className='pd-label' id={this.uid('grd') + '-lbl'}>{messages.gridToggleLabel}</Label>
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.gridToggleTip} placement='top'>
+                <Switch aria-labelledby={this.uid('grd') + '-lbl'} disabled={this.state.mapOnly} checked={this.state.showGrid}
+                  onChange={(e) => this.setState({ showGrid: e.target.checked })} />
+              </Tooltip>
+            </div>
+            )}
+            {this.ctrl('grid') && layout && (layout as any).grid?.enabled && this.state.showGrid && (
             <div className='pd-row'>
-              <Label className='pd-label' id={this.uid('dpi') + '-lbl'}>{messages.dpiLabel}</Label>
-              <Tooltip title={messages.dpiTip} placement='top'>
-                <Select id={this.uid('dpi')} aria-labelledby={this.uid('dpi') + '-lbl'} size='sm' value={this.state.dpi}
-                  onChange={(e: any) => this.setState({ dpi: e.target.value })}>
-                  <option value=''>{messages.dpiDefault}{layout ? ' (' + layout.dpi + ')' : ''}</option>
-                  <option value='96'>96 (draft)</option>
-                  <option value='150'>150</option>
-                  <option value='200'>200</option>
-                  <option value='300'>300</option>
-                  <option value='400'>400</option>
-                  <option value='600'>600</option>
-                </Select>
+              <Label className='pd-label' id={this.uid('gridtype') + '-lbl'}>{messages.gridTypeLabel}</Label>
+              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.gridTypeSelTip} placement='top'>
+              <Select id={this.uid('gridtype')} aria-labelledby={this.uid('gridtype') + '-lbl'} size='sm' disabled={this.state.mapOnly} value={this.state.gridTypeOv}
+                onChange={(e: any) => this.setState({ gridTypeOv: e.target.value })}>
+                <option value=''>{messages.layoutDefaultOption}</option>
+                <option value='graticule'>{messages.gridTypeGraticule}</option>
+                <option value='measured'>{messages.gridTypeMeasured}</option>
+                <option value='reference'>{messages.gridTypeReference}</option>
+              </Select>
               </Tooltip>
             </div>
             )}
-
+            {this.ctrl('grid') && layout && (layout as any).grid?.enabled && this.state.showGrid && !this.state.mapOnly && this.renderGridStyle(messages, layout)}
+            <div className='pd-row'>
+              <div className='pd-pa-switch'>
+                <Label className='pd-label' id={this.uid('sel') + '-lbl'}>{messages.selectionToggleLabel}</Label>
+                <Tooltip title={messages.selectionToggleTip} placement='top'>
+                  <Switch aria-labelledby={this.uid('sel') + '-lbl'} checked={this.state.includeSelection}
+                    onChange={(e) => this.setState({ includeSelection: e.target.checked })} />
+                </Tooltip>
+              </div>
+              <div className='pd-desc'>{messages.selectionToggleHint}</div>
+            </div>
+              </div>
+              )}
+            </div>
+            <div className='pd-print-area' role='group' aria-labelledby={this.uid('gh-text')}>
+              {this.cardHead('text', messages.groupPageText, messages, layout)}
+              {this.cardOpen('text') && (
+              <div id={this.uid('cb-text')} className='pd-card-body'>
+            {this.ctrl('author') && (
+            <div className='pd-row'>
+              <Label className='pd-label' id={this.uid('author') + '-lbl'}>{messages.authorLabel}</Label>
+              <Tooltip title={messages.authorTip} placement='top'>
+                <TextInput id={this.uid('author')} size='sm' aria-labelledby={this.uid('author') + '-lbl'}
+                  value={this.state.author} onChange={(e) => this.setState({ author: e.target.value })} />
+              </Tooltip>
+            </div>
+            )}
+            {this.ctrl('copyright') && (
+            <div className='pd-row'>
+              <Label className='pd-label' id={this.uid('copyright') + '-lbl'}>{messages.copyrightLabel}</Label>
+              <Tooltip title={messages.copyrightTip} placement='top'>
+                <TextInput id={this.uid('copyright')} size='sm' aria-labelledby={this.uid('copyright') + '-lbl'}
+                  value={this.state.copyright} onChange={(e) => this.setState({ copyright: e.target.value })} />
+              </Tooltip>
+            </div>
+            )}
+            <div className='pd-row pd-inline'>
+              <Label className='pd-label' id={this.uid('qr') + '-lbl'}>{messages.qrToggleLabel}</Label>
+              <Switch aria-labelledby={this.uid('qr') + '-lbl'} checked={this.state.qrOn}
+                onChange={(e: any) => this.setState({ qrOn: !!(e.target && e.target.checked) })} />
+            </div>
+            <div className='pd-desc'>{messages.qrToggleDesc}</div>
+              </div>
+              )}
+            </div>
+            {(this.ctrl('font') || (this.ctrl('northArrow') && layout && layout.elements && layout.elements.some(e => e.type === 'northArrow')) || (this.ctrl('scaleBar') && layout && layout.elements && layout.elements.some(e => e.type === 'scaleBar'))) && (
+            <div className='pd-print-area' role='group' aria-labelledby={this.uid('gh-style')}>
+              {this.cardHead('style', messages.groupStyle, messages, layout)}
+              {this.cardOpen('style') && (
+              <div id={this.uid('cb-style')} className='pd-card-body'>
             {this.ctrl('font') && (
             <div className='pd-row'>
               <Label className='pd-label' id={this.uid('font') + '-lbl'}>{messages.fontLabel}</Label>
@@ -3348,7 +3624,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               </Tooltip>
             </div>
             )}
-
             {this.ctrl('northArrow') && layout && layout.elements && layout.elements.some(e => e.type === 'northArrow') && (
               <div className='pd-row'>
                 <Label className='pd-label' id={this.uid('na') + '-lbl'}>{messages.northArrowLabel}</Label>
@@ -3358,7 +3633,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 </Tooltip>
               </div>
             )}
-
             {this.ctrl('scaleBar') && layout && layout.elements && layout.elements.some(e => e.type === 'scaleBar') && (
               <React.Fragment>
                 <div className='pd-row'>
@@ -3398,199 +3672,52 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 )}
               </React.Fragment>
             )}
-
-            {this.ctrl('series') && this.state.format === 'pdf' && (
-            <React.Fragment>
-              <div className='pd-row'>
-                <Button size='sm' type={this.state.seriesOpen ? 'primary' : 'secondary'}
-                  aria-expanded={this.state.seriesOpen}
-                  onClick={() => this.setState({ seriesOpen: !this.state.seriesOpen })}>
-                  {this.state.seriesOpen ? messages.seriesHide : messages.seriesSection}
-                </Button>
               </div>
-              {this.state.seriesOpen && (
-              <React.Fragment>
-              <div className='pd-row'>
-                <Label className='pd-label' id={this.uid('smode') + '-lbl'}>{messages.seriesMode}</Label>
-                <Select size='sm' aria-labelledby={this.uid('smode') + '-lbl'} value={this.state.seriesMode}
-                  onChange={(e: any) => this.setState({ seriesMode: e.target.value })}>
-                  <option value='grid'>{messages.seriesModeGrid}</option>
-                  <option value='features'>{messages.seriesModeFeatures}</option>
+              )}
+            </div>
+            )}
+            {(this.ctrl('format') || this.ctrl('dpi') || this.outSREnabled() || this.meMapOnly() || this.ctrl('fileName')) && (
+            <div className='pd-print-area' role='group' aria-labelledby={this.uid('gh-output')}>
+              {this.cardHead('output', messages.groupOutput, messages, layout)}
+              {this.cardOpen('output') && (
+              <div id={this.uid('cb-output')} className='pd-card-body'>
+            {this.ctrl('format') && (
+            <div className='pd-row'>
+              <Label className='pd-label' id={this.uid('format') + '-lbl'}>{messages.formatLabel}</Label>
+              <Tooltip title={messages.formatTip} placement='top'>
+                <Select id={this.uid('format')} aria-labelledby={this.uid('format') + '-lbl'} size='sm' value={this.state.format}
+                  aria-describedby={(this.state.format === 'svg' || this.state.format === 'svgz' || this.state.format === 'eps') ? this.uid('format-desc') : undefined}
+                  onChange={(e: any) => this.setState({ format: e.target.value })}>
+                  {FORMAT_LABELS
+                    .filter(f => !f.disabled && this.formatAllowed(f.value))
+                    .map(f => (
+                      <option key={f.value} value={f.value} disabled={!!f.disabled}>{f.label}</option>
+                    ))}
                 </Select>
-              </div>
-              {!this.seriesFeatures() && (
-              <React.Fragment>
-              <div className='pd-desc'>{messages.seriesHint}</div>
-              <div className='pd-row pd-inline'>
-                <Label className='pd-label' id={this.uid('srows') + '-lbl'}>{messages.seriesRows}</Label>
-                <TextInput id={this.uid('srows')} aria-labelledby={this.uid('srows') + '-lbl'} size='sm' style={{ width: 64 }}
-                  value={this.state.seriesRows} onChange={(e) => this.setState({ seriesRows: e.target.value })} />
-                <Label className='pd-label' id={this.uid('scols') + '-lbl'}>{messages.seriesCols}</Label>
-                <TextInput id={this.uid('scols')} aria-labelledby={this.uid('scols') + '-lbl'} size='sm' style={{ width: 64 }}
-                  value={this.state.seriesCols} onChange={(e) => this.setState({ seriesCols: e.target.value })} />
-              </div>
-              <div className='pd-row pd-inline'>
-                <Label className='pd-label' id={this.uid('ssize') + '-lbl'}>{messages.seriesSize}</Label>
-                <input type='range' className='pd-range' min={25} max={100} step={5}
-                  aria-labelledby={this.uid('ssize') + '-lbl'}
-                  value={Math.max(25, Math.min(100, parseInt(this.state.seriesSizePct, 10) || 100))}
-                  onChange={(e: any) => this.setState({ seriesSizePct: e.target.value })} />
-                <span className='pd-desc' style={{ minWidth: 34 }}>{(parseInt(this.state.seriesSizePct, 10) || 100)}%</span>
-              </div>
-              <div className='pd-desc'>
-                {messages.seriesEstimate.replace('{n}', String(this.seriesSheetCount() + 1))}
-              </div>
-              {this.renderSeriesLimit(messages)}
-              </React.Fragment>
-              )}
-              {this.seriesFeatures() && this.renderFeaturePagesPanel(messages)}
-              </React.Fragment>
-              )}
-            </React.Fragment>
-            )}
-
-            <div className='pd-row pd-inline'>
-              <Label className='pd-label' id={this.uid('qr') + '-lbl'}>{messages.qrToggleLabel}</Label>
-              <Switch aria-labelledby={this.uid('qr') + '-lbl'} checked={this.state.qrOn}
-                onChange={(e: any) => this.setState({ qrOn: !!(e.target && e.target.checked) })} />
+              </Tooltip>
+              {(this.state.format === 'svg' || this.state.format === 'svgz') &&
+                <div id={this.uid('format-desc')} className='pd-desc'>{messages.svgHint}</div>}
+              {this.state.format === 'eps' &&
+                <div id={this.uid('format-desc')} className='pd-desc'>{messages.epsHint}</div>}
             </div>
-            <div className='pd-desc'>{messages.qrToggleDesc}</div>
-
-            {this.ctrl('author') && (
+            )}
+            {this.ctrl('dpi') && (
             <div className='pd-row'>
-              <Label className='pd-label' id={this.uid('author') + '-lbl'}>{messages.authorLabel}</Label>
-              <Tooltip title={messages.authorTip} placement='top'>
-                <TextInput id={this.uid('author')} size='sm' aria-labelledby={this.uid('author') + '-lbl'}
-                  value={this.state.author} onChange={(e) => this.setState({ author: e.target.value })} />
+              <Label className='pd-label' id={this.uid('dpi') + '-lbl'}>{messages.dpiLabel}</Label>
+              <Tooltip title={messages.dpiTip} placement='top'>
+                <Select id={this.uid('dpi')} aria-labelledby={this.uid('dpi') + '-lbl'} size='sm' value={this.state.dpi}
+                  onChange={(e: any) => this.setState({ dpi: e.target.value })}>
+                  <option value=''>{messages.dpiDefault}{layout ? ' (' + layout.dpi + ')' : ''}</option>
+                  <option value='96'>96 (draft)</option>
+                  <option value='150'>150</option>
+                  <option value='200'>200</option>
+                  <option value='300'>300</option>
+                  <option value='400'>400</option>
+                  <option value='600'>600</option>
+                </Select>
               </Tooltip>
             </div>
             )}
-
-            {this.ctrl('copyright') && (
-            <div className='pd-row'>
-              <Label className='pd-label' id={this.uid('copyright') + '-lbl'}>{messages.copyrightLabel}</Label>
-              <Tooltip title={messages.copyrightTip} placement='top'>
-                <TextInput id={this.uid('copyright')} size='sm' aria-labelledby={this.uid('copyright') + '-lbl'}
-                  value={this.state.copyright} onChange={(e) => this.setState({ copyright: e.target.value })} />
-              </Tooltip>
-            </div>
-            )}
-
-            {this.ctrl('legend') && layout && ((layout.elements && layout.elements.some(e => e.type === 'legend')) || (layout as any).legend?.enabled) && (
-            <div className='pd-row pd-pa-switch'>
-              <Label className='pd-label' id={this.uid('leg') + '-lbl'}>{messages.includeLegendLabel}</Label>
-              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.includeLegendTip} placement='top'>
-                <Switch aria-labelledby={this.uid('leg') + '-lbl'} disabled={this.state.mapOnly} checked={this.state.includeLegend}
-                  onChange={(e) => this.setState({ includeLegend: e.target.checked })} />
-              </Tooltip>
-            </div>
-            )}
-
-            {this.ctrl('overview') && layout && (layout as any).overview?.enabled && (
-            <div className='pd-row pd-pa-switch'>
-              <Label className='pd-label' id={this.uid('ovw') + '-lbl'}>{messages.overviewToggleLabel}</Label>
-              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.overviewToggleTip} placement='top'>
-                <Switch aria-labelledby={this.uid('ovw') + '-lbl'} disabled={this.state.mapOnly} checked={this.state.showOverview}
-                  onChange={(e) => this.setState({ showOverview: e.target.checked })} />
-              </Tooltip>
-            </div>
-            )}
-
-            {this.ctrl('grid') && layout && (layout as any).grid?.enabled && (
-            <div className='pd-row pd-pa-switch'>
-              <Label className='pd-label' id={this.uid('grd') + '-lbl'}>{messages.gridToggleLabel}</Label>
-              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.gridToggleTip} placement='top'>
-                <Switch aria-labelledby={this.uid('grd') + '-lbl'} disabled={this.state.mapOnly} checked={this.state.showGrid}
-                  onChange={(e) => this.setState({ showGrid: e.target.checked })} />
-              </Tooltip>
-            </div>
-            )}
-
-            <div className='pd-row'>
-              <div className='pd-pa-switch'>
-                <Label className='pd-label' id={this.uid('sel') + '-lbl'}>{messages.selectionToggleLabel}</Label>
-                <Tooltip title={messages.selectionToggleTip} placement='top'>
-                  <Switch aria-labelledby={this.uid('sel') + '-lbl'} checked={this.state.includeSelection}
-                    onChange={(e) => this.setState({ includeSelection: e.target.checked })} />
-                </Tooltip>
-              </div>
-              <div className='pd-desc'>{messages.selectionToggleHint}</div>
-            </div>
-
-            {this.ctrl('legend') && layout && (layout as any).legend?.enabled && this.state.includeLegend && (
-            <div className='pd-row' data-testid='legendPosSelect'>
-              <Label className='pd-label' id={this.uid('legpos') + '-lbl'}>{messages.legendPositionLabel}</Label>
-              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.legendPositionTip} placement='top'>
-              <Select id={this.uid('legpos')} aria-labelledby={this.uid('legpos') + '-lbl'} size='sm' disabled={this.state.mapOnly} value={this.state.legendPositionOv}
-                onChange={(e: any) => this.setState({ legendPositionOv: e.target.value, legendPosUserSet: true, legendAutoPaged: false })}>
-                <option value=''>{messages.layoutDefaultOption}</option>
-                <option value='rightPanel'>{messages.legendPosRight}</option>
-                <option value='secondPage'>{messages.legendPosSecondPage}</option>
-                <option value='leftPanel'>{messages.legendPosLeft}</option>
-                <option value='bottomPanel'>{messages.legendPosBottom}</option>
-                <option value='topLeft'>{messages.legendPosTL}</option>
-                <option value='topRight'>{messages.legendPosTR}</option>
-                <option value='bottomLeft'>{messages.legendPosBL}</option>
-                <option value='bottomRight'>{messages.legendPosBR}</option>
-              </Select>
-              </Tooltip>
-            </div>
-            )}
-
-            {this.state.legendAutoPaged && this.state.legendPositionOv === 'secondPage' && this.state.includeLegend && !this.state.mapOnly && (
-            <div className='pd-row' role='status' aria-live='polite'>
-              <Alert type='info' text={messages.legendAutoPagedText} withIcon size='small' className='w-100'
-                aria-label={messages.legendAutoPagedText} />
-              <Button size='sm' type='tertiary'
-                onClick={() => this.setState({ legendPositionOv: '', legendAutoPaged: false, legendPosUserSet: true })}>
-                {messages.legendKeepBeside}
-              </Button>
-            </div>
-            )}
-
-            {(() => {
-              const h = this.state.legendHint
-              if (!h || this.state.legendHintDismissed || this.state.legendPositionOv === 'secondPage' ||
-                  !this.state.includeLegend || this.state.mapOnly) return null
-              const text = (h.level === 'cramped'
-                ? (h.missed > 0
-                    ? messages.legendHintMissed.replace('{count}', String(h.count)).replace('{missed}', String(h.missed))
-                    : messages.legendHintShrunk.replace('{count}', String(h.count)).replace('{font}', String(h.fontPt)))
-                : messages.legendHintMany.replace('{count}', String(h.count))) + ' ' + messages.legendHintSuffix
-              return (
-                <div className='pd-row' role='status' aria-live='polite'>
-                  <Alert type={h.level === 'cramped' ? 'warning' : 'info'} text={text} withIcon size='small' className='w-100'
-                    aria-label={text} />
-                  <div className='pd-hint-actions'>
-                    <Button size='sm' type='primary'
-                      onClick={() => this.setState({ legendPositionOv: 'secondPage', legendHint: null })}>
-                      {messages.legendUseSecondPage}
-                    </Button>
-                    <Button size='sm' type='tertiary'
-                      onClick={() => this.setState({ legendHintDismissed: true })}>
-                      {messages.legendHintDismiss}
-                    </Button>
-                  </div>
-                </div>
-              )
-            })()}
-
-            {this.ctrl('grid') && layout && (layout as any).grid?.enabled && this.state.showGrid && (
-            <div className='pd-row'>
-              <Label className='pd-label' id={this.uid('gridtype') + '-lbl'}>{messages.gridTypeLabel}</Label>
-              <Tooltip title={this.state.mapOnly ? messages.disabledMapOnlyTip : messages.gridTypeSelTip} placement='top'>
-              <Select id={this.uid('gridtype')} aria-labelledby={this.uid('gridtype') + '-lbl'} size='sm' disabled={this.state.mapOnly} value={this.state.gridTypeOv}
-                onChange={(e: any) => this.setState({ gridTypeOv: e.target.value })}>
-                <option value=''>{messages.layoutDefaultOption}</option>
-                <option value='graticule'>{messages.gridTypeGraticule}</option>
-                <option value='measured'>{messages.gridTypeMeasured}</option>
-                <option value='reference'>{messages.gridTypeReference}</option>
-              </Select>
-              </Tooltip>
-            </div>
-            )}
-            {this.ctrl('grid') && layout && (layout as any).grid?.enabled && this.state.showGrid && !this.state.mapOnly && this.renderGridStyle(messages, layout)}
-
             {this.outSREnabled() && (
             <div className='pd-row'>
               <Label className='pd-label' id={this.uid('wkid') + '-lbl'}>{messages.outSRLabel}</Label>
@@ -3602,7 +3729,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               <div className='pd-desc'>{messages.outSRHint}</div>
             </div>
             )}
-
             {this.meMapOnly() && (
             <div className='pd-row pd-pa-switch'>
               <Label className='pd-label' id={this.uid('maponly') + '-lbl'}>{messages.mapOnlyLabel}</Label>
@@ -3612,7 +3738,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               </Tooltip>
             </div>
             )}
-
             {this.meMapOnly() && this.state.mapOnly && (
             <div className='pd-row'>
               <Label className='pd-label' id={this.uid('mow') + '-lbl'}>{messages.mapOnlySizeLabel}</Label>
@@ -3632,7 +3757,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               <div className='pd-desc'>{messages.mapOnlySizeHint}</div>
             </div>
             )}
-
             {this.meMapOnly() && this.state.mapOnly && this.rasterFormat(this.state.format) && (
             <div className='pd-row'>
               <div className='pd-pa-switch'>
@@ -3645,7 +3769,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               <div className='pd-desc'>{messages.georefHint}</div>
             </div>
             )}
-
             {this.meMapOnly() && this.state.mapOnly && (
             <div className='pd-row'>
               <div className='pd-pa-switch'>
@@ -3658,7 +3781,6 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               <div className='pd-desc'>{messages.kmzHint}</div>
             </div>
             )}
-
             {this.ctrl('fileName') && (
             <div className='pd-row'>
               <Label className='pd-label' id={this.uid('fname') + '-lbl'}>{messages.fileNameLabel}</Label>
@@ -3675,6 +3797,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               <div id={this.uid('fname-desc')} className='pd-desc'>{messages.fileNameHint}</div>
             </div>
             )}
+            </div>
+            )}
+
+              </div>
+              )}
             </div>
             )}
 

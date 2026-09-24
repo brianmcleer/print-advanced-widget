@@ -335,6 +335,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
             }
             coerceBools((parsed as any).runtimeDefaults)
             coerceBools((parsed as any).controls)
+            coerceBools((parsed as any).cardsOpen)
             // top-level switches whose "!== false" / "=== true" reads would
             // misread a string: normalize only these, never free-text keys
             for (const k of ['legendScaleFilter', 'legendExtentFilter', 'geoPdf', 'pdfLayers', 'vectorLayers', 'georefKeepRotation', 'diagnostics']) {
@@ -421,7 +422,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         return v === undefined ? dflt : v !== false
     }
 
-    setSub = (objKey: 'runtimeDefaults' | 'controls', field: string, value: any): void => {
+    setSub = (objKey: 'runtimeDefaults' | 'controls' | 'cardsOpen', field: string, value: any): void => {
         const base: any = (this.props.config as any) || Immutable({})
         const curRaw = base[objKey]
         const cur = (curRaw && curRaw.asMutable ? curRaw.asMutable() : curRaw) || {}
@@ -936,6 +937,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
     getStyle = () => css`
     .pd-toolbar { display: flex; gap: .375rem; width: 100%; .jimu-btn { flex: 1 1 0; } }
     .pd-hint { font-size: .8125rem; color: var(--ref-palette-neutral-1100); line-height: 1.3; }
+    .pd-subhead { font-size: .8125rem; font-weight: 600; color: var(--ref-palette-neutral-1200); margin-top: .5rem; border-bottom: 1px solid var(--ref-palette-neutral-500); padding-bottom: .125rem; width: 100%; }
     .pd-font-item { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: 2px 0; }
     .pd-font-name { flex: 1 1 auto; font-size: .8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pd-warn {
@@ -1139,89 +1141,122 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             </SettingRow>
                         </SettingSection>
 
-                        <SettingSection title={messages.overviewSection}>
+                        <SettingSection title={messages.legendSection}>
                             <SettingRow>
-                                <div className='pd-hint'>{messages.overviewHint}</div>
+                                <div className='pd-hint'>{messages.legendHint}</div>
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.overviewEnabled} truncateLabel>
-                                <Switch checked={!!(editing as any).overview?.enabled}
-                                    onChange={(e) => this.patchOverview({ enabled: e.target.checked })} />
+                            <SettingRow tag='label' label={messages.legendEnabled} truncateLabel>
+                                <Switch checked={!!(editing as any).legend?.enabled}
+                                    onChange={(e) => this.patchLegend({ enabled: e.target.checked })} />
                             </SettingRow>
-                            {/* Always available so on OR off transfers. */}
+                            {/* Always available so the current on OR off state
+                                transfers; gating it on enabled meant a legend
+                                turned off could never be propagated. */}
                             {this.getLayouts().length > 1 && (
                                 <SettingRow>
-                                    <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('overview')}>
+                                    <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('legend')}>
                                         {messages.applyAllLayouts}
                                     </Button>
                                 </SettingRow>
                             )}
-                            {(editing as any).overview?.enabled && (
+                            {(editing as any).legend?.enabled && (
                                 <React.Fragment>
-                                    {this.rowWrap(messages.overviewPosition, this.select(
-                                        ((editing as any).overview?.position) || 'topRight',
-                                        v => this.patchOverview({ position: v as any }),
-                                        [
-                                            { value: 'topLeft', label: messages.posTopLeft },
-                                            { value: 'topRight', label: messages.posTopRight },
-                                            { value: 'bottomLeft', label: messages.posBottomLeft },
-                                            { value: 'bottomRight', label: messages.posBottomRight }
-                                        ]))}
-                                    <SettingRow flow='wrap' label={messages.overviewWidth} truncateLabel>
-                                        <NumericInput size='sm' className='w-100' min={0.5} max={24} step={0.25}
-                                            value={Number((editing as any).overview?.widthIn) || 2.5}
-                                            onChange={(v: number) => this.patchOverview({ widthIn: v })} />
-                                    </SettingRow>
-                                    <SettingRow flow='wrap' label={messages.overviewHeight} truncateLabel>
-                                        <NumericInput size='sm' className='w-100' min={0.5} max={24} step={0.25}
-                                            value={Number((editing as any).overview?.heightIn) || 2}
-                                            onChange={(v: number) => this.patchOverview({ heightIn: v })} />
-                                    </SettingRow>
-                                    <SettingRow flow='wrap' label={messages.overviewMargin} truncateLabel>
-                                        <NumericInput size='sm' className='w-100' min={0} max={5} step={0.05}
-                                            value={Number((editing as any).overview?.marginIn) || 0.25}
-                                            onChange={(v: number) => this.patchOverview({ marginIn: v })} />
-                                    </SettingRow>
-                                    {this.rowWrap(messages.overviewScale, this.select(
-                                        Number((editing as any).overview?.fixedScale) > 0
-                                            ? 'fixed'
-                                            : String(Number((editing as any).overview?.scaleMultiplier) || 10),
-                                        v => {
-                                            if (v === 'fixed') this.patchOverview({ fixedScale: 100000 })
-                                            else this.patchOverview({ scaleMultiplier: Number(v), fixedScale: undefined })
-                                        },
-                                        [
-                                            { value: '5', label: '5 x ' + messages.printedScale },
-                                            { value: '10', label: '10 x ' + messages.printedScale },
-                                            { value: '20', label: '20 x ' + messages.printedScale },
-                                            { value: '50', label: '50 x ' + messages.printedScale },
-                                            { value: 'fixed', label: messages.overviewFixed }
-                                        ]))}
-                                    {Number((editing as any).overview?.fixedScale) > 0 && (
-                                        <SettingRow flow='wrap' label={messages.overviewFixedScale} truncateLabel>
-                                            <NumericInput size='sm' className='w-100' min={100} max={50000000} step={1000}
-                                                value={Number((editing as any).overview?.fixedScale) || 100000}
-                                                onChange={(v: number) => this.patchOverview({ fixedScale: v })} />
-                                        </SettingRow>
+                                    {!((editing.elements || []) as any[]).some((e: any) => e.type === 'legend') && (
+                                        <React.Fragment>
+                                            {this.rowWrap(messages.overviewPosition, this.select(
+                                                ((editing as any).legend?.position) || 'rightPanel',
+                                                v => this.patchLegend({ position: v as any }),
+                                                [
+                                                    { value: 'rightPanel', label: messages.legendRightPanel },
+                                                    { value: 'secondPage', label: messages.legendSecondPage },
+                                                    { value: 'leftPanel', label: messages.legendLeftPanel },
+                                                    { value: 'bottomPanel', label: messages.legendBottomPanel },
+                                                    { value: 'topLeft', label: messages.posTopLeft },
+                                                    { value: 'topRight', label: messages.posTopRight },
+                                                    { value: 'bottomLeft', label: messages.posBottomLeft },
+                                                    { value: 'bottomRight', label: messages.posBottomRight }
+                                                ]))}
+                                            {String((editing as any).legend?.position || 'rightPanel').endsWith('Panel') && (
+                                                this.rowWrap(messages.legendPanelSize, this.select(
+                                                    ((editing as any).legend?.panelSizeMode) || 'auto',
+                                                    v => this.patchLegend({ panelSizeMode: v as any }),
+                                                    [
+                                                        { value: 'auto', label: messages.legendPanelAuto },
+                                                        { value: 'fixed', label: messages.legendPanelFixed }
+                                                    ]))
+                                            )}
+                                            {(!String((editing as any).legend?.position || 'rightPanel').endsWith('Panel') ||
+                                                ((editing as any).legend?.panelSizeMode) === 'fixed') &&
+                                                String((editing as any).legend?.position || '') !== 'secondPage' && (
+                                                    <React.Fragment>
+                                                        <SettingRow flow='wrap' label={messages.overviewWidth} truncateLabel>
+                                                            <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
+                                                                value={Number((editing as any).legend?.widthIn) || 3}
+                                                                onChange={(v: number) => this.patchLegend({ widthIn: v })} />
+                                                        </SettingRow>
+                                                        <SettingRow flow='wrap' label={messages.overviewHeight} truncateLabel>
+                                                            <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
+                                                                value={Number((editing as any).legend?.heightIn) || 3.5}
+                                                                onChange={(v: number) => this.patchLegend({ heightIn: v })} />
+                                                        </SettingRow>
+                                                    </React.Fragment>
+                                                )}
+                                        </React.Fragment>
                                     )}
-                                    {this.rowWrap(messages.indicatorColor, this.select(
-                                        JSON.stringify(((editing as any).overview?.indicatorColor) || [221, 0, 0]),
-                                        v => this.patchOverview({ indicatorColor: JSON.parse(v) }),
+                                    <SettingRow flow='wrap' label={messages.legendTitle} truncateLabel>
+                                        <TextInput size='sm' className='w-100'
+                                            value={String((editing as any).legend?.title ?? 'Legend')}
+                                            onChange={(e: any) => this.patchLegend({ title: e.target.value })} />
+                                    </SettingRow>
+                                    <SettingRow tag='label' label={messages.legendShowTitle} truncateLabel>
+                                        <Switch checked={((editing as any).legend?.showTitle) !== false}
+                                            onChange={(e) => this.patchLegend({ showTitle: e.target.checked })} />
+                                    </SettingRow>
+                                    <SettingRow tag='label' label={messages.legendLayerNames} truncateLabel>
+                                        <Switch checked={((editing as any).legend?.showLayerNames) !== false}
+                                            onChange={(e) => this.patchLegend({ showLayerNames: e.target.checked })} />
+                                    </SettingRow>
+                                    {this.rowWrap(messages.legendColumns, this.select(
+                                        String(Number((editing as any).legend?.columns) || 0),
+                                        v => this.patchLegend({ columns: Number(v) }),
                                         [
-                                            { value: '[221,0,0]', label: messages.colorRed },
-                                            { value: '[0,0,0]', label: messages.colorBlack },
-                                            { value: '[255,255,255]', label: messages.colorWhite },
-                                            { value: '[0,92,230]', label: messages.colorBlue },
-                                            { value: '[255,170,0]', label: messages.colorOrange }
+                                            { value: '0', label: messages.legendAuto },
+                                            { value: '1', label: '1' },
+                                            { value: '2', label: '2' },
+                                            { value: '3', label: '3' },
+                                            { value: '4', label: '4' }
                                         ]))}
-                                    {this.rowWrap(messages.indicatorWidth, this.select(
-                                        String(Number((editing as any).overview?.indicatorWidthPt) || 1),
-                                        v => this.patchOverview({ indicatorWidthPt: Number(v) }),
+                                    {this.rowWrap(messages.legendFont, this.select(
+                                        String(Number((editing as any).legend?.baseFontPt) || 8),
+                                        v => this.patchLegend({ baseFontPt: Number(v) }),
                                         [
-                                            { value: '0.5', label: '0.5 pt' },
-                                            { value: '1', label: '1 pt' },
-                                            { value: '2', label: '2 pt' },
-                                            { value: '3', label: '3 pt' }
+                                            { value: '6', label: '6 pt' },
+                                            { value: '7', label: '7 pt' },
+                                            { value: '8', label: '8 pt' },
+                                            { value: '9', label: '9 pt' },
+                                            { value: '10', label: '10 pt' },
+                                            { value: '12', label: '12 pt' },
+                                            { value: '14', label: '14 pt (large formats)' }
                                         ]))}
+                                    {this.rowWrap(messages.legendPatch, this.select(
+                                        ((editing as any).legend?.patchSize) || 'medium',
+                                        v => this.patchLegend({ patchSize: v as any }),
+                                        [
+                                            { value: 'small', label: messages.patchSmall },
+                                            { value: 'medium', label: messages.patchMedium },
+                                            { value: 'large', label: messages.patchLarge }
+                                        ]))}
+                                    {this.rowWrap(messages.legendSourceLabel, this.select(
+                                        String((this.props.config as any).legendWidgetId || ''),
+                                        v => this.setLegendWidgetId(v),
+                                        [
+                                            { value: '', label: messages.legendSourceAuto },
+                                            ...this.findLegendWidgets().map(w => ({ value: w.id, label: messages.legendSourceWidget + ': ' + w.label }))
+                                        ]))}
+                                    <SettingRow tag='label' label={messages.legendBackground} truncateLabel>
+                                        <Switch checked={((editing as any).legend?.background) !== false}
+                                            onChange={(e) => this.patchLegend({ background: e.target.checked })} />
+                                    </SettingRow>
                                 </React.Fragment>
                             )}
                         </SettingSection>
@@ -1423,122 +1458,89 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             )}
                         </SettingSection>
 
-                        <SettingSection title={messages.legendSection}>
+                        <SettingSection title={messages.overviewSection}>
                             <SettingRow>
-                                <div className='pd-hint'>{messages.legendHint}</div>
+                                <div className='pd-hint'>{messages.overviewHint}</div>
                             </SettingRow>
-                            <SettingRow tag='label' label={messages.legendEnabled} truncateLabel>
-                                <Switch checked={!!(editing as any).legend?.enabled}
-                                    onChange={(e) => this.patchLegend({ enabled: e.target.checked })} />
+                            <SettingRow tag='label' label={messages.overviewEnabled} truncateLabel>
+                                <Switch checked={!!(editing as any).overview?.enabled}
+                                    onChange={(e) => this.patchOverview({ enabled: e.target.checked })} />
                             </SettingRow>
-                            {/* Always available so the current on OR off state
-                                transfers; gating it on enabled meant a legend
-                                turned off could never be propagated. */}
+                            {/* Always available so on OR off transfers. */}
                             {this.getLayouts().length > 1 && (
                                 <SettingRow>
-                                    <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('legend')}>
+                                    <Button size='sm' type='tertiary' onClick={() => this.applyToAllLayouts('overview')}>
                                         {messages.applyAllLayouts}
                                     </Button>
                                 </SettingRow>
                             )}
-                            {(editing as any).legend?.enabled && (
+                            {(editing as any).overview?.enabled && (
                                 <React.Fragment>
-                                    {!((editing.elements || []) as any[]).some((e: any) => e.type === 'legend') && (
-                                        <React.Fragment>
-                                            {this.rowWrap(messages.overviewPosition, this.select(
-                                                ((editing as any).legend?.position) || 'rightPanel',
-                                                v => this.patchLegend({ position: v as any }),
-                                                [
-                                                    { value: 'rightPanel', label: messages.legendRightPanel },
-                                                    { value: 'secondPage', label: messages.legendSecondPage },
-                                                    { value: 'leftPanel', label: messages.legendLeftPanel },
-                                                    { value: 'bottomPanel', label: messages.legendBottomPanel },
-                                                    { value: 'topLeft', label: messages.posTopLeft },
-                                                    { value: 'topRight', label: messages.posTopRight },
-                                                    { value: 'bottomLeft', label: messages.posBottomLeft },
-                                                    { value: 'bottomRight', label: messages.posBottomRight }
-                                                ]))}
-                                            {String((editing as any).legend?.position || 'rightPanel').endsWith('Panel') && (
-                                                this.rowWrap(messages.legendPanelSize, this.select(
-                                                    ((editing as any).legend?.panelSizeMode) || 'auto',
-                                                    v => this.patchLegend({ panelSizeMode: v as any }),
-                                                    [
-                                                        { value: 'auto', label: messages.legendPanelAuto },
-                                                        { value: 'fixed', label: messages.legendPanelFixed }
-                                                    ]))
-                                            )}
-                                            {(!String((editing as any).legend?.position || 'rightPanel').endsWith('Panel') ||
-                                                ((editing as any).legend?.panelSizeMode) === 'fixed') &&
-                                                String((editing as any).legend?.position || '') !== 'secondPage' && (
-                                                    <React.Fragment>
-                                                        <SettingRow flow='wrap' label={messages.overviewWidth} truncateLabel>
-                                                            <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
-                                                                value={Number((editing as any).legend?.widthIn) || 3}
-                                                                onChange={(v: number) => this.patchLegend({ widthIn: v })} />
-                                                        </SettingRow>
-                                                        <SettingRow flow='wrap' label={messages.overviewHeight} truncateLabel>
-                                                            <NumericInput size='sm' className='w-100' min={1} max={30} step={0.25}
-                                                                value={Number((editing as any).legend?.heightIn) || 3.5}
-                                                                onChange={(v: number) => this.patchLegend({ heightIn: v })} />
-                                                        </SettingRow>
-                                                    </React.Fragment>
-                                                )}
-                                        </React.Fragment>
+                                    {this.rowWrap(messages.overviewPosition, this.select(
+                                        ((editing as any).overview?.position) || 'topRight',
+                                        v => this.patchOverview({ position: v as any }),
+                                        [
+                                            { value: 'topLeft', label: messages.posTopLeft },
+                                            { value: 'topRight', label: messages.posTopRight },
+                                            { value: 'bottomLeft', label: messages.posBottomLeft },
+                                            { value: 'bottomRight', label: messages.posBottomRight }
+                                        ]))}
+                                    <SettingRow flow='wrap' label={messages.overviewWidth} truncateLabel>
+                                        <NumericInput size='sm' className='w-100' min={0.5} max={24} step={0.25}
+                                            value={Number((editing as any).overview?.widthIn) || 2.5}
+                                            onChange={(v: number) => this.patchOverview({ widthIn: v })} />
+                                    </SettingRow>
+                                    <SettingRow flow='wrap' label={messages.overviewHeight} truncateLabel>
+                                        <NumericInput size='sm' className='w-100' min={0.5} max={24} step={0.25}
+                                            value={Number((editing as any).overview?.heightIn) || 2}
+                                            onChange={(v: number) => this.patchOverview({ heightIn: v })} />
+                                    </SettingRow>
+                                    <SettingRow flow='wrap' label={messages.overviewMargin} truncateLabel>
+                                        <NumericInput size='sm' className='w-100' min={0} max={5} step={0.05}
+                                            value={Number((editing as any).overview?.marginIn) || 0.25}
+                                            onChange={(v: number) => this.patchOverview({ marginIn: v })} />
+                                    </SettingRow>
+                                    {this.rowWrap(messages.overviewScale, this.select(
+                                        Number((editing as any).overview?.fixedScale) > 0
+                                            ? 'fixed'
+                                            : String(Number((editing as any).overview?.scaleMultiplier) || 10),
+                                        v => {
+                                            if (v === 'fixed') this.patchOverview({ fixedScale: 100000 })
+                                            else this.patchOverview({ scaleMultiplier: Number(v), fixedScale: undefined })
+                                        },
+                                        [
+                                            { value: '5', label: '5 x ' + messages.printedScale },
+                                            { value: '10', label: '10 x ' + messages.printedScale },
+                                            { value: '20', label: '20 x ' + messages.printedScale },
+                                            { value: '50', label: '50 x ' + messages.printedScale },
+                                            { value: 'fixed', label: messages.overviewFixed }
+                                        ]))}
+                                    {Number((editing as any).overview?.fixedScale) > 0 && (
+                                        <SettingRow flow='wrap' label={messages.overviewFixedScale} truncateLabel>
+                                            <NumericInput size='sm' className='w-100' min={100} max={50000000} step={1000}
+                                                value={Number((editing as any).overview?.fixedScale) || 100000}
+                                                onChange={(v: number) => this.patchOverview({ fixedScale: v })} />
+                                        </SettingRow>
                                     )}
-                                    <SettingRow flow='wrap' label={messages.legendTitle} truncateLabel>
-                                        <TextInput size='sm' className='w-100'
-                                            value={String((editing as any).legend?.title ?? 'Legend')}
-                                            onChange={(e: any) => this.patchLegend({ title: e.target.value })} />
-                                    </SettingRow>
-                                    <SettingRow tag='label' label={messages.legendShowTitle} truncateLabel>
-                                        <Switch checked={((editing as any).legend?.showTitle) !== false}
-                                            onChange={(e) => this.patchLegend({ showTitle: e.target.checked })} />
-                                    </SettingRow>
-                                    <SettingRow tag='label' label={messages.legendLayerNames} truncateLabel>
-                                        <Switch checked={((editing as any).legend?.showLayerNames) !== false}
-                                            onChange={(e) => this.patchLegend({ showLayerNames: e.target.checked })} />
-                                    </SettingRow>
-                                    {this.rowWrap(messages.legendColumns, this.select(
-                                        String(Number((editing as any).legend?.columns) || 0),
-                                        v => this.patchLegend({ columns: Number(v) }),
+                                    {this.rowWrap(messages.indicatorColor, this.select(
+                                        JSON.stringify(((editing as any).overview?.indicatorColor) || [221, 0, 0]),
+                                        v => this.patchOverview({ indicatorColor: JSON.parse(v) }),
                                         [
-                                            { value: '0', label: messages.legendAuto },
-                                            { value: '1', label: '1' },
-                                            { value: '2', label: '2' },
-                                            { value: '3', label: '3' },
-                                            { value: '4', label: '4' }
+                                            { value: '[221,0,0]', label: messages.colorRed },
+                                            { value: '[0,0,0]', label: messages.colorBlack },
+                                            { value: '[255,255,255]', label: messages.colorWhite },
+                                            { value: '[0,92,230]', label: messages.colorBlue },
+                                            { value: '[255,170,0]', label: messages.colorOrange }
                                         ]))}
-                                    {this.rowWrap(messages.legendFont, this.select(
-                                        String(Number((editing as any).legend?.baseFontPt) || 8),
-                                        v => this.patchLegend({ baseFontPt: Number(v) }),
+                                    {this.rowWrap(messages.indicatorWidth, this.select(
+                                        String(Number((editing as any).overview?.indicatorWidthPt) || 1),
+                                        v => this.patchOverview({ indicatorWidthPt: Number(v) }),
                                         [
-                                            { value: '6', label: '6 pt' },
-                                            { value: '7', label: '7 pt' },
-                                            { value: '8', label: '8 pt' },
-                                            { value: '9', label: '9 pt' },
-                                            { value: '10', label: '10 pt' },
-                                            { value: '12', label: '12 pt' },
-                                            { value: '14', label: '14 pt (large formats)' }
+                                            { value: '0.5', label: '0.5 pt' },
+                                            { value: '1', label: '1 pt' },
+                                            { value: '2', label: '2 pt' },
+                                            { value: '3', label: '3 pt' }
                                         ]))}
-                                    {this.rowWrap(messages.legendPatch, this.select(
-                                        ((editing as any).legend?.patchSize) || 'medium',
-                                        v => this.patchLegend({ patchSize: v as any }),
-                                        [
-                                            { value: 'small', label: messages.patchSmall },
-                                            { value: 'medium', label: messages.patchMedium },
-                                            { value: 'large', label: messages.patchLarge }
-                                        ]))}
-                                    {this.rowWrap(messages.legendSourceLabel, this.select(
-                                        String((this.props.config as any).legendWidgetId || ''),
-                                        v => this.setLegendWidgetId(v),
-                                        [
-                                            { value: '', label: messages.legendSourceAuto },
-                                            ...this.findLegendWidgets().map(w => ({ value: w.id, label: messages.legendSourceWidget + ': ' + w.label }))
-                                        ]))}
-                                    <SettingRow tag='label' label={messages.legendBackground} truncateLabel>
-                                        <Switch checked={((editing as any).legend?.background) !== false}
-                                            onChange={(e) => this.patchLegend({ background: e.target.checked })} />
-                                    </SettingRow>
                                 </React.Fragment>
                             )}
                         </SettingSection>
@@ -1602,118 +1604,51 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     </React.Fragment>
                 )}
 
-                <SettingSection title={messages.widgetOptionsSection}>
-                    <SettingRow tag='label' label={messages.allowAdvanced} truncateLabel>
-                        <Switch
-                            checked={((this.props.config as any)?.showAdvancedOptions) !== false}
-                            onChange={(e) => {
-                                const base: any = (this.props.config as any) || Immutable({})
-                                this.props.onSettingChange({
-                                    id: this.props.id,
-                                    config: base.set('showAdvancedOptions', e.target.checked)
-                                })
-                            }}
-                        />
-                    </SettingRow>
-                    <SettingRow>
-                        <div className='pd-hint'>{messages.allowAdvancedHint}</div>
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.defaultFont} truncateLabel>
-                        <Select size='sm' className='w-100'
-                            value={((this.props.config as any)?.defaultFontFamily) || 'sans'}
-                            onChange={(e: any) => {
-                                const base: any = (this.props.config as any) || Immutable({})
-                                this.props.onSettingChange({
-                                    id: this.props.id,
-                                    config: base.set('defaultFontFamily', e.target.value)
-                                })
-                            }}>
-                            <option value='sans'>Sans-serif (Helvetica / Arial)</option>
-                            <option value='serif'>Serif (Times)</option>
-                            <option value='mono'>Monospace (Courier)</option>
-                        </Select>
-                    </SettingRow>
-                    <SettingRow>
-                        <div className='pd-hint'>{messages.defaultFontHint}</div>
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.fontImportLabel} truncateLabel>
-                        <div style={{ display: 'flex', gap: '.375rem', width: '100%' }}>
-                            <TextInput size='sm' style={{ flex: 1 }}
-                                aria-label={messages.fontImportLabel}
-                                value={this.state.fontImport}
-                                placeholder='Montserrat  or  https://fonts.googleapis.com/css2?family=Montserrat'
-                                onChange={(e: any) => this.setState({ fontImport: e.target.value })} />
-                            <Tooltip title={messages.fontImportTip} placement='top'>
-                                <Button size='sm' type='primary' disabled={this.state.fontImportBusy}
-                                    aria-label={messages.fontImportGo}
-                                    onClick={this.resolveGoogleFont}>
-                                    {this.state.fontImportBusy ? <span aria-hidden='true'>…</span> : messages.fontImportGo}
-                                </Button>
-                            </Tooltip>
-                        </div>
-                    </SettingRow>
-                    {this.state.fontImportMsg && (
-                        <SettingRow>
-                            <div className='pd-hint' role='status' aria-live='polite'>{this.state.fontImportMsg}</div>
-                        </SettingRow>
-                    )}
-                    {this.customFontsList().length > 0 && (
-                        <SettingRow flow='wrap' label={messages.customFontsListLabel} truncateLabel>
-                            <div className='w-100'>
-                                {this.customFontsList().map(f => (
-                                    <div key={f.name} className='pd-font-item'>
-                                        <span className='pd-font-name' title={f.url}>{f.name}{f.boldUrl ? ' + bold' : ''}</span>
-                                        <Button size='sm' type='tertiary'
-                                            aria-label={messages.remove + ': ' + f.name}
-                                            onClick={() => this.removeCustomFont(f.name)}>{messages.remove}</Button>
-                                    </div>
-                                ))}
-                            </div>
-                        </SettingRow>
-                    )}
-                    <SettingRow flow='wrap' label={messages.customFontName} truncateLabel>
-                        <TextInput size='sm' className='w-100'
-                            value={this.state.newFontName}
-                            placeholder='Open Sans'
-                            onChange={(e: any) => this.setState({ newFontName: e.target.value })} />
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.customFontUrl} truncateLabel>
-                        <TextInput size='sm' className='w-100'
-                            value={this.state.newFontUrl}
-                            placeholder='https://…/OpenSans-Regular.ttf'
-                            onChange={(e: any) => this.setState({ newFontUrl: e.target.value })} />
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.customFontBoldUrl} truncateLabel>
-                        <TextInput size='sm' className='w-100'
-                            value={this.state.newFontBoldUrl}
-                            placeholder='https://…/OpenSans-Bold.ttf (optional)'
-                            onChange={(e: any) => this.setState({ newFontBoldUrl: e.target.value })} />
-                    </SettingRow>
-                    <SettingRow>
-                        <Tooltip title={messages.customFontAddTip} placement='top'>
-                            <Button size='sm' type='primary' className='w-100'
-                                disabled={!this.state.newFontName.trim() || !this.state.newFontUrl.trim()}
-                                onClick={this.addManualFont}>{messages.customFontAdd}</Button>
-                        </Tooltip>
-                    </SettingRow>
-                    <SettingRow>
-                        <div className='pd-hint'>{messages.customFontHint}</div>
-                    </SettingRow>
-                </SettingSection>
-
                 <SettingSection title={messages.defaultsSection}>
-                    <SettingRow flow='wrap' label={messages.defFormat} truncateLabel>
-                        <Select size='sm' className='w-100'
-                            value={((this.props.config as any)?.runtimeDefaults?.format) || 'pdf'}
-                            onChange={(e: any) => this.setSub('runtimeDefaults', 'format', e.target.value === 'pdf' ? '' : e.target.value)}>
-                            {FORMAT_LABELS.filter(f => !f.disabled).map(f => (
-                                <option key={f.value} value={f.value}>{f.label}</option>
-                            ))}
-                        </Select>
+                    <SettingRow>
+                        <div className='pd-subhead'>{messages.subPageText}</div>
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.defTitle} truncateLabel>
+                        <TextInput size='sm' className='w-100'
+                            value={((this.props.config as any)?.defaultTitle) || ''}
+                            placeholder='{layout}'
+                            onChange={(e: any) => this.setCfg('defaultTitle', e.target.value)} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.defAuthor} truncateLabel>
+                        <TextInput size='sm' className='w-100'
+                            value={((this.props.config as any)?.defaultAuthor) || ''}
+                            placeholder={messages.defAuthorPh}
+                            onChange={(e: any) => this.setCfg('defaultAuthor', e.target.value)} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.defCopyright} truncateLabel>
+                        <TextInput size='sm' className='w-100'
+                            value={((this.props.config as any)?.defaultCopyright) || ''}
+                            onChange={(e: any) => this.setCfg('defaultCopyright', e.target.value)} />
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.includeAttribution} truncateLabel>
+                        <Switch checked={((this.props.config as any)?.includeAttribution) !== false}
+                            onChange={(e) => this.setCfg('includeAttribution', e.target.checked ? '' : false)} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-subhead'>{messages.subOnMap}</div>
                     </SettingRow>
                     <SettingRow tag='label' label={messages.defLegendOn}>
                         <Switch checked={((this.props.config as any)?.runtimeDefaults?.includeLegend) !== false}
                             onChange={(e: any) => this.setSub('runtimeDefaults', 'includeLegend', e.target.checked ? undefined : false)} />
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.legendScaleFilterLabel}>
+                        <Switch checked={((this.props.config as any)?.legendScaleFilter) !== false}
+                            onChange={(e: any) => this.setCfg('legendScaleFilter', e.target.checked ? '' : false)} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.legendScaleFilterHint}</div>
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.legendExtentFilterLabel}>
+                        <Switch checked={((this.props.config as any)?.legendExtentFilter) === true}
+                            onChange={(e: any) => this.setCfg('legendExtentFilter', e.target.checked ? true : '')} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.legendExtentFilterHint}</div>
                     </SettingRow>
                     <SettingRow tag='label' label={messages.defOverviewOn}>
                         <Switch checked={((this.props.config as any)?.runtimeDefaults?.showOverview) !== false}
@@ -1730,19 +1665,103 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     <SettingRow>
                         <div className='pd-hint'>{messages.defSelectionHint}</div>
                     </SettingRow>
-                    <SettingRow tag='label' label={messages.legendScaleFilterLabel}>
-                        <Switch checked={((this.props.config as any)?.legendScaleFilter) !== false}
-                            onChange={(e: any) => this.setCfg('legendScaleFilter', e.target.checked ? '' : false)} />
+                    <SettingRow>
+                        <div className='pd-subhead'>{messages.subStyle}</div>
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.defNa} truncateLabel>
+                        <Select size='sm' className='w-100'
+                            value={((this.props.config as any)?.runtimeDefaults?.northArrowStyle) || ''}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'northArrowStyle', e.target.value)}>
+                            <option value=''>{messages.fromPagx}</option>
+                            {NORTH_ARROW_STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </Select>
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.defSb} truncateLabel>
+                        <Select size='sm' className='w-100'
+                            value={((this.props.config as any)?.runtimeDefaults?.scaleBarStyle) || ''}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'scaleBarStyle', e.target.value)}>
+                            <option value=''>{messages.fromPagx}</option>
+                            {SCALE_BAR_STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </Select>
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.defUnits} truncateLabel>
+                        <Select size='sm' className='w-100'
+                            value={((this.props.config as any)?.runtimeDefaults?.scaleBarUnits) || ''}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'scaleBarUnits', e.target.value)}>
+                            <option value=''>{messages.fromPagx}</option>
+                            {SCALE_BAR_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                        </Select>
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.defUnits2} truncateLabel>
+                        <Select size='sm' className='w-100'
+                            value={((this.props.config as any)?.runtimeDefaults?.scaleBarUnits2) || ''}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'scaleBarUnits2', e.target.value)}>
+                            <option value=''>{messages.dualNone}</option>
+                            {SCALE_BAR_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                        </Select>
                     </SettingRow>
                     <SettingRow>
-                        <div className='pd-hint'>{messages.legendScaleFilterHint}</div>
+                        <div className='pd-subhead'>{messages.subOutput}</div>
                     </SettingRow>
-                    <SettingRow tag='label' label={messages.legendExtentFilterLabel}>
-                        <Switch checked={((this.props.config as any)?.legendExtentFilter) === true}
-                            onChange={(e: any) => this.setCfg('legendExtentFilter', e.target.checked ? true : '')} />
+                    <SettingRow flow='wrap' label={messages.defFormat} truncateLabel>
+                        <Select size='sm' className='w-100'
+                            value={((this.props.config as any)?.runtimeDefaults?.format) || 'pdf'}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'format', e.target.value === 'pdf' ? '' : e.target.value)}>
+                            {FORMAT_LABELS.filter(f => !f.disabled).map(f => (
+                                <option key={f.value} value={f.value}>{f.label}</option>
+                            ))}
+                        </Select>
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.defDpi} truncateLabel>
+                        <Select size='sm' className='w-100'
+                            value={((this.props.config as any)?.runtimeDefaults?.dpi) || ''}
+                            onChange={(e: any) => this.setSub('runtimeDefaults', 'dpi', e.target.value)}>
+                            <option value=''>{messages.defDpiLayout}</option>
+                            <option value='96'>96</option>
+                            <option value='150'>150</option>
+                            <option value='200'>200</option>
+                            <option value='300'>300</option>
+                        </Select>
+                    </SettingRow>
+                    <SettingRow tag='label' label={messages.enableOutputSR} truncateLabel>
+                        <Switch checked={((this.props.config as any)?.enableOutputSR) === true}
+                            onChange={(e) => this.setCfg('enableOutputSR', e.target.checked ? true : '')} />
+                    </SettingRow>
+                    {((this.props.config as any)?.enableOutputSR) === true && (
+                        <SettingRow flow='wrap' label={messages.defaultOutputWkid} truncateLabel>
+                            <NumericInput size='sm' className='w-100' min={0} step={1}
+                                value={Number((this.props.config as any)?.defaultOutputWkid) || 0}
+                                onChange={(v: number) => this.setCfg('defaultOutputWkid', v ? Math.round(v) : '')} />
+                        </SettingRow>
+                    )}
+                    <SettingRow tag='label' label={messages.enableMapOnly} truncateLabel>
+                        <Switch checked={((this.props.config as any)?.enableMapOnly) === true}
+                            onChange={(e) => this.setCfg('enableMapOnly', e.target.checked ? true : '')} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.defFilename} truncateLabel>
+                        <TextInput size='sm' className='w-100'
+                            value={((this.props.config as any)?.defaultFilename) || ''}
+                            placeholder='{title}-{date}'
+                            onChange={(e: any) => this.setCfg('defaultFilename', e.target.value)} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.maxCapture} truncateLabel>
+                        <TextInput size='sm' className='w-100'
+                            value={String((this.props.config as any)?.maxImagePx || '')}
+                            placeholder='Auto (graphics card limit)'
+                            onChange={(e: any) => {
+                                const digits = String(e.target.value || '').replace(/[^0-9]/g, '')
+                                const n = Math.min(16384, Number(digits) || 0)
+                                this.setCfg('maxImagePx', n > 0 ? n : '')
+                            }} />
                     </SettingRow>
                     <SettingRow>
-                        <div className='pd-hint'>{messages.legendExtentFilterHint}</div>
+                        <div className='pd-hint'>{messages.defaultsHint}</div>
+                    </SettingRow>
+                </SettingSection>
+
+                <SettingSection title={messages.outputFeaturesSection}>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.outputFeaturesHint}</div>
                     </SettingRow>
                     <SettingRow tag='label' label={messages.geoPdfLabel}>
                         <Switch checked={((this.props.config as any)?.geoPdf) !== false}
@@ -1778,130 +1797,6 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     </SettingRow>
                     <SettingRow>
                         <div className='pd-hint'>{messages.diagHint}</div>
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.defDpi} truncateLabel>
-                        <Select size='sm' className='w-100'
-                            value={((this.props.config as any)?.runtimeDefaults?.dpi) || ''}
-                            onChange={(e: any) => this.setSub('runtimeDefaults', 'dpi', e.target.value)}>
-                            <option value=''>{messages.defDpiLayout}</option>
-                            <option value='96'>96</option>
-                            <option value='150'>150</option>
-                            <option value='200'>200</option>
-                            <option value='300'>300</option>
-                        </Select>
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.defNa} truncateLabel>
-                        <Select size='sm' className='w-100'
-                            value={((this.props.config as any)?.runtimeDefaults?.northArrowStyle) || ''}
-                            onChange={(e: any) => this.setSub('runtimeDefaults', 'northArrowStyle', e.target.value)}>
-                            <option value=''>{messages.fromPagx}</option>
-                            {NORTH_ARROW_STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                        </Select>
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.defSb} truncateLabel>
-                        <Select size='sm' className='w-100'
-                            value={((this.props.config as any)?.runtimeDefaults?.scaleBarStyle) || ''}
-                            onChange={(e: any) => this.setSub('runtimeDefaults', 'scaleBarStyle', e.target.value)}>
-                            <option value=''>{messages.fromPagx}</option>
-                            {SCALE_BAR_STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                        </Select>
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.defUnits} truncateLabel>
-                        <Select size='sm' className='w-100'
-                            value={((this.props.config as any)?.runtimeDefaults?.scaleBarUnits) || ''}
-                            onChange={(e: any) => this.setSub('runtimeDefaults', 'scaleBarUnits', e.target.value)}>
-                            <option value=''>{messages.fromPagx}</option>
-                            {SCALE_BAR_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-                        </Select>
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.defUnits2} truncateLabel>
-                        <Select size='sm' className='w-100'
-                            value={((this.props.config as any)?.runtimeDefaults?.scaleBarUnits2) || ''}
-                            onChange={(e: any) => this.setSub('runtimeDefaults', 'scaleBarUnits2', e.target.value)}>
-                            <option value=''>{messages.dualNone}</option>
-                            {SCALE_BAR_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-                        </Select>
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.defTitle} truncateLabel>
-                        <TextInput size='sm' className='w-100'
-                            value={((this.props.config as any)?.defaultTitle) || ''}
-                            placeholder='{layout}'
-                            onChange={(e: any) => this.setCfg('defaultTitle', e.target.value)} />
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.defAuthor} truncateLabel>
-                        <TextInput size='sm' className='w-100'
-                            value={((this.props.config as any)?.defaultAuthor) || ''}
-                            placeholder={messages.defAuthorPh}
-                            onChange={(e: any) => this.setCfg('defaultAuthor', e.target.value)} />
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.defCopyright} truncateLabel>
-                        <TextInput size='sm' className='w-100'
-                            value={((this.props.config as any)?.defaultCopyright) || ''}
-                            onChange={(e: any) => this.setCfg('defaultCopyright', e.target.value)} />
-                    </SettingRow>
-                    <SettingRow tag='label' label={messages.includeAttribution} truncateLabel>
-                        <Switch checked={((this.props.config as any)?.includeAttribution) !== false}
-                            onChange={(e) => this.setCfg('includeAttribution', e.target.checked ? '' : false)} />
-                    </SettingRow>
-                    <SettingRow tag='label' label={messages.enableMapOnly} truncateLabel>
-                        <Switch checked={((this.props.config as any)?.enableMapOnly) === true}
-                            onChange={(e) => this.setCfg('enableMapOnly', e.target.checked ? true : '')} />
-                    </SettingRow>
-                    <SettingRow tag='label' label={messages.enableOutputSR} truncateLabel>
-                        <Switch checked={((this.props.config as any)?.enableOutputSR) === true}
-                            onChange={(e) => this.setCfg('enableOutputSR', e.target.checked ? true : '')} />
-                    </SettingRow>
-                    {((this.props.config as any)?.enableOutputSR) === true && (
-                        <SettingRow flow='wrap' label={messages.defaultOutputWkid} truncateLabel>
-                            <NumericInput size='sm' className='w-100' min={0} step={1}
-                                value={Number((this.props.config as any)?.defaultOutputWkid) || 0}
-                                onChange={(v: number) => this.setCfg('defaultOutputWkid', v ? Math.round(v) : '')} />
-                        </SettingRow>
-                    )}
-                    <SettingRow flow='wrap' label={messages.defFilename} truncateLabel>
-                        <TextInput size='sm' className='w-100'
-                            value={((this.props.config as any)?.defaultFilename) || ''}
-                            placeholder='{title}-{date}'
-                            onChange={(e: any) => this.setCfg('defaultFilename', e.target.value)} />
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.maxCapture} truncateLabel>
-                        <TextInput size='sm' className='w-100'
-                            value={String((this.props.config as any)?.maxImagePx || '')}
-                            placeholder='Auto (graphics card limit)'
-                            onChange={(e: any) => {
-                                const digits = String(e.target.value || '').replace(/[^0-9]/g, '')
-                                const n = Math.min(16384, Number(digits) || 0)
-                                this.setCfg('maxImagePx', n > 0 ? n : '')
-                            }} />
-                    </SettingRow>
-                    <SettingRow>
-                        <div className='pd-hint'>{messages.defaultsHint}</div>
-                    </SettingRow>
-                </SettingSection>
-
-                <SettingSection title={messages.seriesLimitSection}>
-                    <SettingRow flow='wrap' label={messages.seriesWarnLabel} truncateLabel>
-                        <NumericInput size='sm' className='w-100' min={1} max={200} step={1} placeholder='20'
-                            aria-label={messages.seriesWarnLabel}
-                            value={Number((this.props.config as any)?.seriesWarnPages) || undefined}
-                            onChange={(v: number) => this.setCfg('seriesWarnPages', v > 0 ? Math.min(200, Math.round(v)) : '')} />
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.seriesMaxLabel} truncateLabel>
-                        <NumericInput size='sm' className='w-100' min={1} max={200} step={1} placeholder='50'
-                            aria-label={messages.seriesMaxLabel}
-                            value={Number((this.props.config as any)?.seriesMaxPages) || undefined}
-                            onChange={(v: number) => this.setCfg('seriesMaxPages', v > 0 ? Math.min(200, Math.round(v)) : '')} />
-                    </SettingRow>
-                    <SettingRow flow='wrap' label={messages.seriesModeLabel} truncateLabel>
-                        <Select size='sm' className='w-100' aria-label={messages.seriesModeLabel}
-                            value={((this.props.config as any)?.seriesLimitMode) === 'first' ? 'first' : 'block'}
-                            onChange={(e: any) => this.setCfg('seriesLimitMode', e.target.value === 'first' ? 'first' : '')}>
-                            <option value='block'>{messages.seriesModeBlock}</option>
-                            <option value='first'>{messages.seriesModeFirst}</option>
-                        </Select>
-                    </SettingRow>
-                    <SettingRow>
-                        <div className='pd-hint'>{messages.seriesLimitHint}</div>
                     </SettingRow>
                 </SettingSection>
 
@@ -1986,6 +1881,32 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     )}
                 </SettingSection>
 
+                <SettingSection title={messages.seriesLimitSection}>
+                    <SettingRow flow='wrap' label={messages.seriesWarnLabel} truncateLabel>
+                        <NumericInput size='sm' className='w-100' min={1} max={200} step={1} placeholder='20'
+                            aria-label={messages.seriesWarnLabel}
+                            value={Number((this.props.config as any)?.seriesWarnPages) || undefined}
+                            onChange={(v: number) => this.setCfg('seriesWarnPages', v > 0 ? Math.min(200, Math.round(v)) : '')} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.seriesMaxLabel} truncateLabel>
+                        <NumericInput size='sm' className='w-100' min={1} max={200} step={1} placeholder='50'
+                            aria-label={messages.seriesMaxLabel}
+                            value={Number((this.props.config as any)?.seriesMaxPages) || undefined}
+                            onChange={(v: number) => this.setCfg('seriesMaxPages', v > 0 ? Math.min(200, Math.round(v)) : '')} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.seriesModeLabel} truncateLabel>
+                        <Select size='sm' className='w-100' aria-label={messages.seriesModeLabel}
+                            value={((this.props.config as any)?.seriesLimitMode) === 'first' ? 'first' : 'block'}
+                            onChange={(e: any) => this.setCfg('seriesLimitMode', e.target.value === 'first' ? 'first' : '')}>
+                            <option value='block'>{messages.seriesModeBlock}</option>
+                            <option value='first'>{messages.seriesModeFirst}</option>
+                        </Select>
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.seriesLimitHint}</div>
+                    </SettingRow>
+                </SettingSection>
+
                 <SettingSection title={messages.formatsSection}>
                     <SettingRow>
                         <div className='pd-hint'>{messages.formatsHint}</div>
@@ -1999,25 +1920,40 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                 </SettingSection>
 
                 <SettingSection title={messages.controlsSection}>
+                    <SettingRow tag='label' label={messages.allowAdvanced} truncateLabel>
+                        <Switch
+                            checked={((this.props.config as any)?.showAdvancedOptions) !== false}
+                            onChange={(e) => {
+                                const base: any = (this.props.config as any) || Immutable({})
+                                this.props.onSettingChange({
+                                    id: this.props.id,
+                                    config: base.set('showAdvancedOptions', e.target.checked)
+                                })
+                            }}
+                        />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.allowAdvancedHint}</div>
+                    </SettingRow>
                     <SettingRow>
                         <div className='pd-hint'>{messages.controlsHint}</div>
                     </SettingRow>
                     {([
                         ['title', messages.ctrlTitle],
-                        ['format', messages.ctrlFormat],
-                        ['dpi', messages.ctrlDpi],
-                        ['font', messages.ctrlFont],
-                        ['northArrow', messages.ctrlNa],
-                        ['scaleBar', messages.ctrlSb],
-                        ['fileName', messages.ctrlFilename],
-                        ['author', messages.ctrlAuthor],
-                        ['copyright', messages.ctrlCopyright],
+                        ['pagePreview', messages.ctrlPagePreview],
+                        ['series', messages.ctrlSeries],
                         ['legend', messages.ctrlLegend],
                         ['overview', messages.ctrlOverview],
                         ['grid', messages.ctrlGrid],
-                        ['series', messages.ctrlSeries],
                         ['gridStyle', messages.ctrlGridStyle],
-                        ['pagePreview', messages.ctrlPagePreview]
+                        ['author', messages.ctrlAuthor],
+                        ['copyright', messages.ctrlCopyright],
+                        ['font', messages.ctrlFont],
+                        ['northArrow', messages.ctrlNa],
+                        ['scaleBar', messages.ctrlSb],
+                        ['format', messages.ctrlFormat],
+                        ['dpi', messages.ctrlDpi],
+                        ['fileName', messages.ctrlFilename]
                     ] as Array<[string, string]>).map(([key, label]) => (
                         <SettingRow key={key} tag='label' label={label} truncateLabel>
                             <Switch
@@ -2028,6 +1964,119 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     <SettingRow tag='label' label={messages.advOpenDefault} truncateLabel>
                         <Switch checked={((this.props.config as any)?.advancedOpenByDefault) === true}
                             onChange={(e) => this.setCfg('advancedOpenByDefault', e.target.checked ? true : '')} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-subhead'>{messages.cardsOpenHead}</div>
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.cardsOpenHint}</div>
+                    </SettingRow>
+                    {([
+                        ['area', messages.cardArea, true],
+                        ['series', messages.cardSeries, false],
+                        ['onmap', messages.cardOnMap, true],
+                        ['text', messages.cardText, false],
+                        ['style', messages.cardStyle, false],
+                        ['output', messages.cardOutput, false]
+                    ] as Array<[string, string, boolean]>).map(([key, label, def]) => {
+                        const v = (this.props.config as any)?.cardsOpen?.[key]
+                        return (
+                            <SettingRow key={key} tag='label' label={label} truncateLabel>
+                                <Switch checked={typeof v === 'boolean' ? v : def}
+                                    onChange={(e) => this.setSub('cardsOpen', key, e.target.checked === def ? '' : e.target.checked)} />
+                            </SettingRow>
+                        )
+                    })}
+                    <SettingRow tag='label' label={messages.showHelpLabel} truncateLabel>
+                        <Switch checked={this.props.config?.showHelp !== false}
+                            onChange={(evt) => { this.props.onSettingChange({ id: this.props.id, config: (this.props.config as any).set('showHelp', evt.target.checked) }) }} />
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.showHelpHint}</div>
+                    </SettingRow>
+                </SettingSection>
+
+                <SettingSection title={messages.fontsSection}>
+                    <SettingRow flow='wrap' label={messages.defaultFont} truncateLabel>
+                        <Select size='sm' className='w-100'
+                            value={((this.props.config as any)?.defaultFontFamily) || 'sans'}
+                            onChange={(e: any) => {
+                                const base: any = (this.props.config as any) || Immutable({})
+                                this.props.onSettingChange({
+                                    id: this.props.id,
+                                    config: base.set('defaultFontFamily', e.target.value)
+                                })
+                            }}>
+                            <option value='sans'>Sans-serif (Helvetica / Arial)</option>
+                            <option value='serif'>Serif (Times)</option>
+                            <option value='mono'>Monospace (Courier)</option>
+                        </Select>
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.defaultFontHint}</div>
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.fontImportLabel} truncateLabel>
+                        <div style={{ display: 'flex', gap: '.375rem', width: '100%' }}>
+                            <TextInput size='sm' style={{ flex: 1 }}
+                                aria-label={messages.fontImportLabel}
+                                value={this.state.fontImport}
+                                placeholder='Montserrat  or  https://fonts.googleapis.com/css2?family=Montserrat'
+                                onChange={(e: any) => this.setState({ fontImport: e.target.value })} />
+                            <Tooltip title={messages.fontImportTip} placement='top'>
+                                <Button size='sm' type='primary' disabled={this.state.fontImportBusy}
+                                    aria-label={messages.fontImportGo}
+                                    onClick={this.resolveGoogleFont}>
+                                    {this.state.fontImportBusy ? <span aria-hidden='true'>…</span> : messages.fontImportGo}
+                                </Button>
+                            </Tooltip>
+                        </div>
+                    </SettingRow>
+                    {this.state.fontImportMsg && (
+                        <SettingRow>
+                            <div className='pd-hint' role='status' aria-live='polite'>{this.state.fontImportMsg}</div>
+                        </SettingRow>
+                    )}
+                    {this.customFontsList().length > 0 && (
+                        <SettingRow flow='wrap' label={messages.customFontsListLabel} truncateLabel>
+                            <div className='w-100'>
+                                {this.customFontsList().map(f => (
+                                    <div key={f.name} className='pd-font-item'>
+                                        <span className='pd-font-name' title={f.url}>{f.name}{f.boldUrl ? ' + bold' : ''}</span>
+                                        <Button size='sm' type='tertiary'
+                                            aria-label={messages.remove + ': ' + f.name}
+                                            onClick={() => this.removeCustomFont(f.name)}>{messages.remove}</Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </SettingRow>
+                    )}
+                    <SettingRow flow='wrap' label={messages.customFontName} truncateLabel>
+                        <TextInput size='sm' className='w-100'
+                            value={this.state.newFontName}
+                            placeholder='Open Sans'
+                            onChange={(e: any) => this.setState({ newFontName: e.target.value })} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.customFontUrl} truncateLabel>
+                        <TextInput size='sm' className='w-100'
+                            value={this.state.newFontUrl}
+                            placeholder='https://…/OpenSans-Regular.ttf'
+                            onChange={(e: any) => this.setState({ newFontUrl: e.target.value })} />
+                    </SettingRow>
+                    <SettingRow flow='wrap' label={messages.customFontBoldUrl} truncateLabel>
+                        <TextInput size='sm' className='w-100'
+                            value={this.state.newFontBoldUrl}
+                            placeholder='https://…/OpenSans-Bold.ttf (optional)'
+                            onChange={(e: any) => this.setState({ newFontBoldUrl: e.target.value })} />
+                    </SettingRow>
+                    <SettingRow>
+                        <Tooltip title={messages.customFontAddTip} placement='top'>
+                            <Button size='sm' type='primary' className='w-100'
+                                disabled={!this.state.newFontName.trim() || !this.state.newFontUrl.trim()}
+                                onClick={this.addManualFont}>{messages.customFontAdd}</Button>
+                        </Tooltip>
+                    </SettingRow>
+                    <SettingRow>
+                        <div className='pd-hint'>{messages.customFontHint}</div>
                     </SettingRow>
                 </SettingSection>
 
@@ -2108,15 +2157,6 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             </div>
                         </SettingRow>
                     )}
-                </SettingSection>
-                <SettingSection title='Help'>
-                  <SettingRow tag='label' label='Show help guide'>
-                    <Switch
-                      checked={this.props.config?.showHelp !== false}
-                      onChange={(evt) => { this.props.onSettingChange({ id: this.props.id, config: (this.props.config as any).set('showHelp', evt.target.checked) }) }}
-                      aria-label='Show the question-mark button that opens the widget help guide'
-                    />
-                  </SettingRow>
                 </SettingSection>
 
             </div>

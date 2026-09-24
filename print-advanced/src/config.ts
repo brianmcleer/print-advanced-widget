@@ -326,6 +326,11 @@ export interface Config {
     /** Live page preview switch in the panel. */
     pagePreview?: boolean
   }
+  /** Which Advanced options cards start open (area, series, onmap, text,
+   *  style, output). Absent = the built-in defaults (Print area and On the
+   *  map open). Users can open and close cards; their choice is remembered
+   *  in their browser. */
+  cardsOpen?: Record<string, boolean>
   /** Bind the printed legend to a specific Legend widget id (''/absent =
    *  automatic: first Legend widget found in the app). */
   legendWidgetId?: string
