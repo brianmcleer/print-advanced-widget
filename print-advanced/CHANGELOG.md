@@ -2,6 +2,10 @@
 
 Newest first. Every release bumps `manifest.json` and `package.json` together.
 
+## 1.14.2 (2026-10-02)
+
+- Fixed: exports above 96 DPI came out with a blank map frame on Web Mercator maps (and any map not in a geographic coordinate system). When the capture view was re-sized for the print resolution, its center was put back as a plain `[x, y]` array, which the Maps SDK reads as longitude and latitude, so the view landed far off the map. The center is now put back as the Point it was read from. Reported in issue #5 by ncramer11, with the diagnosis.
+
 ## 1.14.1 (2026-09-24)
 
 - Panel order reworked so it reads top to bottom the way people print: Layout, Map title, then Page preview (now under the title it shows), then Export. Advanced options is organized into cards, each a labelled group for screen readers: Print area; Map series (a switch, Print as a map series (PDF), with a page count badge; turning it on sets Format to PDF); On the map (legend and its placement together, overview, grid with its type and style together, selection); Page text (author, copyright, QR code); Style (font, north arrow, scale bar); Output (format, DPI, coordinate system, map-only export, file name). The Esri print service path gets the same Page text then Output order. Page preview says when it is paused for a map series, and Show print area stays on (and says why) while data-driven pages use Inside the print area.

@@ -2627,11 +2627,17 @@ async function captureMapHiRes(
         // is what georeferences a ROTATED capture (the extent alone cannot).
         let resSnapshot = 0
         let centerSnapshot: { x: number, y: number } | null = null
+        // the Point itself, kept for putting the view back: a plain [x, y] array assigned to
+        // view.center is read as longitude and latitude, which sends a Web Mercator view off the map
+        let centerPoint: any = null
         try {
             const r0 = Number((tmp as any).resolution)
             if (r0 > 0 && isFinite(r0)) resSnapshot = r0
             const c0: any = (tmp as any).center
-            if (c0 && isFinite(c0.x) && isFinite(c0.y)) centerSnapshot = { x: c0.x, y: c0.y }
+            if (c0 && isFinite(c0.x) && isFinite(c0.y)) {
+                centerSnapshot = { x: c0.x, y: c0.y }
+                centerPoint = typeof c0.clone === 'function' ? c0.clone() : c0
+            }
         } catch (e) { /* snapshot best-effort */ }
         const renderAt = async (renderScale: number, shotOpts: any): Promise<any> => {
             let css = cssFor(renderScale)
@@ -2653,7 +2659,7 @@ async function captureMapHiRes(
                     await new Promise(r => setTimeout(r, 60))
                     ;(tmp as any).scale = got
                 }
-                if (centerSnapshot) { try { (tmp as any).center = [centerSnapshot.x, centerSnapshot.y] } catch (e) { /* keep */ } }
+                if (centerPoint) { try { (tmp as any).center = centerPoint } catch (e) { /* keep */ } }
                 await Promise.race([
                     reactiveUtils.whenOnce(() => !!tmp && !tmp.updating),
                     new Promise(resolve => setTimeout(resolve, 20000))
