@@ -1,4 +1,4 @@
 allowBuilds:
   core-js: set this to true or false
 overrides:
-  dompurify: ">=3.4.13"
+  dompurify: ">=3.4.16"
