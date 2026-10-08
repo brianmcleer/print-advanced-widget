@@ -12,6 +12,9 @@
  */
 import { React, jsx } from 'jimu-core'
 import { useTokens } from '../theme'
+import { hooks as __exbI18nHooks } from 'jimu-core';
+import __exbI18nMessages from '../translations/default';
+
 
 export interface PagePreviewProps {
   url: string
@@ -26,6 +29,7 @@ export interface PagePreviewProps {
 }
 
 const PagePreview: React.FC<PagePreviewProps> = ({ url, busy, note, alt, loadingText, updatingText, aspect, captionId }) => {
+  const t = __exbI18nHooks.useTranslation(__exbI18nMessages);
   const tokens = useTokens()
   return (
     <div className='pd-row'>
