@@ -39,6 +39,7 @@ const gifenc = require('gifenc')
 // them without pulling this module's esri/* imports into the settings bundle.
 // Re-exported here so runtime imports keep working unchanged.
 import { OutputFormat } from '../../printConstants'
+import { __t, __tc } from '../i18n-t'
 export { FORMAT_LABELS, FONT_FAMILIES, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } from '../../printConstants'
 export type { OutputFormat } from '../../printConstants'
 
@@ -1293,7 +1294,7 @@ export function buildGroundOverlayKml (imgName: string, quad: LatLonQuad, title:
     return '<?xml version="1.0" encoding="UTF-8"?>\n' +
         '<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n' +
         '  <GroundOverlay>\n' +
-        '    <name>' + kmlEscape(title || 'Map') + '</name>\n' +
+        '    <name>' + kmlEscape(__tc(title, "map")) + '</name>\n' +
         '    <Icon><href>' + kmlEscape(imgName) + '</href></Icon>\n' +
         '    <gx:LatLonQuad><coordinates>' + coords + '</coordinates></gx:LatLonQuad>\n' +
         '  </GroundOverlay>\n' +
@@ -2025,7 +2026,7 @@ export async function renderSeries(
             } catch (e) { /* the page prints without its overview */ }
         }
         if (i > 0) doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
-        const pageTitle = seriesPageTitle(title || useLayout.name || 'Map', i, n, t, isFeatures)
+        const pageTitle = seriesPageTitle(__tc(title || useLayout.name, "map"), i, n, t, isFeatures)
         // graticule on a projected output: projected per sheet
         const gS: any = useLayout.grid
         if (gS && gS.enabled && gS.type === 'graticule' && options.showGrid !== false && cap.projection === 'projected') {
@@ -2095,7 +2096,7 @@ export async function renderSeries(
             if (gg) idxOptsG = { ...idxOpts, gridGeomOverride: gg }
         } catch (e) { /* index prints without its graticule */ }
     }
-    await composePage(pd, useLayout, idxCap, idxHasLegend ? legendRows : [], (title || useLayout.name || 'Map') + '  (Index)', idxOptsG)
+    await composePage(pd, useLayout, idxCap, idxHasLegend ? legendRows : [], (__tc(title || useLayout.name, "map")) + '  (Index)', idxOptsG)
     pd.beginLayer(PAGE_LAYERS.series)
     drawIndexOverlay(pd, useLayout, idxCap as any, tiles)
     pd.endLayer()
@@ -3729,7 +3730,7 @@ async function buildRowsFromLegendModel(view: MapView): Promise<LegendRow[]> {
             const elements = (ali.legendElements || []) as any[]
             const kids = ali.children && ali.children.length ? ali.children.toArray ? ali.children.toArray() : ali.children : []
             if (!elements.length && !kids.length) return
-            rows.push({ kind: 'layer', label: ali.title || 'Layer', indent: depth })
+            rows.push({ kind: 'layer', label: __tc(ali.title, "seriesLayer"), indent: depth })
             for (const el of elements) {
                 if (rows.length >= MAX_LEGEND_ROWS) return
                 if (el.type === 'symbol-table') {
@@ -3839,7 +3840,7 @@ async function buildRowsFromRenderers(view: MapView, maxItems: number): Promise<
                 if (!layer.loaded && layer.load) await layer.load()
                 const renderer = layer.renderer
                 if (!renderer) continue
-                rows.push({ kind: 'layer', label: layer.title || 'Layer' })
+                rows.push({ kind: 'layer', label: __tc(layer.title, "seriesLayer") })
                 if (renderer.type === 'simple' && renderer.symbol) {
                     rows.push({ kind: 'item', label: '', dataUrl: await symbolToDataUrl(renderer.symbol) })
                     count++
@@ -3856,7 +3857,7 @@ async function buildRowsFromRenderers(view: MapView, maxItems: number): Promise<
                         count++
                     }
                 } else {
-                    rows.push({ kind: 'note', label: '(symbology not supported)' })
+                    rows.push({ kind: 'note', label: __t("symbologyNotSupported") })
                     count++
                 }
             } catch (e) { /* one bad layer never kills the export */ }
@@ -4375,7 +4376,7 @@ export const LEGEND_DEFAULTS: LegendConfig = {
     widthIn: 3,
     heightIn: 3.5,
     marginIn: 0.25,
-    title: 'Legend',
+    title: __t("cardLegend"),
     showTitle: true,
     columns: 0,
     baseFontPt: 8,
@@ -4841,7 +4842,7 @@ async function drawLegendEl(d: Drawer, el: LegendEl, rows: LegendRow[], cfgIn?: 
     if (cfg.showTitle !== false) {
         d.setFont('bold', layout.titleFontPt)
         d.setTextColor(30, 30, 30)
-        d.text(cfg.title || 'Legend', lx + 8, ly + layout.titleFontPt + 6)
+        d.text(__tc(cfg.title, "cardLegend"), lx + 8, ly + layout.titleFontPt + 6)
     }
 
     for (const it of layout.items) {
@@ -5804,7 +5805,7 @@ export const PAGE_LAYERS = {
     overview: 'Overview map',
     legend: 'Legend',
     northScale: 'North arrow and scale bar',
-    text: 'Text',
+    text: __t("text"),
     graphics: 'Graphics',
     qr: 'QR code',
     series: 'Map series'
@@ -5875,7 +5876,7 @@ export async function composePage(
                 // PDF / SVG layer named after the map layer
                 if (opts.vectorData && opts.vectorData.length && (cap.affine || cap.groundExtent)) {
                     for (const vl of opts.vectorData) {
-                        layer(vl.title || 'Feature layer')
+                        layer(__tc(vl.title, "featureLayer"))
                         try { drawVectorLayer(d, cap, mf, vl) } catch (e) { /* best-effort */ }
                     }
                     // labels on top of every layer's geometry, deconflicted
@@ -5883,7 +5884,7 @@ export async function composePage(
                     const board: LabelBoard = { boxes: [] }
                     for (const vl of opts.vectorData) {
                         if (!vl.labels || !vl.labels.length) continue
-                        layer((vl.title || 'Feature layer') + ' labels')
+                        layer((__tc(vl.title, "featureLayer")) + ' labels')
                         try { drawVectorLabels(d, cap, mf, vl, board) } catch (e) { /* best-effort */ }
                     }
                 }
@@ -6073,7 +6074,7 @@ export async function composePage(
                 // quiet zone: the spec requires 4 clear modules on every side;
                 // anything inside it (borders, captions) breaks scanners
                 const qz = Math.max(6, mod * 4)
-                const capText = String((opts as any).qrCaption || 'Scan for interactive map')
+                const capText = String((opts as any).qrCaption || __t("qrCaption"))
                 d.setFont('normal', 5.5)
                 const capW2 = Math.min(d.textWidth(capText), qrSide + qz * 2)
                 const boxW2 = Math.max(qrSide, capW2) + qz * 2
@@ -6372,7 +6373,7 @@ async function fetchFontBuffer(rawUrl: string): Promise<ArrayBuffer> {
             'otf-cff': 'The URL returned an OTF (CFF outlines), which PDF embedding does not support - use the TTF version of the font.',
             woff: 'The URL returned a WOFF file - use the raw .ttf instead.',
             woff2: 'The URL returned a WOFF2 file (typical of Google Fonts CSS links) - use the raw .ttf, e.g. the Raw URL of the .ttf in github.com/google/fonts.',
-            text: 'The URL returned a web page, not a font - on GitHub, use the Raw file URL (raw.githubusercontent.com), not the page URL.',
+            text: __t("theUrlReturnedAWebPage"),
             unknown: 'The URL did not return a recognizable font file.'
         }
         throw new Error(why[kind] + ' (' + url + ')')

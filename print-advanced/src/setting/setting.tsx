@@ -17,6 +17,28 @@ import { FORMAT_LABELS, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } 
 import { IMConfig, PrintLayout, PictureEl, LegendEl, newLayoutId, OverviewConfig, GridConfig, LegendConfig } from '../config'
 import { parsePagx } from '../pagxParser'
 import defaultMessages from './translations/default'
+let __paIntl: any = null
+/** defaultMessages, but each string comes from the app language when the widget intl has it. */
+const __pm: any = new Proxy(defaultMessages as any, {
+  get: (tgt: any, k: any) => {
+    const v = tgt[k]
+    if (typeof k !== 'string' || typeof v !== 'string') return v
+    const m = __paIntl && __paIntl.messages ? __paIntl.messages[k] : undefined
+    return typeof m === 'string' ? m : v
+  }
+})
+import __i18nDefaults from './translations/default'
+import { __setIntl } from './i18n-t'
+let __i18nIntl: any = null
+/** Module translator: app language via the widget intl, English from default.ts, {name} values filled. */
+const __t = (id: string, values?: { [key: string]: any }): string => {
+  const msg: string = (__i18nDefaults as any)[id] ?? id
+  if (__i18nIntl && typeof __i18nIntl.formatMessage === 'function') {
+    try { return __i18nIntl.formatMessage({ id, defaultMessage: msg }, values) } catch (e) { }
+  }
+  return msg.replace(/\{(\w+)\}/g, (m: string, k: string) => (values && values[k] != null ? String(values[k]) : m))
+}
+
 
 interface State {
     fontImport: string
@@ -262,7 +284,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
             const xml = configToXml(this.currentConfigPlain())
             this.setState({ exportXml: xml, ieError: null, ieSuccess: null })
         } catch (e: any) {
-            this.setState({ ieError: (e && e.message) || 'Export failed.' })
+            this.setState({ ieError: (e && e.message) || __t("exportFailed") })
         }
     }
 
@@ -279,7 +301,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
     }
 
     copyConfig = (): void => {
-        const m = defaultMessages as any
+        const m = __pm
         // ALWAYS serialize the live config; never trust the cached preview.
         const xml = configToXml(this.currentConfigPlain())
         try {
@@ -311,12 +333,12 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         if (!file) return
         const reader = new FileReader()
         reader.onload = (ev) => this.setState({ importXml: String(ev.target?.result || ''), ieError: null, ieSuccess: null })
-        reader.onerror = () => this.setState({ ieError: (defaultMessages as any).ieReadFail })
+        reader.onerror = () => this.setState({ ieError: __pm.ieReadFail })
         reader.readAsText(file)
     }
 
     importConfig = (): void => {
-        const m = defaultMessages as any
+        const m = __pm
         const text = (this.state.importXml || '').trim()
         if (!text) { this.setState({ ieError: m.ieEmpty, ieSuccess: null }); return }
         try {
@@ -517,7 +539,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                 fontImportMsg: `Imported ${family}${bold ? ' (regular + bold)' : ''}.${note} It appears in the widget's Font list (Advanced options); if it isn't there yet, save the app so the widget reloads.`
             })
         } catch (e: any) {
-            this.setState({ fontImportBusy: false, fontImportMsg: (e && e.message) || 'Import failed.' })
+            this.setState({ fontImportBusy: false, fontImportMsg: (e && e.message) || __t("importFailed") })
         }
     }
 
@@ -557,9 +579,9 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
     addManualFont = (): void => {
         const name = (this.state.newFontName || '').trim()
         const url = (this.state.newFontUrl || '').trim()
-        if (!name || !url) { this.setState({ fontImportMsg: (defaultMessages as any).fontNeedNameUrl }); return }
+        if (!name || !url) { this.setState({ fontImportMsg: __pm.fontNeedNameUrl }); return }
         this.addCustomFont({ name, url, ...(this.state.newFontBoldUrl.trim() ? { boldUrl: this.state.newFontBoldUrl.trim() } : {}) })
-        this.setState({ newFontName: '', newFontUrl: '', newFontBoldUrl: '', fontImportMsg: (defaultMessages as any).fontAdded.replace('{name}', name) })
+        this.setState({ newFontName: '', newFontUrl: '', newFontBoldUrl: '', fontImportMsg: __pm.fontAdded.replace('{name}', name) })
     }
 
     setDefaultLogo = (dataUrl: string | undefined): void => {
@@ -656,7 +678,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         widthIn: 3,
         heightIn: 3.5,
         marginIn: 0.25,
-        title: 'Legend',
+        title: __t("legendSection"),
         showTitle: true,
         columns: 0,
         baseFontPt: 8,
@@ -775,7 +797,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     added.push(r.res.layout)
                     r.res.warnings.forEach((w: string) => warnings.push(multi ? r.file.name + ': ' + w : w))
                 } else {
-                    failed.push(r.file.name + ' (' + ((r.err && r.err.message) || 'import failed') + ')')
+                    failed.push(r.file.name + ' (' + ((r.err && r.err.message) || __t("importFailed2")) + ')')
                 }
             })
             if (added.length) {
@@ -955,7 +977,10 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
   `
 
     render(): React.ReactNode {
-        const messages = defaultMessages as any
+    __setIntl((this.props as any).intl)
+    __paIntl = (this.props as any).intl
+    __i18nIntl = (this.props as any).intl
+        const messages = __pm
         const layouts = this.getLayouts()
         const editing = this.getEditing()
 
@@ -1007,7 +1032,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             <SettingRow flow='wrap' label={messages.srcTemplates} truncateLabel>
                                 <TextInput size='sm' className='w-100'
                                     value={(() => { const c = (this.props.config as any)?.serviceTemplates; const a = c && c.asMutable ? c.asMutable() : c; return Array.isArray(a) ? a.join(', ') : '' })()}
-                                    placeholder='letter-ansi-a-landscape, a4-landscape, map-only'
+                                    placeholder={__t("uiLetterAnsiALandscapeA4Landscape")}
                                     onChange={(e: any) => {
                                         const list = String(e.target.value).split(',').map(s => s.trim()).filter(Boolean)
                                         this.setCfg('serviceTemplates', list.length ? list : '')
@@ -1089,7 +1114,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             <SettingRow>
                                 <div className='pd-src'>
                                     {editing.sourceFile ? messages.source + ': ' + editing.sourceFile + ' · ' : ''}
-                                    {editing.pageWidthIn} × {editing.pageHeightIn} in · {editing.elements.length} {messages.elements}
+                                    {editing.pageWidthIn} × {editing.pageHeightIn} {__t("uiIn")} {editing.elements.length} {messages.elements}
                                 </div>
                             </SettingRow>
                             {/* One button that pushes THIS layout's whole
@@ -1117,16 +1142,16 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             {this.rowWrap(messages.dpi, this.select(String(editing.dpi),
                                 v => this.patch({ dpi: Number(v) }),
                                 [
-                                    { value: '96', label: '96 (draft)' },
+                                    { value: '96', label: __t("_96Draft") },
                                     { value: '150', label: '150' },
-                                    { value: '200', label: '200 (recommended)' },
+                                    { value: '200', label: __t("_200Recommended") },
                                     { value: '300', label: '300' }
                                 ]))}
                             {this.rowWrap(messages.imageFormat, this.select(editing.imageFormat,
                                 v => this.patch({ imageFormat: v as any }),
                                 [
-                                    { value: 'jpg', label: 'JPEG (smaller file)' },
-                                    { value: 'png', label: 'PNG (crisper labels)' }
+                                    { value: 'jpg', label: __t("jpegSmallerFile") },
+                                    { value: 'png', label: __t("pngCrisperLabels") }
                                 ]))}
                             {this.rowWrap(messages.preserve, this.select(editing.preserve,
                                 v => this.patch({ preserve: v as any }),
@@ -1205,7 +1230,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                     )}
                                     <SettingRow flow='wrap' label={messages.legendTitle} truncateLabel>
                                         <TextInput size='sm' className='w-100'
-                                            value={String((editing as any).legend?.title ?? 'Legend')}
+                                            value={String((editing as any).legend?.title ?? __t("legendSection"))}
                                             onChange={(e: any) => this.patchLegend({ title: e.target.value })} />
                                     </SettingRow>
                                     <SettingRow tag='label' label={messages.legendShowTitle} truncateLabel>
@@ -1230,13 +1255,13 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                         String(Number((editing as any).legend?.baseFontPt) || 8),
                                         v => this.patchLegend({ baseFontPt: Number(v) }),
                                         [
-                                            { value: '6', label: '6 pt' },
-                                            { value: '7', label: '7 pt' },
-                                            { value: '8', label: '8 pt' },
-                                            { value: '9', label: '9 pt' },
-                                            { value: '10', label: '10 pt' },
-                                            { value: '12', label: '12 pt' },
-                                            { value: '14', label: '14 pt (large formats)' }
+                                            { value: '6', label: __t("_6Pt") },
+                                            { value: '7', label: __t("_7Pt") },
+                                            { value: '8', label: __t("_8Pt") },
+                                            { value: '9', label: __t("_9Pt") },
+                                            { value: '10', label: __t("_10Pt") },
+                                            { value: '12', label: __t("_12Pt") },
+                                            { value: '14', label: __t("_14PtLargeFormats") }
                                         ]))}
                                     {this.rowWrap(messages.legendPatch, this.select(
                                         ((editing as any).legend?.patchSize) || 'medium',
@@ -1344,13 +1369,13 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                         String(Number((editing as any).grid?.lineWidthPt) || 0.5),
                                         v => this.patchGrid({ lineWidthPt: Number(v) }),
                                         [
-                                            { value: '0.25', label: '0.25 pt' },
-                                            { value: '0.5', label: '0.5 pt' },
-                                            { value: '0.75', label: '0.75 pt' },
-                                            { value: '1', label: '1 pt' },
-                                            { value: '1.5', label: '1.5 pt' },
-                                            { value: '2', label: '2 pt' },
-                                            { value: '3', label: '3 pt' }
+                                            { value: '0.25', label: __t("_025Pt") },
+                                            { value: '0.5', label: __t("_05Pt") },
+                                            { value: '0.75', label: __t("_075Pt") },
+                                            { value: '1', label: __t("_1Pt") },
+                                            { value: '1.5', label: __t("_15Pt") },
+                                            { value: '2', label: __t("_2Pt") },
+                                            { value: '3', label: __t("_3Pt") }
                                         ]))}
                                     {this.rowWrap(messages.gridOpacity, this.select(
                                         String(Number((editing as any).grid?.lineOpacity) || 1),
@@ -1404,15 +1429,15 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                                 String(Number((editing as any).grid?.labelSizePt) || 7),
                                                 v => this.patchGrid({ labelSizePt: Number(v) }),
                                                 [
-                                                    { value: '6', label: '6 pt' },
-                                                    { value: '7', label: '7 pt' },
-                                                    { value: '8', label: '8 pt' },
-                                                    { value: '9', label: '9 pt' },
-                                                    { value: '10', label: '10 pt' },
-                                                    { value: '12', label: '12 pt' },
-                                                    { value: '14', label: '14 pt' },
-                                                    { value: '18', label: '18 pt (large formats)' },
-                                                    { value: '24', label: '24 pt (large formats)' }
+                                                    { value: '6', label: __t("_6Pt") },
+                                                    { value: '7', label: __t("_7Pt") },
+                                                    { value: '8', label: __t("_8Pt") },
+                                                    { value: '9', label: __t("_9Pt") },
+                                                    { value: '10', label: __t("_10Pt") },
+                                                    { value: '12', label: __t("_12Pt") },
+                                                    { value: '14', label: __t("_14Pt") },
+                                                    { value: '18', label: __t("_18PtLargeFormats") },
+                                                    { value: '24', label: __t("_24PtLargeFormats") }
                                                 ]))}
                                             <SettingRow label={messages.gridLabelColor} truncateLabel>
                                                 {this.colorPick(messages.gridLabelColor, (editing as any).grid?.labelColor || (editing as any).grid?.lineColor, [90, 90, 90], c => this.patchGrid({ labelColor: c } as any))}
@@ -1536,10 +1561,10 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                         String(Number((editing as any).overview?.indicatorWidthPt) || 1),
                                         v => this.patchOverview({ indicatorWidthPt: Number(v) }),
                                         [
-                                            { value: '0.5', label: '0.5 pt' },
-                                            { value: '1', label: '1 pt' },
-                                            { value: '2', label: '2 pt' },
-                                            { value: '3', label: '3 pt' }
+                                            { value: '0.5', label: __t("_05Pt") },
+                                            { value: '1', label: __t("_1Pt") },
+                                            { value: '2', label: __t("_2Pt") },
+                                            { value: '3', label: __t("_3Pt") }
                                         ]))}
                                 </React.Fragment>
                             )}
@@ -1558,7 +1583,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                             <div className='pd-pic'>
                                                 {pic.dataUrl
                                                     ? <img src={pic.dataUrl} alt={pic.sourceName || messages.picturesSection} />
-                                                    : <span aria-hidden='true' style={{ width: '2.25rem', textAlign: 'center' }}>none</span>}
+                                                    : <span aria-hidden='true' style={{ width: '2.25rem', textAlign: 'center' }}>{__t("uiNone")}</span>}
                                                 <span className='pd-pic-name' title={pic.sourceName}>{pic.sourceName}</span>
                                                 <Button size='sm'
                                                     aria-label={(pic.dataUrl ? messages.replaceImage : messages.attachImage) + (pic.sourceName ? ': ' + pic.sourceName : '')}
@@ -1611,7 +1636,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     <SettingRow flow='wrap' label={messages.defTitle} truncateLabel>
                         <TextInput size='sm' className='w-100'
                             value={((this.props.config as any)?.defaultTitle) || ''}
-                            placeholder='{layout}'
+                            placeholder={__t("layout")}
                             onChange={(e: any) => this.setCfg('defaultTitle', e.target.value)} />
                     </SettingRow>
                     <SettingRow flow='wrap' label={messages.defAuthor} truncateLabel>
@@ -1747,7 +1772,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     <SettingRow flow='wrap' label={messages.maxCapture} truncateLabel>
                         <TextInput size='sm' className='w-100'
                             value={String((this.props.config as any)?.maxImagePx || '')}
-                            placeholder='Auto (graphics card limit)'
+                            placeholder={__t("uiAutoGraphicsCardLimit")}
                             onChange={(e: any) => {
                                 const digits = String(e.target.value || '').replace(/[^0-9]/g, '')
                                 const n = Math.min(16384, Number(digits) || 0)
@@ -2007,9 +2032,9 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                                     config: base.set('defaultFontFamily', e.target.value)
                                 })
                             }}>
-                            <option value='sans'>Sans-serif (Helvetica / Arial)</option>
-                            <option value='serif'>Serif (Times)</option>
-                            <option value='mono'>Monospace (Courier)</option>
+                            <option value='sans'>{__t("uiSansSerifHelveticaArial")}</option>
+                            <option value='serif'>{__t("uiSerifTimes")}</option>
+                            <option value='mono'>{__t("uiMonospaceCourier")}</option>
                         </Select>
                     </SettingRow>
                     <SettingRow>
@@ -2020,7 +2045,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             <TextInput size='sm' style={{ flex: 1 }}
                                 aria-label={messages.fontImportLabel}
                                 value={this.state.fontImport}
-                                placeholder='Montserrat  or  https://fonts.googleapis.com/css2?family=Montserrat'
+                                placeholder={__t("uiMontserratOrHttpsFontsGoogleapisCom")}
                                 onChange={(e: any) => this.setState({ fontImport: e.target.value })} />
                             <Tooltip title={messages.fontImportTip} placement='top'>
                                 <Button size='sm' type='primary' disabled={this.state.fontImportBusy}
@@ -2041,7 +2066,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                             <div className='w-100'>
                                 {this.customFontsList().map(f => (
                                     <div key={f.name} className='pd-font-item'>
-                                        <span className='pd-font-name' title={f.url}>{f.name}{f.boldUrl ? ' + bold' : ''}</span>
+                                        <span className='pd-font-name' title={f.url}>{f.name}{f.boldUrl ? " " + __t("bold") + "" : ''}</span>
                                         <Button size='sm' type='tertiary'
                                             aria-label={messages.remove + ': ' + f.name}
                                             onClick={() => this.removeCustomFont(f.name)}>{messages.remove}</Button>
@@ -2053,7 +2078,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     <SettingRow flow='wrap' label={messages.customFontName} truncateLabel>
                         <TextInput size='sm' className='w-100'
                             value={this.state.newFontName}
-                            placeholder='Open Sans'
+                            placeholder={__t("uiOpenSans")}
                             onChange={(e: any) => this.setState({ newFontName: e.target.value })} />
                     </SettingRow>
                     <SettingRow flow='wrap' label={messages.customFontUrl} truncateLabel>
@@ -2088,7 +2113,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                         <div className='pd-pic'>
                             {(this.props.config as any)?.defaultLogo
                                 ? <img src={(this.props.config as any).defaultLogo} alt={messages.logoLabel} />
-                                : <span aria-hidden='true' style={{ width: '2.25rem', textAlign: 'center' }}>none</span>}
+                                : <span aria-hidden='true' style={{ width: '2.25rem', textAlign: 'center' }}>{__t("uiNone")}</span>}
                             <span className='pd-pic-name'>{messages.logoLabel}</span>
                             <Button size='sm'
                                 aria-label={((this.props.config as any)?.defaultLogo ? messages.replaceImage : messages.attachImage) + ': ' + messages.logoLabel}

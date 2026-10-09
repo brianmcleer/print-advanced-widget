@@ -9,61 +9,62 @@
  * widget hangs on the loading spinner.
  */
 import { ScaleBarUnits, ScaleBarStyle, NorthArrowStyle, FontFamily } from './config'
+import { __t } from './runtime/i18n-t'
 
 export type OutputFormat = 'pdf' | 'png32' | 'png8' | 'jpg' | 'gif' | 'eps' | 'svg' | 'svgz' | 'aix' | 'tiff'
 
 export const FORMAT_LABELS: Array<{ value: OutputFormat, label: string, disabled?: boolean }> = [
-    { value: 'pdf', label: 'Portable Document Format (PDF)' },
-    { value: 'png32', label: '32-bit Portable Network Graphics (PNG32)' },
-    { value: 'png8', label: '8-bit Portable Network Graphics (PNG8)' },
-    { value: 'jpg', label: 'Joint Photographic Experts Group (JPG)' },
-    { value: 'gif', label: 'Graphics Interchange Format (GIF)' },
-    { value: 'eps', label: 'Encapsulated PostScript (EPS)' },
-    { value: 'svg', label: 'Scalable Vector Graphics (SVG)' },
-    { value: 'svgz', label: 'Compressed Scalable Vector Graphics (SVGZ)' },
-    { value: 'aix', label: 'Adobe Illustrator Exchange (AIX)', disabled: true },
-    { value: 'tiff', label: 'Tag Image File Format (TIFF)' }
+    { value: 'pdf', label: __t("portableDocumentFormatPdf") },
+    { value: 'png32', label: __t("_32BitPortableNetworkGraphicsPng32") },
+    { value: 'png8', label: __t("_8BitPortableNetworkGraphicsPng8") },
+    { value: 'jpg', label: __t("jointPhotographicExpertsGroupJpg") },
+    { value: 'gif', label: __t("graphicsInterchangeFormatGif") },
+    { value: 'eps', label: __t("encapsulatedPostScriptEps") },
+    { value: 'svg', label: __t("scalableVectorGraphicsSvg") },
+    { value: 'svgz', label: __t("compressedScalableVectorGraphicsSvgz") },
+    { value: 'aix', label: __t("adobeIllustratorExchangeAix"), disabled: true },
+    { value: 'tiff', label: __t("tagImageFileFormatTiff") }
 ]
 
 export const FONT_FAMILIES: Array<{ value: FontFamily, label: string }> = [
-    { value: 'sans', label: 'Sans-serif (Helvetica / Arial)' },
-    { value: 'serif', label: 'Serif (Times)' },
-    { value: 'mono', label: 'Monospace (Courier)' }
+    { value: 'sans', label: __t("sansSerifHelveticaArial") },
+    { value: 'serif', label: __t("serifTimes") },
+    { value: 'mono', label: __t("monospaceCourier") }
 ]
 
 export const NORTH_ARROW_STYLES: Array<{ value: NorthArrowStyle, label: string }> = [
-    { value: 'splitArrow', label: 'Split arrow' },
-    { value: 'solidTriangle', label: 'Solid triangle' },
-    { value: 'outlineArrow', label: 'Outline triangle' },
-    { value: 'needle', label: 'Needle' },
-    { value: 'simpleArrow', label: 'Simple arrow' },
-    { value: 'chevron', label: 'Chevron' },
-    { value: 'meridian', label: 'Meridian' },
-    { value: 'compassStar', label: 'Compass star' },
-    { value: 'compassRose', label: 'Compass rose' },
-    { value: 'starburst', label: 'Starburst' },
-    { value: 'circledArrow', label: 'Circled arrow' },
-    { value: 'filledCircleArrow', label: 'Filled circle' }
+    { value: 'splitArrow', label: __t("splitArrow") },
+    { value: 'solidTriangle', label: __t("solidTriangle") },
+    { value: 'outlineArrow', label: __t("outlineTriangle") },
+    { value: 'needle', label: __t("needle") },
+    { value: 'simpleArrow', label: __t("simpleArrow") },
+    { value: 'chevron', label: __t("chevron") },
+    { value: 'meridian', label: __t("meridian") },
+    { value: 'compassStar', label: __t("compassStar") },
+    { value: 'compassRose', label: __t("compassRose") },
+    { value: 'starburst', label: __t("starburst") },
+    { value: 'circledArrow', label: __t("circledArrow") },
+    { value: 'filledCircleArrow', label: __t("filledCircle") }
 ]
 
 export const SCALE_BAR_STYLES: Array<{ value: ScaleBarStyle, label: string }> = [
-    { value: 'alternating', label: 'Alternating' },
-    { value: 'alternating2', label: 'Alternating (ticked)' },
-    { value: 'doubleAlternating', label: 'Double alternating' },
-    { value: 'hollow', label: 'Hollow' },
-    { value: 'hollowDouble', label: 'Double hollow' },
-    { value: 'singleDivision', label: 'Single division' },
-    { value: 'line', label: 'Line' },
-    { value: 'line2', label: 'Line (labels below)' },
-    { value: 'scaleLine', label: 'Scale line' },
-    { value: 'scaleLine2', label: 'Scale line (center)' },
-    { value: 'steppedLine', label: 'Stepped line' },
-    { value: 'steppedFilled', label: 'Stepped filled' }
+    { value: 'alternating', label: __t("alternating") },
+    { value: 'alternating2', label: __t("alternatingTicked") },
+    { value: 'doubleAlternating', label: __t("doubleAlternating") },
+    { value: 'hollow', label: __t("hollow") },
+    { value: 'hollowDouble', label: __t("doubleHollow") },
+    { value: 'singleDivision', label: __t("singleDivision") },
+    { value: 'line', label: __t("line") },
+    { value: 'line2', label: __t("lineLabelsBelow") },
+    { value: 'scaleLine', label: __t("scaleLine") },
+    { value: 'scaleLine2', label: __t("scaleLineCenter") },
+    { value: 'steppedLine', label: __t("steppedLine") },
+    { value: 'steppedFilled', label: __t("steppedFilled") }
 ]
 
 export const SCALE_BAR_UNITS: Array<{ value: ScaleBarUnits, label: string }> = [
-    { value: 'feet', label: 'Feet' },
-    { value: 'miles', label: 'Miles' },
-    { value: 'meters', label: 'Meters' },
-    { value: 'kilometers', label: 'Kilometers' }
+    { value: 'feet', label: __t("feet") },
+    { value: 'miles', label: __t("miles") },
+    { value: 'meters', label: __t("meters") },
+    { value: 'kilometers', label: __t("kilometers") }
 ]

@@ -20,6 +20,16 @@ import Polygon from 'esri/geometry/Polygon'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
 import { metersPerMapUnit, printExtent, extentRings, extentFitScale, resolvePrintedScale } from './lib/scaleMath'
 import defaultMessages from './translations/default'
+let __paIntl: any = null
+/** defaultMessages, but each string comes from the app language when the widget intl has it. */
+const __pm: any = new Proxy(defaultMessages as any, {
+  get: (tgt: any, k: any) => {
+    const v = tgt[k]
+    if (typeof k !== 'string' || typeof v !== 'string') return v
+    const m = __paIntl && __paIntl.messages ? __paIntl.messages[k] : undefined
+    return typeof m === 'string' ? m : v
+  }
+})
 import { renderLayout, OutputFormat, FORMAT_LABELS, RenderOptions, lookupEsriWkt, renderPagePreview, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS, FONT_FAMILIES, computeLegendPanel, harvestLegendDom, findLegendDom, LEGEND_DEFAULTS, layoutLegend, resolveLegendCorner, renderSeries, seriesPageTitle, getPointProjector, SelectionGeometry, SeriesStep } from './lib/pdfRenderer'
 import { gridTilesByCount, envelopeForFrame, featurePageTiles, FeaturePageInput } from './lib/seriesMath'
 import { CalciteIcon } from 'calcite-components'
@@ -29,6 +39,7 @@ import PagePreview from './components/PagePreview'
 import { buildHelpSections } from './helpSections'
 import { beacon } from '../shared/beacon'
 import type { BeaconHandle } from '../shared/beacon'
+import { __setIntl, __t, __tc } from './i18n-t'
 
 const printIcon = require('./assets/icons/icon.svg')
 
@@ -483,8 +494,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const left = Math.max(0, st.pageCount - this.seriesSheetsDone) + (st.kind === 'sheet' ? 1 : 0)
     if (st.kind !== 'sheet' || left <= 0) return ''
     const sec = Math.round((per * left) / 1000)
-    if (sec < 60) return String((defaultMessages as any).seriesStepEtaSec || '').replace('{s}', String(Math.max(5, Math.round(sec / 5) * 5)))
-    return String((defaultMessages as any).seriesStepEtaMin || '').replace('{m}', String(Math.round(sec / 60)))
+    if (sec < 60) return String(__pm.seriesStepEtaSec || '').replace('{s}', String(Math.max(5, Math.round(sec / 5) * 5)))
+    return String(__pm.seriesStepEtaMin || '').replace('{m}', String(Math.round(sec / 60)))
   }
 
   seriesStepHeadline = (st: SeriesStep, messages: any): string => {
@@ -695,7 +706,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   availableScaleModes = (): Array<{ value: string, label: string }> => {
     const me = this.mapExtentCfg()
-    const m = defaultMessages as any
+    const m = __pm
     const out: Array<{ value: string, label: string }> = []
     if (me.showPreserveScale !== false) out.push({ value: 'current', label: m.modeCurrent })
     if (me.showPreserveExtent) out.push({ value: 'preserveExtent', label: m.modeExtent })
@@ -1350,9 +1361,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const { jimuMapView } = this.state
     if (!jimuMapView || !jimuMapView.view) return
     const url = this.serviceUrl()
-    if (!url) { this.setState({ error: (defaultMessages as any).svcNoUrl }); return }
+    if (!url) { this.setState({ error: __pm.svcNoUrl }); return }
     this.beacon?.action('print-service')
-    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, status: (defaultMessages as any).svcSubmitting })
+    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, status: __pm.svcSubmitting })
     try {
       const fmt = this.state.format === 'aix' ? 'aix' : this.state.format
       const template = new PrintTemplate({
@@ -1376,17 +1387,17 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       } as any)
       const result: any = await print.execute(url, params as any)
       const outUrl = result && result.url
-      if (!outUrl) throw new Error((defaultMessages as any).svcNoResult)
+      if (!outUrl) throw new Error(__pm.svcNoResult)
       const name = (this.buildFileName(this.getSelectedLayout()) || 'map')
       this.setState({
         busy: false, status: '',
         lastResult: name + '  ·  ' + (this.state.svcTemplate || this.serviceTemplates()[0]),
-        results: this.pushResult({ name: name + '.' + (this.state.format || 'pdf'), url: outUrl, meta: (defaultMessages as any).svcResultMeta })
+        results: this.pushResult({ name: name + '.' + (this.state.format || 'pdf'), url: outUrl, meta: __pm.svcResultMeta })
       })
       try { window.open(outUrl, '_blank') } catch (e) { /* popup blocked; link is in the list */ }
     } catch (err: any) {
       this.beacon?.error(err, 'print-service')
-      this.setState({ busy: false, status: '', error: (err && err.message) || (defaultMessages as any).svcFailed })
+      this.setState({ busy: false, status: '', error: (err && err.message) || __pm.svcFailed })
     }
   }
 
@@ -1604,8 +1615,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   /** Translate one help string and fill any {token} placeholders. */
   private helpT = (id: string, values?: Record<string, string>): string => {
-    const __intl: any = (this.props as any).intl; if (__intl && typeof __intl.formatMessage === "function") { try { return __intl.formatMessage({ id, defaultMessage: (defaultMessages as any)[id] ?? id }, values) } catch (e) { } }
-    let s = String((defaultMessages as any)[id] || '')
+    const __intl: any = (this.props as any).intl; if (__intl && typeof __intl.formatMessage === "function") { try { return __intl.formatMessage({ id, defaultMessage: __pm[id] ?? id }, values) } catch (e) { } }
+    let s = String(__pm[id] || '')
     if (values) {
       for (const k of Object.keys(values)) s = s.split('{' + k + '}').join(values[k])
     }
@@ -1679,7 +1690,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (!jimuMapView || !jimuMapView.view || !layout) return
 
     this.beacon?.action('export', this.state.format)
-    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, status: 'Preparing…' })
+    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, status: __t("preparing") })
     try {
       const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0 // 0 = auto (GPU-detected)
       const effLayout = this.state.dpi
@@ -1707,7 +1718,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           const qu = this.qrSafeUrl()
           if (qu) {
             (options as any).qrUrl = qu;
-            (options as any).qrCaption = (defaultMessages as any).qrCaption || 'Scan for interactive map'
+            (options as any).qrCaption = __tc(__pm.qrCaption, "qrCaption")
           }
         } catch (e) { /* QR is best-effort */ }
       }
@@ -1800,7 +1811,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         jimuMapView.view as any,
         effLayout,
         effFormat,
-        this.state.title || layout.name || 'Map',
+        __tc(this.state.title || layout.name, "map"),
         this.buildFileName(layout),
         maxImagePx,
         options,
@@ -1817,7 +1828,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       })
     } catch (err: any) {
       this.beacon?.error(err, 'export')
-      this.setState({ busy: false, status: '', error: (err && err.message) || 'Export failed.' })
+      this.setState({ busy: false, status: '', error: (err && err.message) || __t("exportFailed") })
     }
   }
 
@@ -2173,7 +2184,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const n = feats ? (this.featCache ? Math.min(this.featCache.total, this.seriesLimits().max) : 0) : this.seriesSheetCount()
     let sample = ''
     try {
-      sample = seriesPageTitle(this.state.title || (layout && layout.name) || 'Map', 0, Math.max(1, n || 1),
+      sample = seriesPageTitle(this.state.title || (layout && layout.name) || __t("map"), 0, Math.max(1, n || 1),
         { name: first ? first.name : (feats ? '' : undefined), fields: first ? first.fields : undefined }, feats)
     } catch (e) { sample = '' }
     return (
@@ -2502,7 +2513,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (this.seriesBlocked()) return
     this.beacon?.action(this.seriesFeatures() ? 'export-series-features' : 'export-series')
     this.beginBusyClock(); this.seriesSheetStart = 0; this.seriesSheetsDone = 0; this.seriesCancelled = false
-    this.setState({ busy: true, error: null, note: '', status: 'Preparing series\u2026', seriesStep: { done: 0, total: 1, kind: 'prep', page: 0, pageCount: 0 } })
+    this.setState({ busy: true, error: null, note: '', status: __t("preparingSeries"), seriesStep: { done: 0, total: 1, kind: 'prep', page: 0, pageCount: 0 } })
     try {
       const mfEl: any = (layout.elements || []).find((e: any) => e.type === 'mapFrame')
       const ext = view.extent
@@ -2527,17 +2538,17 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       let featTilesFor: ((fw: number, fh: number) => { tiles: any[], scaleDenom: number }) | null = null
       if (this.seriesFeatures()) {
         const layer = this.featLayer()
-        if (!layer) throw new Error((defaultMessages as any).seriesNoLayer)
-        this.setState({ status: (defaultMessages as any).seriesFetching })
+        if (!layer) throw new Error(__pm.seriesNoLayer)
+        this.setState({ status: __pm.seriesFetching })
         const r = await this.fetchFeaturePages(view, layer)
         featTotal = r.total
         if (this.seriesCancelled) throw new Error('SERIES_CANCELLED')
-        if (!r.feats.length) throw new Error((defaultMessages as any).seriesNoFeatures)
+        if (!r.feats.length) throw new Error(__pm.seriesNoFeatures)
         // the fresh count can differ from the panel's (data edits, filters):
         // hold the limit here too
         const L = this.seriesLimits()
         if (r.total > L.max && L.mode !== 'first') {
-          throw new Error(String((defaultMessages as any).seriesOverFeat).replace('{n}', String(r.total)).replace(/\{max\}/g, String(L.max)))
+          throw new Error(String(__pm.seriesOverFeat).replace('{n}', String(r.total)).replace(/\{max\}/g, String(L.max)))
         }
         featTilesFor = (fw: number, fh: number) => {
           const t2 = this.featTilesFor(view, fw, fh, r.feats)
@@ -2553,7 +2564,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           const qu = this.qrSafeUrl()
           if (qu) {
             (options as any).qrUrl = qu;
-            (options as any).qrCaption = (defaultMessages as any).qrCaption || 'Scan for interactive map'
+            (options as any).qrCaption = __tc(__pm.qrCaption, "qrCaption")
           }
         } catch (e) { /* QR is best-effort */ }
       }
@@ -2599,7 +2610,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       const name = (this.buildFileName(layout) || 'map-series').replace(/\.pdf$/i, '') + (featTilesFor ? '-pages.pdf' : '-series.pdf')
       const cap = this.seriesLimits().max
       const result = await renderSeries(
-        view, effLayout, this.state.title || layout.name || 'Map', name, maxImagePx,
+        view, effLayout, __tc(this.state.title || layout.name, "map"), name, maxImagePx,
         {
           tiles,
           scaleDenom,
@@ -2625,14 +2636,14 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           name: result.fileName,
           url: result.url,
           meta: result.pages + ' pages \u00b7 ' + result.sizeKb + ' KB' +
-            (featTotal > cap ? ' \u00b7 ' + String((defaultMessages as any).seriesCapped || '').replace('{cap}', String(cap)).replace('{n}', String(featTotal)) : '') +
+            (featTotal > cap ? ' \u00b7 ' + String(__pm.seriesCapped || '').replace('{cap}', String(cap)).replace('{n}', String(featTotal)) : '') +
             (result.warning ? ' \u00b7 ' + result.warning : '')
         })
       }, () => this.updateSeriesPreview())
     } catch (err: any) {
       if (!(err && err.message === 'SERIES_CANCELLED')) this.beacon?.error(err, 'export-series')
       const cancelled = !!(err && err.message === 'SERIES_CANCELLED')
-      this.setState({ busy: false, status: '', seriesStep: null, note: cancelled ? String((defaultMessages as any).seriesCancelledNote || '') : '', error: cancelled ? null : ((err && err.message) || 'Series export failed.') }, () => {
+      this.setState({ busy: false, status: '', seriesStep: null, note: cancelled ? String(__pm.seriesCancelledNote || '') : '', error: cancelled ? null : ((err && err.message) || __t("seriesExportFailed")) }, () => {
         this.updateSeriesPreview()
 
       })
@@ -2859,7 +2870,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
     if (this.state.qrOn) {
       const qu = this.qrSafeUrl()
-      if (qu) { (options as any).qrUrl = qu; (options as any).qrCaption = (defaultMessages as any).qrCaption || 'Scan for interactive map' }
+      if (qu) { (options as any).qrUrl = qu; (options as any).qrCaption = __tc(__pm.qrCaption, "qrCaption") }
     }
     if (this.state.author) options.author = this.state.author
     if (this.state.copyright) options.copyright = this.state.copyright
@@ -2901,13 +2912,13 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           if (dom) rows = await harvestLegendDom(dom)
         } catch (e) { rows = [] }
       }
-      const r = await renderPagePreview(view, layout, this.state.title || layout.name || 'Map', options, rows, 640)
-      const m: any = defaultMessages
+      const r = await renderPagePreview(view, layout, __tc(this.state.title || layout.name, "map"), options, rows, 640)
+      const m: any = __pm
       const note = String(m.pagePreviewScale || '1:{scale}').replace('{scale}', r.printedScale.toLocaleString()) +
         (r.notes.length ? ' \u00b7 ' + r.notes.join(' \u00b7 ') : '')
       this.setState({ pagePreviewUrl: r.dataUrl, pagePreviewNote: note, pagePreviewBusy: false })
     } catch (e: any) {
-      this.setState({ pagePreviewBusy: false, pagePreviewNote: (defaultMessages as any).pagePreviewFailed })
+      this.setState({ pagePreviewBusy: false, pagePreviewNote: __pm.pagePreviewFailed })
     } finally {
       this.previewPageRunning = false
       if (this.previewPageAgain) { this.previewPageAgain = false; this.queuePagePreview() }
@@ -3090,10 +3101,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   }
 
   render (): React.ReactNode {
+    __setIntl((this.props as any).intl)
+    __paIntl = (this.props as any).intl
     const { useMapWidgetIds } = this.props
     const layouts = this.getLayouts()
     const layout = this.getSelectedLayout()
-    const messages = defaultMessages as any
+    const messages = __pm
 
     if (!useMapWidgetIds || useMapWidgetIds.length === 0) {
       return <WidgetPlaceholder icon={printIcon} message={messages.selectMapHint} widgetId={this.props.id} />
@@ -3709,7 +3722,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 <Select id={this.uid('dpi')} aria-labelledby={this.uid('dpi') + '-lbl'} size='sm' value={this.state.dpi}
                   onChange={(e: any) => this.setState({ dpi: e.target.value })}>
                   <option value=''>{messages.dpiDefault}{layout ? ' (' + layout.dpi + ')' : ''}</option>
-                  <option value='96'>96 (draft)</option>
+                  <option value='96'>{__t("_96Draft")}</option>
                   <option value='150'>150</option>
                   <option value='200'>200</option>
                   <option value='300'>300</option>
@@ -3791,7 +3804,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                   size='sm'
                   value={this.state.fileName}
                   onChange={(e) => this.setState({ fileName: e.target.value })}
-                  placeholder='{title}'
+                  placeholder={__t("title")}
                   aria-describedby={this.uid('fname-desc')}
                 />
               </Tooltip>
