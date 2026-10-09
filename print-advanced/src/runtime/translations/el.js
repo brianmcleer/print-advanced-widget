@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (σχέδιο)",
         title: "{title}",
         unknownError: "άγνωστο σφάλμα",
-        unserializableError: "σφάλμα μη ανιχνεύσιμο"
+        unserializableError: "σφάλμα μη ανιχνεύσιμο",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} από {pages}",
+        in: "στο ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

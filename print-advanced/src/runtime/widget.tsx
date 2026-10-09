@@ -39,7 +39,7 @@ import PagePreview from './components/PagePreview'
 import { buildHelpSections } from './helpSections'
 import { beacon } from '../shared/beacon'
 import type { BeaconHandle } from '../shared/beacon'
-import { __setIntl, __t, __tc } from './i18n-t'
+import { __locale, __setIntl, __t, __tc } from './i18n-t'
 
 const printIcon = require('./assets/icons/icon.svg')
 
@@ -1959,7 +1959,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   cardSummary = (key: string, messages: any, layout: any): string => {
     const s: any = this.state
     try {
-      if (key === 'area') return s.scaleReadout ? '1:' + Number(s.scaleReadout).toLocaleString() : ''
+      if (key === 'area') return s.scaleReadout ? '1:' + Number(s.scaleReadout).toLocaleString(__locale()) : ''
       if (key === 'series') return this.seriesActive() ? String(messages.seriesPagesBadge).replace('{n}', String(this.seriesPageCount())) : messages.cardOff
       if (key === 'onmap') {
         const on: string[] = []
@@ -2195,9 +2195,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         <div className='pd-inline' style={{ flexWrap: 'wrap', gap: 4 }}>
           <span className='pd-desc'>{messages.seriesTitleTokens}</span>
           {feats && (
-            <Button size='sm' type='tertiary' onClick={() => this.insertTitleToken('{pageName}')}>{messages.seriesTokName}</Button>
+            <Button size='sm' type='tertiary' onClick={() => this.insertTitleToken(__t("pageName"))}>{messages.seriesTokName}</Button>
           )}
-          <Button size='sm' type='tertiary' onClick={() => this.insertTitleToken('{page} of {pages}')}>{messages.seriesTokNumber}</Button>
+          <Button size='sm' type='tertiary' onClick={() => this.insertTitleToken(__t("pageOfPages"))}>{messages.seriesTokNumber}</Button>
           {feats && fields.length > 0 && (
             <Select size='sm' style={{ width: 130 }} aria-label={messages.seriesTokField} value=''
               onChange={(e: any) => { if (e.target.value) this.insertTitleToken('{field:' + e.target.value + '}') }}>
@@ -2355,7 +2355,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         }
       } catch (e) { /* raw value */ }
       const f = fields.find((x: any) => x && x.name === k)
-      out[k] = f && f.type === 'date' && typeof v === 'number' ? new Date(v).toLocaleDateString() : String(v)
+      out[k] = f && f.type === 'date' && typeof v === 'number' ? new Date(v).toLocaleDateString(__locale()) : String(v)
     }
     return out
   }
@@ -2657,8 +2657,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   }
 
   describeLayout = (layout: PrintLayout): string => {
-    return layout.pageWidthIn + ' × ' + layout.pageHeightIn + ' in · ' + layout.dpi + ' DPI · ' +
-      (layout.preserve === 'scale' ? 'keeps map zoom level' : 'prints what you see')
+    return layout.pageWidthIn + ' × ' + layout.pageHeightIn + " " + __t("in") + " " + layout.dpi + " " + __t("dpi") + " " +
+      (layout.preserve === 'scale' ? __t("keepsMapZoomLevel") : __t("printsWhatYouSee"))
   }
 
   getStyle = () => css`
@@ -2923,7 +2923,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       }
       const r = await renderPagePreview(view, layout, __tc(this.state.title || layout.name, "map"), options, rows, 640)
       const m: any = __pm
-      const note = String(m.pagePreviewScale || '1:{scale}').replace('{scale}', r.printedScale.toLocaleString()) +
+      const note = String(m.pagePreviewScale || '1:{scale}').replace('{scale}', r.printedScale.toLocaleString(__locale())) +
         (r.notes.length ? ' \u00b7 ' + r.notes.join(' \u00b7 ') : '')
       this.setState({ pagePreviewUrl: r.dataUrl, pagePreviewNote: note, pagePreviewBusy: false })
     } catch (e: any) {
@@ -3388,7 +3388,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                           onChange={(e: any) => this.setState({ fixedScale: e.target.value, locked: false })}>
                           <option value=''>{messages.scalePick}</option>
                           {this.scaleChoices().map(c => (
-                            <option key={c} value={String(c)}>1:{c.toLocaleString()}</option>
+                            <option key={c} value={String(c)}>1:{c.toLocaleString(__locale())}</option>
                           ))}
                         </Select>
                       : <TextInput size='sm' aria-labelledby={this.uid('fixedscale') + '-lbl'}

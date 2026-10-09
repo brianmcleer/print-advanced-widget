@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Tilføj så mange skrifttyper som du vil - hver vises i widget skrifttype menuen. Indlæses af URL ved eksport tid - intet er indlejret i widget. Skal være en statisk TTF (ikke WOFF / WOFF2 / OTF, ikke et Google Fonts CSS-link). Fra github.com / google / skrifttyper bruge den Raw URL af en .ttf - foretrækker filer under en statisk / mappe; nogle variable- font TTFs vil ikke integrere i PDF. GitHub side URL 'er konverteres til rå automatisk. En City webserver med en CORS header virker også (f.eks. en licenseret Tahoma TTF). PDF og billedformater indlejrede de rigtige glyffer; SVG refererer kun skrifttypen ved navn.",
         allowAdvancedHint: "Off: brugere kun vælge et layout, skrive en titel, se side preview og eksportere (hurtig print). På: en kollapset Avanceret muligheder sektion tilføjer Udskriv område, Kort serie, På kortet, Side tekst, Style og Output-kort.",
         logoSection: "Standardlogo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Logokilde",
+        logoEmbedded: "Indlejret billede (standard)",
+        logoLinked: "Link til billed- URL",
+        logoSourceHint: "Bruges af billedelementer uden eget billede. Skift kilder rydder det tidligere billede eller link.",
+        logoUrlLabel: "Logo- billed- URL",
+        logoUrlHint: "Brug en HTTP (S) eller app- relativ billedURL. Kun linket gemmes; billedet indlæses ved eksport, ikke i den levende forhåndsvisning. Eksterne servere skal tillade CORS. Utilgængelige billeder bruger layout billede pladsholder.",
         logoHint: "Uploadet én gang og gemt i widget - bruges af ethvert billede element, der ikke har noget billede af sin egen, på tværs af alle layouts. Uafhængigt af .pagx fil stier.",
         logoLabel: "Kontrollogo",
         whiteBg: "Hvid baggrund",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (store formater)",
         _24PtLargeFormats: "24 pt (store formater)",
         layout: "{layout}",
-        bold: "+ fed"
+        bold: "+ fed",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

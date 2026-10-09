@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Ajoutez autant de polices que vous voulez - chaque police apparaît dans le menu widget Font. Charged by URL at export time - rien n'est intégré dans le widget. Doit être un TTF statique (pas WOFF/WOFF2/OTF, pas un lien CSS de Google Fonts). À partir de github.com/google/fonts, utilisez l'URL brute d'un .ttf - préférez les fichiers dans un dossier statique/; certains TTF variables ne seront pas intégrés au PDF. Les URL de page GitHub sont automatiquement converties en brut. Un serveur web City avec un en-tête CORS fonctionne également (par exemple un TTF Tahoma sous licence). Les formats PDF et image intègrent les glyphes réels; SVG ne fait référence qu'à la police par nom.",
         allowAdvancedHint: "Off: les utilisateurs choisissent seulement une mise en page, tapez un titre, regardez l'aperçu de page et exportez (impression rapide). On: une section Options avancées effondrée ajoute la zone d'impression, la série de cartes, sur la carte, le texte de page, le style et les cartes de sortie.",
         logoSection: "Logo par défaut",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Source du logo",
+        logoEmbedded: "Image intégrée (par défaut)",
+        logoLinked: "Lien vers l'URL de l'image",
+        logoSourceHint: "Utilisé par des éléments d'image sans leur propre image. Changer de source efface l'image ou le lien précédent.",
+        logoUrlLabel: "URL de l'image du logo",
+        logoUrlHint: "Utilisez une URL d'image HTTP(S) ou app-relative. Seul le lien est enregistré ; l'image est chargée lors de l'exportation, pas dans l'aperçu en direct. Les serveurs externes doivent permettre CORS. Les images non disponibles utilisent le support de mise en page de l'image.",
         logoHint: "Téléchargé une fois et stocké dans le widget - utilisé par tout élément d'image qui n'a pas d'image propre, sur toutes les mises en page. Indépendamment des chemins de fichiers .pagx.",
         logoLabel: "Logo Widget",
         whiteBg: "Fond blanc",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (grands formats)",
         _24PtLargeFormats: "24 pt (grands formats)",
         layout: "{layout}",
-        bold: "+ gras"
+        bold: "+ gras",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

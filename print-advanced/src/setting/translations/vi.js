@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Thêm nhiều phông chữ tùy thích - mỗi phông chữ xuất hiện trong trình đơn phông chữ ô điều khiển. Được tải bởi URL tại thời điểm xuất khẩu - không có gì được nhúng trong ô điều khiển. Phải là một liên kết TTF tĩnh (không phải WOFF/WOFF2/OOTF, không phải liên kết Google Fonts CSS). Từ githib.com/google/fots sử dụng URL thô của một .tf - thích tập tin dưới một trạng thái tĩnh/ thư mục; một số biến TTFs sẽ không nhúng vào PDF. Các URL trang GitHub được chuyển thành tự động thô. Một trình phục vụ mạng thành phố với một tiêu đề CORS cũng hoạt động (v. d. một trình phục vụ có giấy phép Tahoma TTF). PDF và ảnh dạng nhúng các nét vẽ thật; SVG chỉ tham khảo phông chữ bằng tên.",
         allowAdvancedHint: "Tắt: người dùng chỉ chọn bố trí, gõ tiêu đề, xem ô xem thử trang và xuất khẩu (cần in). Trên: một phần tùy chọn cấp cao bị sụp đổ thêm vùng Print, loạt bản đồ, trên bản đồ, chữ trang, kiểu dáng và thẻ xuất.",
         logoSection: "logo mặc định",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Nguồn đăng nhập",
+        logoEmbedded: "Đang nhúng ảnh (mặc định)",
+        logoLinked: "Liên kết tới URL ảnh",
+        logoSourceHint: "Dùng bởi các yếu tố hình ảnh không có hình ảnh riêng. Đang chuyển đổi các nguồn làm sạch ảnh hay liên kết trước.",
+        logoUrlLabel: "URL ảnh đăng nhập",
+        logoUrlHint: "Dùng một địa chỉ Mạng ảnh định dạng HTTP (S) hay ứng dụng. Chỉ lưu liên kết; ảnh được nạp khi xuất khẩu, không phải trong ô xem thử trực tiếp. Máy phục vụ bên ngoài phải cho phép CORS. Ảnh không sẵn sàng dùng bộ giữ chỗ hình bố trí.",
         logoHint: "Tải lên một lần và lưu trong ô điều khiển - được dùng bởi bất cứ phần tử hình ảnh nào không có ảnh của riêng nó, qua mọi bố trí. Độc lập các đường dẫn tập tin .pagx.",
         logoLabel: "logo ô điều khiển",
         whiteBg: "Nền trắng",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (các định dạng lớn)",
         _24PtLargeFormats: "24 pt (các định dạng lớn)",
         layout: "{layout}",
-        bold: "+ đậm"
+        bold: "+ đậm",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

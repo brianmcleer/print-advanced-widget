@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (luonnos)",
         title: "{title}",
         unknownError: "tuntematon virhe",
-        unserializableError: "epätavallinen virhe"
+        unserializableError: "epätavallinen virhe",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page}/{pages}",
+        in: "·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (bên dưới)",
         title: "{title}",
         unknownError: "lỗi không rõ",
-        unserializableError: "Lỗi không thể gửi đi được"
+        unserializableError: "Lỗi không thể gửi đi được",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} / {pages}",
+        in: "in·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

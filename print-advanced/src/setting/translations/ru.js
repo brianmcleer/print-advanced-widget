@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Добавьте столько шрифтов, сколько хотите - каждый появляется в меню шрифта виджета. Загружается по URL во время экспорта - в виджет ничего не встроено. Должен быть статический TTF (не WOFF/WOFF2/OTF, не ссылка Google Fonts CSS). Из github.com/google/fonts используют Raw URL .ttf - предпочитают файлы под статической/папкой; некоторые TTF с переменным шрифтом не будут вставляться в PDF. URL-адреса страниц GitHub автоматически преобразуются в сырые. Также работает городской веб-сервер с заголовком CORS (например, лицензированный Tahoma TTF). PDF и форматы изображений встраивают реальные глифы; SVG ссылается на шрифт только по имени.",
         allowAdvancedHint: "Выключено: пользователи выбирают только макет, вводят заголовок, просматривают предварительный просмотр страницы и экспортируют (быстрая печать). На: разрушенный раздел расширенных опций добавляет область печати, серию карт, на карте, текст страницы, карты стиля и вывода.",
         logoSection: "Логотип Default",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Источник логотипа",
+        logoEmbedded: "Встроенное изображение (по умолчанию)",
+        logoLinked: "Ссылка на URL изображения",
+        logoSourceHint: "Используется элементами изображения без собственного изображения. Переключение источников очищает прежнее изображение или ссылку.",
+        logoUrlLabel: "Логотип изображения URL",
+        logoUrlHint: "Используйте HTTP (S) или относительный URL-адрес изображения приложения. Сохраняется только ссылка; изображение загружается при экспорте, а не в режиме реального времени. Внешние серверы должны разрешать CORS. Недоступные изображения используют заполнитель макета изображения.",
         logoHint: "Загружается один раз и хранится в виджете – используется любой элемент изображения, не имеющий собственного изображения, по всем макетам. Независимо от .pagx-файлов.",
         logoLabel: "Виджетный логотип",
         whiteBg: "Белый фон",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (большие форматы)",
         _24PtLargeFormats: "24 pt (большие форматы)",
         layout: "{layout}",
-        bold: "+ смелый"
+        bold: "+ смелый",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

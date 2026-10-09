@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (udkast)",
         title: "{title}",
         unknownError: "ukendt fejl",
-        unserializableError: "userialiserbar fejl"
+        unserializableError: "userialiserbar fejl",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} for {pages}",
+        in: "I ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

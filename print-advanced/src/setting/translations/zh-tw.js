@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "添加您想要的字型 - 每個字都出現在元件字型選單中 。 匯出時已被 URL 載入 - 元件中沒有嵌入 。 必須是靜態的 TTF( 不是 WOFF/ WOFF2/ OTF, 不是 Google Fonts CSS 連結) 。 從 github.com/ google/ fonts 中, 使用 . ttf 的 Raw URL - 比較喜歡靜態/ 資料夾下的檔案; 一些變數型的 TTF 不會嵌入 PDF 中 。 GitHub 頁面網址自動轉換成原始 。 配有 CORS 頭的 City 網頁伺服器也有效( 例如有授權的 Tahoma TTF ) 。 PDF 和影像格式嵌入了真正的格言; SVG 只用名稱來參考字型 。",
         allowAdvancedHint: "關閉: 使用者只選擇佈局, 輸入標題, 監視頁面預覽與匯出( 快速列印) 。 在 : 已坍塌的 Advanced 選項中加入 Prind 區域、 映射系列、 地圖、 頁面文字、 樣式與輸出卡片 。",
         logoSection: "預設標籤",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "紀錄來源",
+        logoEmbedded: "嵌入影像( 預設 )",
+        logoLinked: "連結到影像網址",
+        logoSourceHint: "由圖片元素使用, 切換來源清除先前的影像或連結 。",
+        logoUrlLabel: "紀錄影像網址",
+        logoUrlHint: "使用 HTTP( S) 或相關影像網址 。 只有連結被儲存; 影像在匯出時被載入, 而不是在直播預覽中 。 外部伺服器必須允許 CORS 。 不可用的影像使用佈局圖占位符 。",
         logoHint: "上傳一次並儲存在元件中 - 由任何沒有自己影像的圖片元素使用, 遍及所有布局 。 独立于 .pagx 檔案路徑 。",
         logoLabel: "元件標誌",
         whiteBg: "白色背景",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt( 大格式)",
         _24PtLargeFormats: "24 pt( 大格式)",
         layout: "{layout}",
-        bold: "+ 粗体"
+        bold: "+ 粗体",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

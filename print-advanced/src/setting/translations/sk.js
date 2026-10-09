@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Pridať čo najviac písiem, ako sa vám páči - každý sa zobrazí v menu písma. Načítané URL v čase exportu - nič nie je vložené do widgetu. Musí to byť statické TTF (nie WOFF/WOFF2/OTF, nie odkaz na Google Fonts CSS). Z github.com/google/fonts používať Raw URL .ttf - preferovať súbory pod statickým/ priečinokom; niektoré premenné-font TTFs nebudú vložené do PDF. URL stránky GitHub sa automaticky konvertujú na surové. Funguje aj webový server mesta s hlavičkou CORS (napr. licencovaná Tahoma TTF). PDF a formáty obrázkov vložili skutočné glyfy; SVG odkazuje na písmo len podľa mena.",
         allowAdvancedHint: "Off: používatelia vybrať iba rozloženie, zadajte názov, sledovať náhľad stránky a export (rýchle tlač). Na: zrútený Rozšírené možnosti sekcia pridáva oblasť tlače, Mapa série, Na mape, Text stránky, Štýl a Výstupné karty.",
         logoSection: "Štandardné logo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Zdroj loga",
+        logoEmbedded: "Vložiť obrázok (predvolený)",
+        logoLinked: "Odkaz na URL obrázku",
+        logoSourceHint: "Používané obrazovými prvkami bez vlastného obrazu. Prepínanie zdrojov vylučuje predchádzajúci obrázok alebo odkaz.",
+        logoUrlLabel: "Logo URL",
+        logoUrlHint: "Použiť HTTP (S) alebo app-relative obrazovú URL. Iba odkaz je uložený; obrázok je načítaný pri exporte, nie v priamom náhľade. Externé servery musia povoliť CORS. Nedostupné obrázky používajú dispozičný obrázok.",
         logoHint: "Nahrané raz a uložené do widgetu - použité akýmkoľvek obrazovým prvkom, ktorý nemá vlastný obrázok, vo všetkých rozloženiach. Nezávislá od .pagx súborových ciest.",
         logoLabel: "Logo komponentu",
         whiteBg: "Biely podklad",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 bodov (veľké formáty)",
         _24PtLargeFormats: "24 bodov (veľké formáty)",
         layout: "{layout}",
-        bold: "+ tučný"
+        bold: "+ tučný",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

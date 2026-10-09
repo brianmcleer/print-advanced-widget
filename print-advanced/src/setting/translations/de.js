@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Fügen Sie so viele Schriftarten hinzu, wie Sie möchten - jede erscheint im Widget Font-Menü. Nach URL zum Exportzeitpunkt geladen - nichts ist im Widget eingebettet. Muss ein statischer TTF sein (nicht WOFF/WOFF2/OTF, nicht ein Google Fonts CSS Link). Von github.com/google/fonts verwenden Sie die Raw-URL eines .ttf - bevorzugen Sie Dateien unter einem statischen/Ordner; einige Variable-font-TFs werden nicht in PDF eingebettet. GitHub Seiten-URLs werden automatisch in raw konvertiert. Ein City-Webserver mit einem CORS-Header funktioniert ebenfalls (z.B. ein lizenziertes Tahoma TTF). PDF- und Bildformate betten die echten Glyphen ein; SVG verweist die Schrift nur mit Namen.",
         allowAdvancedHint: "Aus: Benutzer wählen nur ein Layout, geben einen Titel ein, schauen sich die Vorschau der Seite an und exportieren (schneller Druck). On: Ein zusammengebrochener Abschnitt Erweiterte Optionen fügt den Druckbereich, die Kartenserie, die Karte, den Seitentext, die Stil- und Ausgabekarten hinzu.",
         logoSection: "Standardlogo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Logoquelle",
+        logoEmbedded: "Einbettungsbild (Standard)",
+        logoLinked: "Link zum Bild URL",
+        logoSourceHint: "Wird von Bildelementen ohne eigenes Bild verwendet. Der Wechsel der Quellen löscht das vorherige Bild oder den vorherigen Link.",
+        logoUrlLabel: "Logobild URL",
+        logoUrlHint: "Verwenden Sie eine HTTP(S)- oder App-relative Image URL. Nur der Link wird gespeichert; das Bild wird beim Export geladen, nicht in der Live-Vorschau. Externe Server müssen CORS zulassen. Nicht verfügbare Bilder verwenden den Layoutbildplatzhalter.",
         logoHint: "Einmal hochgeladen und im Widget gespeichert - wird von jedem Bildelement verwendet, das über alle Layouts hinweg kein eigenes Bild hat. Unabhängig von den .pagx Dateipfaden.",
         logoLabel: "Widget-Logo",
         whiteBg: "Weißer Hintergrund",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (Großformate)",
         _24PtLargeFormats: "24 pt (Großformate)",
         layout: "{layout}",
-        bold: "+ fett"
+        bold: "+ fett",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

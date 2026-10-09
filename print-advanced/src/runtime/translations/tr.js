@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (draft)",
         title: "{title}",
         unknownError: "Bilinmeyen hata",
-        unserializableError: "Başarısız olmayan hata"
+        unserializableError: "Başarısız olmayan hata",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} / {pages}",
+        in: "·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

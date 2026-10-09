@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (Entwurf)",
         title: "{title}",
         unknownError: "Unbekannter Fehler",
-        unserializableError: "nichtialisierbarer Fehler"
+        unserializableError: "nichtialisierbarer Fehler",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} von {pages}",
+        in: "in ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

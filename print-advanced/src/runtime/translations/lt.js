@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (projektas)",
         title: "{title}",
         unknownError: "nežinoma klaida",
-        unserializableError: "nenustatoma klaida"
+        unserializableError: "nenustatoma klaida",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} iš {pages}",
+        in: "in",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

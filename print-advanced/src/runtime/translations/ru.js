@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (проект)",
         title: "{title}",
         unknownError: "Неизвестная ошибка",
-        unserializableError: "несериализируемая ошибка"
+        unserializableError: "несериализируемая ошибка",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} из {pages}",
+        in: "в ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Afegeix tants tipus de lletra com vulgueu - cadascun apareix al menú de tipus de lletra de l' estri. Carregat per l' URL alhora d' exportació - no hi ha res encastat a l' estri. Ha de ser un enllaç TTF estàtic (no WOF/OF2/OTF, no un enllaç CSS de Google fonts). Des de github. com/google/fonts usen l' URL RAW d' un .tf - prefereix fitxers sota una carpeta estàtica/ carpeta; alguna variable TTFs no s' encastarà a PDF. Els URL de la pàgina de GitHub es converteixen automàticament en cru. Un servidor web de la ciutat amb una capçalera CORS també funciona (p. ex. una llicència Thoma TTF). Formats PDF i d' imatge encastar els tipus reals; SVG fa referència al tipus de lletra només pel nom.",
         allowAdvancedHint: "Off: els usuaris només seleccionen una disposició, teclegeu un títol, mireu la vista prèvia de la pàgina i export (pràpid print). En: una secció d' opcions avançades afegeix l'àrea d' impressió, sèrie de mapes, en el mapa, text de pàgina, estil i targetes de sortida.",
         logoSection: "logo per omissió",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Font del Logotip",
+        logoEmbedded: "Imatge embada (per omissió)",
+        logoLinked: "Enllaç a l' URL d' imatge",
+        logoSourceHint: "Utilitzat per elements de la imatge sense la seva pròpia imatge. El canvi de fonts neteja la imatge o l' enllaç previ.",
+        logoUrlLabel: "URL de la imatge del Logotip",
+        logoUrlHint: "Usa un URL d' imatge HTTP(S) o conforme amb l' aplicació. Només es desa l' enllaç; la imatge es carrega quan s' exporta, no en la vista prèvia en directe. Els servidors externs han de permetre CORS. Les imatges no disponibles usen el marcador de posició de la imatge de format.",
         logoHint: "Carregat una vegada i desat a l' estri - usat per qualsevol element de la imatge que no tingui la seva pròpia imatge, a través de tots els formats. independent dels camins dels fitxers.pagx.",
         logoLabel: "logo d' estri",
         whiteBg: "Fons blanc",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (valors alt)",
         _24PtLargeFormats: "24 pt (formats alt)",
         layout: "{layout}",
-        bold: "+ negreta"
+        bold: "+ negreta",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

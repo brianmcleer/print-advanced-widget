@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "好きなように多くのフォントを追加 - ウィジェットのフォントメニューにそれぞれ表示されます。 エクスポート時にURLをロード - ウィジェットに埋め込まれるものは何もありません。 静的TTF(WOFF/WOFF2/OTFではなく、GoogleフォントのCSSリンクではありません)でなければなりません。 github.com/google/fonts から .ttf の Raw URL を使う - 静的/フォルダーの下にファイルを好む; いくつかの変数-font TTF は PDF に埋め込まれません。 GitHub ページ URL が自動的に生成されます。 CORSヘッダ付き市Webサーバーも機能します(例えば、ライセンスされたTahoma TTF)。 実際のグリフを埋め込むPDFおよびイメージのフォーマット;SVGは名前だけによって壷を参照します。",
         allowAdvancedHint: "Off: ユーザーは、レイアウトを選択し、タイトルを入力し、ページプレビューとエクスポート(クイックプリント)を参照してください。 On: 折り畳まれた高度なオプションセクションでは、プリント領域、マップシリーズ、ページテキスト、スタイル、出力カードを追加します。",
         logoSection: "デフォルトロゴ",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "ロゴの源",
+        logoEmbedded: "埋め込み画像(デフォルト)",
+        logoLinked: "画像URLへのリンク",
+        logoSourceHint: "自分のイメージなしで画像要素によって使用される。 ソースを切り替えると、以前の画像やリンクが消去されます。",
+        logoUrlLabel: "ロゴイメージURL",
+        logoUrlHint: "HTTP(S) や app-relative イメージ URL を使用します。 リンクのみが保存されます。ライブプレビューではなく、エクスポート時に画像が読み込まれます。 外部サーバーはCORSを許可しなければなりません。 レイアウト画像のプレースホルダーは利用できません。",
         logoHint: "一度アップロードしてウィジェットに保存 - すべてのレイアウトで、独自の画像を持たない任意の画像要素で使用されます。 .pagxファイルパスの独立。",
         logoLabel: "ウィジェットのロゴ",
         whiteBg: "白い背景",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (大きいフォーマット)",
         _24PtLargeFormats: "24 pt (大きいフォーマット)",
         layout: "{layout}",
-        bold: "+ 太字"
+        bold: "+ 太字",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

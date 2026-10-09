@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96(ドラフト)",
         title: "{title}",
         unknownError: "未知のエラー",
-        unserializableError: "unserializable エラー"
+        unserializableError: "unserializable エラー",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} / {pages}",
+        in: "お問い合わせ",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (เลื่อน)",
         title: "{title}",
         unknownError: "ข้อผิดพลาดไม่ทราบสาเหตุ",
-        unserializableError: "ข้อผิดพลาดที่ไม่สามารถตรวจสอบได้"
+        unserializableError: "ข้อผิดพลาดที่ไม่สามารถตรวจสอบได้",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} จาก {pages}",
+        in: "ใน พ.ศ.",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

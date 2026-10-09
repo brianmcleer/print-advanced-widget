@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (draft)",
         title: "{title}",
         unknownError: "galat tak dikenal",
-        unserializableError: "kesalahan tidak serialisasi"
+        unserializableError: "kesalahan tidak serialisasi",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} dari {pages}",
+        in: "di",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

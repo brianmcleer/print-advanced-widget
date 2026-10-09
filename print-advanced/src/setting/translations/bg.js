@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Добавяне на колкото шрифтове искате - всеки се появява в менюто с джаджата Font. Зареден с URL по време на износ - нищо не е вградено в джаджата. Трябва да бъде статичен TTF (не WOFF/WOFF2/OTF, а не връзка с Google Fonts CSS). От github.com/google/fonts използвайте Raw URL на .ttf - предпочитайте файлове под статичен/ папка; някои променливи-фонт TTFs няма да се вграждат в PDF. Адресите на GitHub страница се преобразуват автоматично в сурови. A City уеб сървър с CORS заглавна част също работи (напр. лицензиран Tahoma TTF). PDF и формат на изображенията вграждат истинските glyphs; SVG препраща шрифта само по име.",
         allowAdvancedHint: "Изключете: потребителите избират само оформление, напишете заглавие, гледайте страницата преглед и износ (бърз печат). На: срутени Advanced опции раздел добавя област Print, Карта серия, На картата, Страница текст, стил и изход карти.",
         logoSection: "Лого по подразбиране",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Източник на лого",
+        logoEmbedded: "Вграждане на изображение (по подразбиране)",
+        logoLinked: "Връзка към адрес на изображението",
+        logoSourceHint: "Използва се от елементи без собствен образ. Превключването на източниците изчиства предишното изображение или линк.",
+        logoUrlLabel: "Адрес на изображението на логото",
+        logoUrlHint: "Използвайте HTTP(S) или приложение-относително изображение URL. Само линка се записва; изображението се зарежда при износ, а не при преглед на живо. Външните сървъри трябва да позволяват на CORS. Недостъпни изображения използват placeholder оформлението картина.",
         logoHint: "Качва се веднъж и се съхранява в джаджата - използва се от всеки елемент на картина, който няма собствено изображение, във всички макети. Независимо от .pagx файл пътеки.",
         logoLabel: "Лого на джаджата",
         whiteBg: "Бял фон",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 пункта (големи формати)",
         _24PtLargeFormats: "24 пункта (големи формати)",
         layout: "{layout}",
-        bold: "+ получер"
+        bold: "+ получер",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

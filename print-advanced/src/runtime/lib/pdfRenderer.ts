@@ -40,7 +40,7 @@ const gifenc = require('gifenc')
 // Re-exported here so runtime imports keep working unchanged.
 import { OutputFormat } from '../../printConstants'
 import { createLinkedLogoResolver } from './linkedLogo'
-import { __t, __tc } from '../i18n-t'
+import { __locale, __t, __tc } from '../i18n-t'
 export { FORMAT_LABELS, FONT_FAMILIES, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } from '../../printConstants'
 export type { OutputFormat } from '../../printConstants'
 
@@ -729,8 +729,8 @@ export function formatDotNet (d: Date, pattern: string): string {
  *  September 2, 2026, anything else = a .NET custom pattern. */
 export function fmtDateToken (d: Date, fmt: string): string {
     const f = (fmt || '').trim()
-    if (!f || f.toLowerCase() === 'short') return d.toLocaleDateString('en-US')
-    if (f.toLowerCase() === 'long') return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    if (!f || f.toLowerCase() === 'short') return d.toLocaleDateString(__locale())
+    if (f.toLowerCase() === 'long') return d.toLocaleDateString(__locale(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
     return formatDotNet(d, f)
 }
 
@@ -738,8 +738,8 @@ export function fmtDateToken (d: Date, fmt: string): string {
  *  anything else = a .NET custom pattern. */
 export function fmtTimeToken (d: Date, fmt: string): string {
     const f = (fmt || '').trim()
-    if (!f || f.toLowerCase() === 'short') return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    if (f.toLowerCase() === 'long') return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })
+    if (!f || f.toLowerCase() === 'short') return d.toLocaleTimeString(__locale(), { hour: 'numeric', minute: '2-digit' })
+    if (f.toLowerCase() === 'long') return d.toLocaleTimeString(__locale(), { hour: 'numeric', minute: '2-digit', second: '2-digit' })
     return formatDotNet(d, f)
 }
 
@@ -1890,7 +1890,7 @@ export async function renderSeries(
             if (options.legendScaleFilter !== false && scaleDenom > 0 && series.kind !== 'features') {
                 const before = legendRows.length
                 legendRows = filterLegendRowsByScale(legendRows, collectLayerScaleRanges(view as any), scaleDenom)
-                if (legendRows.length < before) onProgress('Legend: hid ' + (before - legendRows.length) + ' row(s) not drawn at 1:' + Math.round(scaleDenom).toLocaleString() + '.')
+                if (legendRows.length < before) onProgress('Legend: hid ' + (before - legendRows.length) + ' row(s) not drawn at 1:' + Math.round(scaleDenom).toLocaleString(__locale()) + '.')
             }
             // one legend serves every sheet: judge "in the print area" against
             // the whole series envelope, so a layer on any page stays listed
@@ -4379,7 +4379,7 @@ export const LEGEND_DEFAULTS: LegendConfig = {
     widthIn: 3,
     heightIn: 3.5,
     marginIn: 0.25,
-    title: __t("cardLegend"),
+    get title () { return __t("cardLegend") },
     showTitle: true,
     columns: 0,
     baseFontPt: 8,
@@ -4785,7 +4785,7 @@ export function paginateLegendRows(
             for (let i = placed.length - 1; i >= 0; i--) {
                 const r = placed[i]
                 if (r.kind === 'heading' || r.kind === 'layer') {
-                    remaining = [{ kind: r.kind, label: r.label + ' (continued)', indent: r.indent }, ...remaining]
+                    remaining = [{ kind: r.kind, label: r.label + " " + __t("continued") + "", indent: r.indent }, ...remaining]
                     break
                 }
             }
@@ -5808,7 +5808,7 @@ export const PAGE_LAYERS = {
     overview: 'Overview map',
     legend: 'Legend',
     northScale: 'North arrow and scale bar',
-    text: __t("text"),
+    get text () { return __t("text") },
     graphics: 'Graphics',
     qr: 'QR code',
     series: 'Map series'
@@ -6806,7 +6806,7 @@ export async function renderLayout(
         try {
             const before = rows.length
             const out = filterLegendRowsByScale(rows, collectLayerScaleRanges(liveView), scale)
-            if (out.length < before) onProgress('Legend: hid ' + (before - out.length) + ' row(s) not drawn at 1:' + Math.round(scale).toLocaleString() + '.')
+            if (out.length < before) onProgress('Legend: hid ' + (before - out.length) + ' row(s) not drawn at 1:' + Math.round(scale).toLocaleString(__locale()) + '.')
             return out
         } catch (e) { return rows }
     }
@@ -6900,7 +6900,7 @@ export async function renderLayout(
         options = { ...options, vectorData: drawn }
         const nFeat = drawn.reduce((a, v) => a + v.features.length, 0)
         const why = vectorPlan.raster.map(r => r.title + ' (' + r.reason + ')').join(', ')
-        onProgress('Vector: ' + drawn.length + ' layer(s), ' + nFeat.toLocaleString() + ' feature(s)' +
+        onProgress('Vector: ' + drawn.length + ' layer(s), ' + nFeat.toLocaleString(__locale()) + ' feature(s)' +
             (vectorPlan.raster.length ? '; raster: ' + why : '') + '.')
         if (vectorPlan.raster.length) {
             cap.warning = (cap.warning ? cap.warning + ' ' : '') + 'Printed as pixels: ' + why + '.'
@@ -6950,7 +6950,7 @@ export async function renderLayout(
         const box = overviewBoxIn(mf, ovCfg)
         const mult = Number(ovCfg.scaleMultiplier) > 0 ? Number(ovCfg.scaleMultiplier) : 10
         const ovScale = Number(ovCfg.fixedScale) > 0 ? Number(ovCfg.fixedScale) : cap.printedScale * mult
-        onProgress('Rendering overview map at 1:' + Math.round(ovScale).toLocaleString() + '…')
+        onProgress('Rendering overview map at 1:' + Math.round(ovScale).toLocaleString(__locale()) + '…')
         const ovCap = await captureMapHiRes(
             liveView, box.wIn, box.hIn,
             { ...useLayout, dpi: Math.min(useLayout.dpi || 96, 150) },

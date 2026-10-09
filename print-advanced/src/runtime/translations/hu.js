@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (tervezet)",
         title: "{title}",
         unknownError: "ismeretlen hiba",
-        unserializableError: "nem sorozható hiba"
+        unserializableError: "nem sorozható hiba",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page}/{pages}",
+        in: "·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

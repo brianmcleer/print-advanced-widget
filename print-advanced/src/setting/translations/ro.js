@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Adaugă câte fonturi doriți - fiecare apare în meniul Widget Font. Încărcat de URL la momentul exportului - nimic nu este încorporat în widget. Trebuie să fie un TTF static (nu WOFF/WOFF2/OTF, nu un link Google Fonts CSS). De la github.com/google/fonts utilizați URL-ul brut al unui .ttf - prefera fișierele sub un static / dosar; unele variabile-font TTF nu vor include în PDF. URL-urile paginii GitHub sunt convertite automat în brute. Un server web City cu antet CORS funcționează, de asemenea, (de exemplu, un Tahoma TTF licențiat). PDF și formatele de imagine au încorporat adevăratele glife; SVG face referire doar la font după nume.",
         allowAdvancedHint: "Off: utilizatorii aleg doar un aspect, tastați un titlu, urmăriți previzualizarea paginii și export (print rapid). Pe: o secțiune de opțiuni avansate prăbușite adaugă zona de imprimare, seria de hărți, Pe hartă, Pagina de text, Style și carduri de ieșire.",
         logoSection: "Sigla implicită",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Sursă logo",
+        logoEmbedded: "Imagine înglobată (default)",
+        logoLinked: "Link către URL imagine",
+        logoSourceHint: "Folosit de elemente de imagine fără propria lor imagine. Comutarea surselor șterge imaginea anterioară sau link-ul.",
+        logoUrlLabel: "URL imagine logo",
+        logoUrlHint: "Utilizați un URL de imagine HTTP (S) sau app-relativ. Numai link-ul este salvat; imaginea este încărcată la export, nu în previzualizare live. Serverele externe trebuie să permită CORS. Imaginile nedisponibile folosesc suportul imaginii de aspect.",
         logoHint: "Încărcat o dată și stocat în widget - folosit de orice element de imagine care nu are nici o imagine proprie, în toate layout-urile. Independent de căile de fișiere .pagx.",
         logoLabel: "Sigla Widget",
         whiteBg: "Fundal alb",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt ( formate mari)",
         _24PtLargeFormats: "24 pt ( formate mari)",
         layout: "{layout}",
-        bold: "+ aldine"
+        bold: "+ aldine",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

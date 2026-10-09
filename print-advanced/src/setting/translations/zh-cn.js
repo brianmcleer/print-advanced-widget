@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "任意添加字体 - 每个字体都出现在部件字体菜单中 。 导出时被 URL 装入 - 部件中没有嵌入 。 必须是静态的TTF(不是WOFF/WOFF2/OTF,不是Google Fonts CSS链接). 从github.com/google/fonts使用.ttf的Raw URL - 喜欢静态/文件夹下的文件;一些可变的font TTF不会嵌入PDF中. GitHub 页面 URL 自动转换为原始 。 一个带有CORS头的City网络服务器也起作用(例如一个持有许可证的Tahoma TTF). PDF和图像格式嵌入了真实的glyphs;SVG只按名称引用字体.",
         allowAdvancedHint: "off:用户只选择一个布局,键入标题,观看页面预览和导出(快速打印). 在:一个崩溃的高级选项部分添加了打印区域,地图系列,在地图上,页面文本,样式和输出卡.",
         logoSection: "默认标志",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "日志来源",
+        logoEmbedded: "嵌入图像( 默认)",
+        logoLinked: "链接到图像 URL",
+        logoSourceHint: "被图片元素使用,没有自己的图像. 切换源清除上一个图像或链接.",
+        logoUrlLabel: "日志图像 URL",
+        logoUrlHint: "使用 HTTP( S) 或应用关联图像 URL 。 只有链接被保存;图像在导出时被加载,而不是在直播预览中. 外部服务器必须允许 CORS. 无法获取的图像使用布局图片占位符 。",
         logoHint: "上传一次并存储在部件中 - 被任何没有自己图像的图片元素所使用, 覆盖所有布局 。 独立于.pagx文件路径.",
         logoLabel: "部件标识",
         whiteBg: "白色背景",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (大格式)",
         _24PtLargeFormats: "24 pt( 大格式)",
         layout: "{layout}",
-        bold: "+ 粗体键"
+        bold: "+ 粗体键",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

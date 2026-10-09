@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "같은 많은 글꼴을 추가 - 각 위젯 글꼴 메뉴에 나타납니다. 수출 시간에 URL에 의해로드 - 아무것도 위젯에 내장되지 않습니다. 정적 TTF (WOFF/WOFF2/OTF는 Google 글꼴 CSS 링크가 아닌)이어야 합니다. github.com/google/fonts에서 .ttf의 익지않는 URL을 사용하십시오 - 정체되는/폴더의 밑에 파일을 선호하십시오; 몇몇 변하기 쉬운 font TTFs는 PDF에서 embed. GitHub 페이지 URL을 자동으로 변환합니다. CORS 헤더를 가진 도시 웹 서버는 또한 작동합니다 (예를들면 Tahoma TTF). PDF 및 이미지 형식은 실제 glyphs를 포함; SVG는 이름으로 글꼴을 참조.",
         allowAdvancedHint: "오프: 사용자는 단지 레이아웃을 선택, 제목을 입력, 페이지 미리보기 및 내보내기 (quick print). On : 붕괴 된 고급 옵션 섹션은 인쇄 영역,지도 시리즈,지도, 페이지 텍스트, 스타일 및 출력 카드를 추가합니다.",
         logoSection: "기본 로고",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "로고 근원",
+        logoEmbedded: "Embed 이미지 (과태)",
+        logoLinked: "이미지 URL 링크",
+        logoSourceHint: "자신의 이미지없이 그림 요소에 의해 사용됩니다. 전환 소스는 이전 이미지 또는 링크를 삭제합니다.",
+        logoUrlLabel: "로고 이미지 URL",
+        logoUrlHint: "HTTP(S) 또는 app-relative 이미지 URL을 사용하십시오. 링크 만 저장됩니다. 이미지는 내보내기 할 때로드됩니다. 외부 서버는 CORS를 허용해야 합니다. 사용 가능한 이미지는 레이아웃 그림 placeholder를 사용합니다.",
         logoHint: "한 번 업로드하고 위젯에 저장 - 모든 레이아웃에 걸쳐 자신의 이미지가없는 모든 그림 요소에 의해 사용됩니다. .pagx 파일 경로의 독립.",
         logoLabel: "Widget 로고",
         whiteBg: "흰색 배경",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (큰 체재)",
         _24PtLargeFormats: "24 pt (큰 체재)",
         layout: "{layout}",
-        bold: "+ 대담한"
+        bold: "+ 대담한",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Dodajte toliko pisav, kot vam je všeč - vsaka se pojavi v meniju widget Font. Naloženo z URL ob času izvoza - nič ni vgrajeno v gradnik. Mora biti statična TTF (ne WOFF/WOFF2/OTF, ne povezava CSS Google Fonts). Od github.com/ google/fonts uporabljajo Raw URL a .ttf - raje datoteke pod statično/ mapo; nekatere variabilne- font TTF ne bodo vključene v PDF. URL strani GitHub se samodejno pretvori v surove. Deluje tudi spletni strežnik City z glavo CORS (npr. licenciran Tahoma TTF). PDF in slikovni formati so vgrajevali prave glife; SVG navaja pisavo samo po imenu.",
         allowAdvancedHint: "Izključeno: uporabniki izberejo le postavitev, vtipkajo naslov, gledajo ogled strani in izvažajo (hiter tisk). Na: rubrika Advanced možnosti dodaja področje tiskanja, serije zemljevidov, Na zemljevidu, Besedilo strani, Slog in izhodne kartice.",
         logoSection: "Privzet logotip",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Vir znaka",
+        logoEmbedded: "Vgrajena slika (privzeto)",
+        logoLinked: "Povezava na URL slike",
+        logoSourceHint: "Uporabljajo ga slikovni elementi brez lastne podobe. Preklop virov očisti prejšnjo sliko ali povezavo.",
+        logoUrlLabel: "URL slike logotipa",
+        logoUrlHint: "Uporabite HTTP(S) ali relativni slikovni URL. Samo povezava je shranjena; slika je naložena pri izvozu, ne v živo predogled. Zunanji strežniki morajo dovoliti CORS. Nerazpoložljive slike uporabljajo prostor za postavitev slike.",
         logoHint: "Naloženo enkrat in shranjeno v widget - ki ga uporablja kateri koli element slike, ki nima svoje slike, v vseh razporedih. Ne glede na .pagx poti datotek.",
         logoLabel: "Logotip gradnika",
         whiteBg: "Belo ozadje",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (veliki formati)",
         _24PtLargeFormats: "24 pt (veliki formati)",
         layout: "{layout}",
-        bold: "+ krepko"
+        bold: "+ krepko",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

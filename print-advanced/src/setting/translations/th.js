@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "เพิ่มแบบอักษรทั้งหมดที่คุณต้องการ - แต่ละแบบอักษรจะปรากฎในเมนูแบบอักษรของวิดเจ็ต โหลดจากที่อยู่ URL เมื่อทําการส่งออก - ไม่มีอะไรฝังอยู่ในวิดเจ็ต ต้องเป็น TTF แบบคงที่ (ไม่ใช่ WOF/WOF2/OTF ไม่ใช่ Google แบบอักษร CSS Link) จาก github.com/google/fontents ใช้ที่อยู่ URL แบบ Raw ของ .ttf - เลือกแฟ้มใต้เส้นตาย/ โฟลเดอร์; บางตัวแปร-font TTFs จะไม่ฝังไว้ใน PDF GitHub ที่อยู่ URL ของหน้าจะถูกแปลงเป็นข้อมูลดิบโดยอัตโนมัติ แม่ข่ายบริการแบบ City Webs with a CorS head ใช้งานได้ด้วย (เช่น Thaoma TTF). PDF และรูปแบบภาพต่าง ๆ ได้ฝังอยู่ในรูปแบบ glyphs ตัวจริง; SVG อ้างอิงแบบอักษรโดยใช้ชื่อเท่านั้น",
         allowAdvancedHint: "ปิด: ผู้ใช้เลือกผังแป้นพิมพ์เท่านั้น, พิมพ์ชื่อเรื่อง, ดูตัวอย่างหน้าและส่งออก (พิมพ์แบบเร็ว) บน: ส่วน ตัวเลือกเพิ่มเติมที่ยุบแล้ว เพิ่มพื้นที่การพิมพ์, ชุดแผนที่, บนแผนที่, ข้อความเพจ, สไตล์และการ์ดส่งออกเสียง",
         logoSection: "โลโก้ปริยาย",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "แหล่งปูมบันทึก",
+        logoEmbedded: "ภาพฝังตัว (ค่าปริยาย)",
+        logoLinked: "เชื่อมโยงไปยังที่อยู่ URL ของภาพ",
+        logoSourceHint: "ถูกใช้โดยองค์ประกอบภาพ ที่ไม่มีภาพของตัวเอง กําลังสลับแหล่งเก็บภาพหรือที่อยู่เชื่อมโยงก่อนหน้า",
+        logoUrlLabel: "ที่อยู่ URL ของอิมเมจโลโก",
+        logoUrlHint: "ใช้ที่อยู่ URL ของภาพแบบ HTTP (S) หรือที่อยู่ URL ของโปรแกรม บันทึกส่วนเชื่อมโยงเท่านั้น; ภาพจะถูกโหลดเมื่อส่งออก, ไม่ใช่ในการแสดงภาพตัวอย่าง เซิร์ฟเวอร์ภายนอกต้องอนุญาตให้ทํางาน ภาพที่ไม่สามารถเรียกข้อมูลได้ ใช้ตัวแสดงตําแหน่งภาพในผังแป้นพิมพ์",
         logoHint: "อัปโหลดและเก็บไว้ในวิดเจ็ต - ที่ใช้โดยองค์ประกอบภาพใด ๆ ที่ไม่มีภาพของตัวเอง ทั่วผังแป้นพิมพ์ทั้งหมด พาธของแฟ้ม PAgx ที่อิสระ",
         logoLabel: "โลโก้วิดเจ็ต",
         whiteBg: "พื้นหลังสีขาว",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (รูปแบบขนาดใหญ่)",
         _24PtLargeFormats: "24 pt (รูปแบบขนาดใหญ่)",
         layout: "{layout}",
-        bold: "ตัวหนา"
+        bold: "ตัวหนา",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

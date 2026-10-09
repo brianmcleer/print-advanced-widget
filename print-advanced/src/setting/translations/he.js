@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "הוסף כמה גופנים כמו שאתה אוהב - כל אחד מופיע בתפריט widget פונט. בכפוף ל-URL בזמן הייצוא - שום דבר לא מוטבע ב-Widget. חייב להיות TTF סטטי (לא WOFF/WOFF2/OTF, לא קישור ל-Google Fonts CSS). מ-github.com/google/פונטים משתמשים בכתובת Raw של .ttf - מעדיפים קבצים תחת תיקיה סטטית / סטטית; חלק מהגופן משתנה TTF לא יטבע ב- PDF. כתובת האתר של GitHub מומרת באופן אוטומטי. שרת אינטרנט עירוני עם מנהל קוריס פועל גם (למשל Tahoma TTF מורשה). פורמטי PDF ודימויים להטביע את הגלימות האמיתיות; SVG מזכיר את הגופן בשם בלבד.",
         allowAdvancedHint: "Off: משתמשים רק לבחור פריסה, הקלד כותרת, לצפות בעמוד תצוגה מקדימה וייצוא (דפסתquick). על: סעיף אפשרויות מתקדמות התמוטט מוסיף את אזור ההדפסה, סדרות מפה, על המפה, דף טקסט, סגנון וכרטיסי Output.",
         logoSection: "לוגו Default",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "מקור",
+        logoEmbedded: "תמונה (default)",
+        logoLinked: "קישור לתמונה URL",
+        logoSourceHint: "בשימוש על ידי אלמנטים תמונה ללא תמונה משלהם. העברת מקורות מנקה את התמונה הקודמת או הקישור.",
+        logoUrlLabel: "צילום: URL",
+        logoUrlHint: "השתמש בכתובת HTTP(S) או App-relative Image URL. רק הקישור נשמר; התמונה עמוסה בעת הייצוא, לא בתצוגה מקדימה חיה. שרתים חיצוניים חייבים לאפשר ל-CorS. תמונות בלתי זמינות משתמשות באיש התמונה של הפריסה.",
         logoHint: "שופץ פעם ומאוחסנים ב widget - בשימוש על ידי כל אלמנט תמונה שאין לו תמונה משלה, על פני כל הפריסה. עצמאי של מסלולי קובץ .pagx.",
         logoLabel: "לוגו Widget",
         whiteBg: "רקע לבן",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt ( פורמטים גדולים)",
         _24PtLargeFormats: "24 pt (large פורמטים)",
         layout: "{layout}",
-        bold: "נועז +"
+        bold: "נועז +",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

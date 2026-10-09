@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (osnutek)",
         title: "{title}",
         unknownError: "neznana napaka",
-        unserializableError: "Neizvedljiva napaka"
+        unserializableError: "Neizvedljiva napaka",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} od {pages}",
+        in: "v ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

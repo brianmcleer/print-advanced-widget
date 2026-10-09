@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "أضف الكثير من العناوين كما تشاء كل واحد يظهر في قائمة المدعوين محجوزة من قِبَل URL في وقت التصدير - لا شيء مُضمّن في المستعار. يجب أن تكون فرقة عمل ثابتة (ليس WOFF/WOFF/OTF2/OTF، وليس رابطة غوغل فونتس CSS). From github.com/google/fonts use the Raw URL of a.ttf - prefer files under a static/ folder; some changing-font TTFs will not embed in PDF. تُحوّل صفحات جيت هوب إلى خام تلقائياً. ويعمل أيضاً خادم على شبكة \" سيتي \" مع رئيس شركة CORS (مثلاً فرقة عمل \" تاهوما \" مرخصة). PDF and image formats embed the real glyphs; SVG references the font by name only.",
         allowAdvancedHint: "مقتطفات: لا يختار المستعملون سوى مخططاً، ويصنفون عنواناً، ويشاهدون الصفحة التمهيدية والصادرة (طبعة سريعة). On: a collapsed Advanced options section adds the Print area, Map series, On the map, Page text, Style and Output cards.",
         logoSection: "الشعار الافتراضي",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
+        logoSourceLabel: "المصدر",
+        logoEmbedded: "صورة مزروعة (قصير)",
         logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceHint: "تستخدمها عناصر الصور بدون صورتها الخاصة وتوضح مصادر التبديل الصورة أو الصلة السابقة.",
+        logoUrlLabel: "صورة لوغو",
+        logoUrlHint: "Use an HTTP(S) or app-relative image URL. ولا يُحفظ سوى الرابط؛ وتُحمَّل الصورة عند التصدير، وليس في الاستعراض المباشر. يجب على الخواديم الخارجية أن تسمح لـ ( CORS). الصور غير المتوفره تُستخدم مُحلّل الصور المُستبدلة",
         logoHint: "تم تحميلها مرة واحدة وخزنت في المستنقعات تستخدم من قبل أي عنصر صورة ليس لديه صورة خاصة به مستقلة عن مسارات الملف",
         logoLabel: "لوم الأرامل",
         whiteBg: "الخلفية البيضاء",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (large formats)",
         _24PtLargeFormats: "24 pt (large formats)",
         layout: "{layout}",
-        bold: "+ جريئة"
+        bold: "+ جريئة",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

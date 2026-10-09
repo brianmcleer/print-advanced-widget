@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (disegno)",
         title: "{title}",
         unknownError: "errore sconosciuto",
-        unserializableError: "errore non serializzabile"
+        unserializableError: "errore non serializzabile",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} di {pages}",
+        in: "in ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

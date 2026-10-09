@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Adja hozzá annyi betűtípust, amennyit szeretne - mindegyik megjelenik a widget betűtípus menüben. Az URL tölti be az export időben - semmi sincs beágyazva a widget-be. Biztosan statikus TTF (nem WOFF / WOFF2 / OTF, nem Google Fonts CSS link). A github.com / google / betűtípusok a .ttf Nyers URL-jét használják - inkább a statikus / mappa alatti fájlokat; néhány változó betűtípusú TTF nem lesz beágyazva PDF-be. A GitHub oldal URL- jei automatikusan nyersessé válnak. A CORS fejlécű City web szerver is működik (pl. egy engedélyezett Tahoma TTF). PDF és képformátumok beágyazta a valódi szimbólumok; SVG hivatkozások a betűtípus csak név.",
         allowAdvancedHint: "Off: a felhasználók csak válasszon egy elrendezés, írja be a címet, nézni az oldalt előnézet és export (gyors nyomtatás). On: Egy összeomlott Advanced opciók szakasz hozzáadja a Print terület, Térkép sorozat, A térképen, Oldal szöveg, Style és kimeneti kártyák.",
         logoSection: "Alapértelmezett logó",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Logóforrás",
+        logoEmbedded: "Beágyazott kép (alapértelmezés)",
+        logoLinked: "Kapcsolat a kép URL",
+        logoSourceHint: "Képelemek használják saját képük nélkül. A váltási források törlik az előző képet vagy linket.",
+        logoUrlLabel: "Logókép URL",
+        logoUrlHint: "HTTP (S) vagy app- relative képURL. Csak a link menthető meg; a kép az exportáláskor van betöltve, nem pedig az élő előnézetben. A külső szervereknek lehetővé kell tenniük a CORS használatát. A nem elérhető képek az elrendezés képtábláját használják.",
         logoHint: "Egyszer feltöltve, a widget-ben tárolva - minden olyan képelem használja, amely nem rendelkezik saját képpel, minden elrendezésben. Függetlenül a .pagx fájloktól.",
         logoLabel: "Widget logó",
         whiteBg: "Fehér háttér",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (nagyformátumú)",
         _24PtLargeFormats: "24 pt (nagyformátumú)",
         layout: "{layout}",
-        bold: "+ félkövér"
+        bold: "+ félkövér",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

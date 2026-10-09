@@ -258,11 +258,11 @@ System.register([], function (e) {
         allowAdvancedHint: "Av: användare väljer bara en layout, skriver en titel, tittar på sidan förhandsgranskning och export (snabbt tryck). På: en kollapsad Avancerad alternativ avsnitt lägger till Print-området, Kartserien, På kartan, Sidtext, Style och Output-kort.",
         logoSection: "Standard logotyp",
         logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoEmbedded: "Inbäddad bild (standard)",
+        logoLinked: "Länk till bild URL",
+        logoSourceHint: "Används av bildelement utan egen bild. Byta källor rensar den tidigare bilden eller länken.",
+        logoUrlLabel: "Logo bild URL",
+        logoUrlHint: "Använd en HTTP(S) eller app-relativ bild URL. Endast länken sparas; bilden laddas när du exporterar, inte i live förhandsvisningen. Externa servrar måste tillåta CORS. Otillgängliga bilder använder layoutbildplatshållaren.",
         logoHint: "Uppladdad en gång och lagrad i widgeten - som används av något bildelement som inte har någon bild av sin egen, över alla layouter. Oberoende av .pagx-filvägarna.",
         logoLabel: "Widget logo",
         whiteBg: "Vit bakgrund",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (stora format)",
         _24PtLargeFormats: "24 pt (stora format)",
         layout: "{layout}",
-        bold: "+ djärv"
+        bold: "+ djärv",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

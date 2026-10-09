@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Añadir tantas fuentes como quieras - cada aparece en el menú widget Font. Cargado por URL en tiempo de exportación - nada está incrustado en el widget. Debe ser una TTF estática (no WOFF/WOFF2/OTF, no un enlace de Google Fonts CSS). Desde github.com/google/fonts utilizan la URL cruda de un .ttf - prefieren los archivos bajo una carpeta estática /; algunos TTFs de transferencia variable no se incrustarán en PDF. Las URL de la página GitHub se convierten en crudas automáticamente. Un servidor web de City con un encabezado CORS también funciona (por ejemplo, un Tahoma TTF con licencia). PDF y formatos de imagen incrustan los glifos reales; SVG hace referencia a la fuente solo por nombre.",
         allowAdvancedHint: "Off: los usuarios sólo eligen un diseño, escriban un título, ver la vista previa de la página y exportar (impresión rápida). En: una sección Opciones avanzadas colapsada agrega el área de impresión, serie de mapas, En el mapa, texto de página, tarjetas de estilo y salida.",
         logoSection: "Logo Default",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Fuente de logotipo",
+        logoEmbedded: "Imagen en relieve (por defecto)",
+        logoLinked: "Enlace a la URL de la imagen",
+        logoSourceHint: "Utilizado por elementos de imagen sin su propia imagen. Las fuentes de cambio aclaran la imagen o el enlace anterior.",
+        logoUrlLabel: "Imagen de logotipo URL",
+        logoUrlHint: "Usar una URL de imagen relacionada con HTTP(S). Sólo el enlace se guarda; la imagen se carga cuando se exporta, no en la vista previa en vivo. Los servidores externos deben permitir CORS. Las imágenes indisponibles utilizan el marcador de posición de diseño.",
         logoHint: "Subido una vez y almacenado en el widget - utilizado por cualquier elemento de imagen que no tiene imagen propia, a través de todos los diseños. Independiente de las vías de archivo .pagx.",
         logoLabel: "Widget logo",
         whiteBg: "Fondo blanco",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt ( formatos grandes)",
         _24PtLargeFormats: "24 pt ( formatos grandes)",
         layout: "{layout}",
-        bold: "+ negrita"
+        bold: "+ negrita",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

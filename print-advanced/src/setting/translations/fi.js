@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Lisää niin monta fonttia kuin haluat - jokainen näkyy widget Font-valikossa. Ladattu URL vientihetkellä - mitään ei ole upotettu vekotin. Täytyy olla staattinen TTF (ei WOFF/WoFF2/OTF, ei Google Fonts CSS-linkki). Github.com/google/fontit käyttävät .ttf: n Raw- URL- osoitetta - suosivat tiedostoja staattisen/ kansion alla; jotkut muuttuvat TTF: t eivät sisälly PDF: ään. GitHub-sivun URL-osoitteet muunnetaan raa'aksi automaattisesti. Toimii myös kaupungin verkkopalvelin, jossa on CORS-otsikko (esim. lisensoitu Tahoma TTF). PDF- ja kuvamuodot upottivat oikeat glyphit; SVG viittaa kirjasin vain nimen.",
         allowAdvancedHint: "Off: käyttäjät vain valita ulkoasu, kirjoita otsikko, katso sivun esikatselu ja vienti (pikatulostus). On: romahtanut Advanced vaihtoehtoja osio lisää Tulosta alue, Kartta sarja, Kartalla, Page teksti, Tyyli ja Tulostus kortit.",
         logoSection: "Oletuslogo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Logolähde",
+        logoEmbedded: "Upota kuva (oletus)",
+        logoLinked: "Linkki kuvan URL-osoitteeseen",
+        logoSourceHint: "Käytetään kuvaelementit ilman omaa kuvaa. Lähteen vaihtaminen tyhjentää edellisen kuvan tai linkin.",
+        logoUrlLabel: "Logokuvan URL",
+        logoUrlHint: "Käytä HTTP(S) tai sovelluksen suhteellinen kuva URL. Vain linkki tallennetaan; kuva on ladattu viennin aikana, ei suorana esikatseluna. Ulkoisten palvelimien on sallittava CORS. Ei saatavilla kuvia käyttää layout kuvan paikkaholkin.",
         logoHint: "Ladattu kerran ja tallennettu widget - käyttää kaikki kuva elementti, joka ei ole kuva omasta, kaikki asettelut. Riippuen .pagx tiedostopolkuja.",
         logoLabel: "Widget- logo",
         whiteBg: "Valkoinen tausta",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (suurissa muodoissa)",
         _24PtLargeFormats: "24 pt (suuret muodot)",
         layout: "{layout}",
-        bold: "+ lihava"
+        bold: "+ lihava",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Aggiungi il maggior numero di caratteri come ti piace - ogni appare nel menu del widget Font. Caricato da URL al momento dell'esportazione - nulla è incorporato nel widget. Deve essere un TTF statico (non WOFF/WOFF2/OTF, non un collegamento Google Fonts CSS). Da github.com/google/fonts utilizzare l'URL crudo di un .ttf - preferiscono i file in una cartella statica /; alcuni TTF variabili-font non saranno incorporati in PDF. Gli URL della pagina GitHub vengono convertiti automaticamente in raw. Funziona anche un web server City con un'intestazione CORS (ad esempio un Tahoma TTF con licenza). PDF e formati di immagini incorporano i veri glifi; SVG fa riferimento al carattere solo per nome.",
         allowAdvancedHint: "Off: gli utenti scelgono solo un layout, digitano un titolo, guardano l'anteprima della pagina e esportano (stampa rapida). Su: una sezione di opzioni avanzate collassate aggiunge l'area di stampa, serie di mappe, sulla mappa, testo di pagina, stile e schede di uscita.",
         logoSection: "Logo predefinito",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Fonte del logo",
+        logoEmbedded: "Immagine incorporata (default)",
+        logoLinked: "Link all'URL dell'immagine",
+        logoSourceHint: "Utilizzato da elementi fotografici senza la propria immagine. Le fonti di commutazione cancellano l'immagine precedente o il link.",
+        logoUrlLabel: "Logo immagine URL",
+        logoUrlHint: "Utilizzare un HTTP(S) o un URL di immagine relativo all'app. Solo il link viene salvato; l'immagine viene caricata quando si esporta, non in anteprima dal vivo. I server esterni devono consentire CORS. Le immagini non disponibili utilizzano il segnaposto dell'immagine del layout.",
         logoHint: "Caricato una volta e memorizzato nel widget - utilizzato da qualsiasi elemento immagine che non ha alcuna immagine propria, attraverso tutti i layout. Indipendentemente dai percorsi dei file .pagx.",
         logoLabel: "logo Widget",
         whiteBg: "Sfondo bianco",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (grandi formati)",
         _24PtLargeFormats: "24 pt (grandi formati)",
         layout: "{layout}",
-        bold: "+ in grassetto"
+        bold: "+ in grassetto",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

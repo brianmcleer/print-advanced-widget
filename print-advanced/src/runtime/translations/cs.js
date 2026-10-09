@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (návrh)",
         title: "{title}",
         unknownError: "neznámá chyba",
-        unserializableError: "neserializovatelná chyba"
+        unserializableError: "neserializovatelná chyba",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} z {pages}",
+        in: "v ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

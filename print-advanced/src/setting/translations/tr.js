@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Sizin gibi birçok font ekleyin - her biri widget Font menüsünde görünür. URL'ye ihracat zamanında yüklendi - widget'da hiçbir şey gömülü değil. Bir statik TTF ( WOFF/WOFF2/OTF değil, Google Fonts CSS bağlantısı değil). Takhub.com/google/fonts, bir .ttf'in Raw URL'sini kullanıyor - statik / bir klasör altında dosyaları tercih ediyor; bazı değişken-font TTFs PDF'de yer almayacaktır. GitHub sayfa URL'leri otomatik olarak ham'ye dönüştürülür. Bir KURUMSALS başlığıyla bir Şehir web sunucusu da çalışır (örneğin lisanslı Tahoma TTF). PDF ve görüntü formatları gerçek rogliflere sahiptir; SVG sadece isim tarafından yazıya atıfta bulunur.",
         allowAdvancedHint: "Off: kullanıcılar sadece bir düzen, tip bir başlık seçin, sayfa önizleme ve ihracat izleyin (quick baskı). On: Bir çöktü Gelişmiş seçenek bölümü, Yazdır alanı, Map serisini, haritada, Page text, Style ve Çıktı kartları ekliyor.",
         logoSection: "Varsayılan logo",
-        logoSourceLabel: "Logo source",
+        logoSourceLabel: "Logo kaynağı",
         logoEmbedded: "Embed image (default)",
         logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceHint: "Kendi imajı olmadan resim elementleri tarafından kullanılır. Anahtarlama kaynakları önceki resmi veya bağlantıyı açıklar.",
+        logoUrlLabel: "Logo görüntüsü URL",
+        logoUrlHint: "HTTP (S) veya app-relative image URL kullanın. Sadece bağlantı kurtarılır; görüntü ihracat yaparken yüklenir, canlı önizlemede değil. Dış sunucular KURUMSALS'a izin vermelidir. Mevcut olmayan görüntüler tablo yer sahibini kullanır.",
         logoHint: "Bir kez ve widget'da depolanır - kendi imajı olmayan herhangi bir resim elemanı tarafından kullanılır, tüm yapılar boyunca. .pagx dosya yollarından bağımsız olarak.",
         logoLabel: "Widget logo",
         whiteBg: "Beyaz arka plan",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (large formatları)",
         _24PtLargeFormats: "24 pt (large formatları)",
         layout: "{layout}",
-        bold: "+ cesur"
+        bold: "+ cesur",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Dodaj tyle czcionek ile chcesz - każdy pojawia się w menu Czcionka widget. Załadowany przez URL w czasie eksportu - nic nie jest wbudowane w widget. Musi to być statyczny TTF (nie WOFF / WOFF2 / OTF, nie jest to link do Google Fonts CSS). Z github.com / google / fonts używać Surowy URL .ttf - preferować pliki pod statyczny / folder; niektóre zmienno- font TTFs nie będzie osadzony w PDF. URL strony GitHub są konwertowane na surowe automatycznie. Działa również serwer sieciowy City z nagłówkiem CORS (np. licencjonowany TTF). PDF i formaty obrazów osadziły prawdziwe glify; SVG odnosi czcionkę tylko po nazwie.",
         allowAdvancedHint: "Wyłączone: użytkownicy wybierają tylko układ, wpisują tytuł, oglądają podgląd strony i eksport (szybki druk). Na: zapadnięta sekcja Zaawansowane opcje dodaje obszar Drukuj, Seria map, Na mapie, Tekst strony, Styl i karty wyjściowe.",
         logoSection: "Domyślne logo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Źródło logo",
+        logoEmbedded: "Zamieść obraz (domyślnie)",
+        logoLinked: "Link do URL obrazka",
+        logoSourceHint: "Używane przez elementy obrazu bez własnego obrazu. Przełączanie źródeł oczyszcza poprzedni obraz lub link.",
+        logoUrlLabel: "URL obrazka logo",
+        logoUrlHint: "Użyj HTTP (S) lub względnego adresu URL obrazka. Tylko link jest zapisany; obraz jest wczytywany podczas eksportu, nie w podglądzie na żywo. Zewnętrzne serwery muszą umożliwiać CORS. Niedostępne obrazy korzystają z plakietki graficznej.",
         logoHint: "Wysłany raz i przechowywany w widżecie - używany przez dowolny element obrazu, który nie ma własnego obrazu, we wszystkich układach. Niezależnie od ścieżki pliku .pagx.",
         logoLabel: "Logo widget",
         whiteBg: "Białe tło",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pkt (duże formaty)",
         _24PtLargeFormats: "24 pkt (duże formaty)",
         layout: "{layout}",
-        bold: "+ pogrubiona"
+        bold: "+ pogrubiona",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

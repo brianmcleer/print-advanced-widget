@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Pievienot tik daudz fontu, cik vēlaties - katrs parādās logdaļu fonta izvēlnē. Ielādējis URL pēc eksporta laika - nekas nav iestrādāts logdaļā. Jābūt statiskam TTF (nevis WOFF/WOFF2/OTF, ne Google Fonts CSS saite). No github.com / google / fonts izmantot Raw URL .tf - dod priekšroku failus zem statiskā / mapes; daži mainīgs- fonts TTF netiks iegulti PDF. GitHub lapu URLs tiek pārveidots automātiski. Darbojas arī City tīmekļa serveris ar CORS galvu (piemēram, licencēts Tahoma TTF). PDF un attēlu formāti iegult reālo gliphs; SVG atsauces fontu tikai pēc nosaukuma.",
         allowAdvancedHint: "Izslēgts: lietotāji tikai izvēlieties izkārtojumu, ierakstiet nosaukumu, skatieties lapas priekšskatījumu un eksportējiet (ātrā drukāšana). Pēc: sabruka Advanced options section papildina Drukāt teritoriju, Karte sērija, Kartē, Page tekstu, Stils un Izlaides kartes.",
         logoSection: "Noklusētais logo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Logo avots",
+        logoEmbedded: "Iegultais attēls (noklusētais)",
+        logoLinked: "Saite uz attēla URL",
+        logoSourceHint: "Izmanto attēla elementi bez sava attēla. Pārslēdzot avotus, tiek notīrīts iepriekšējais attēls vai saite.",
+        logoUrlLabel: "Logo attēla URL",
+        logoUrlHint: "Izmantojiet HTTP( S) vai lietotnes relatīvā attēla URL. Tiek saglabāta tikai saite; eksportējot attēls tiek ielādēts, nevis tiešraidē. Ārējiem serveriem jāļauj CORS. Nav pieejami attēli izmanto attēla izkārtojuma vietturi.",
         logoHint: "Augšupielādēja vienreiz un glabājas widget - izmanto jebkurš attēla elements, kas nav attēlu savu, pāri visiem izkārtojumiem. Neatkarīgi no .pagx failu ceļiem.",
         logoLabel: "Logdaļas logo",
         whiteBg: "Balts fons",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (lieli formāti)",
         _24PtLargeFormats: "24 pt (lieli formāti)",
         layout: "{layout}",
-        bold: "+ treknraksts"
+        bold: "+ treknraksts",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

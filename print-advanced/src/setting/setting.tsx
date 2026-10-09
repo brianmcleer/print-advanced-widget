@@ -688,7 +688,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
         widthIn: 3,
         heightIn: 3.5,
         marginIn: 0.25,
-        title: __t("legendSection"),
+        get title () { return __t("legendSection") },
         showTitle: true,
         columns: 0,
         baseFontPt: 8,
@@ -2189,7 +2189,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
                     <SettingRow flow='wrap' label={messages.ieImportLabel} truncateLabel>
                         <TextArea aria-label={messages.ieImportLabel} className='w-100'
                             height={120} value={this.state.importXml}
-                            placeholder={'<' + 'PrintAdvancedConfig version="1" ...>'}
+                            placeholder={'<' + __t("printAdvancedConfigVersion1")}
                             onChange={(e: any) => this.setState({ importXml: e.target.value, ieError: null, ieSuccess: null })} />
                     </SettingRow>
                     <SettingRow>

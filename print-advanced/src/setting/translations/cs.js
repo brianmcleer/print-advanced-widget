@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Přidat tolik písma, jak se vám líbí - každý se objeví v nabídce widget font. Načteno URL v době exportu - nic není vloženo do widget. Musí to být statická TTF (ne WOFF / WOFF2 / OTF, ne odkaz na Google Fonts CSS). Od github.com / google / fonty používat Raw URL na .ttf - preferuje soubory pod statickou / složku; některé variable-font TTFs nebudou vloženy do PDF. Záložka GitHub URL se automaticky převádí na syrové. Funguje také webový server města s hlavičkou CORS (např. licencovaný Tahoma TTF). PDF a obrazové formáty vkládaly skutečné glyfy; SVG odkazuje pouze na font podle jména.",
         allowAdvancedHint: "Vypnuto: uživatelé si vyberou pouze rozložení, napište název, podívejte se na náhled stránky a export (rychlý tisk). Na: zkolabovaná sekce Advanced options přidá plochu tisku, řadu map, Na mapě, text stránky, styl a výstupní karty.",
         logoSection: "Výchozí logo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Zdroj logo",
+        logoEmbedded: "Vložený obrázek (přednastaveno)",
+        logoLinked: "Odkaz na URL obrázku",
+        logoSourceHint: "Používané obrazovými prvky bez jejich vlastního obrazu. Přepínací zdroje vymažou předchozí obrázek nebo odkaz.",
+        logoUrlLabel: "Name",
+        logoUrlHint: "Použijte HTTP (S) nebo app- relative image URL. Pouze odkaz je uložen; obrázek se nahrává při exportu, ne v živé ukázce. Externí servery musí umožňovat CORS. Nedostupné obrázky používají držák na rozvržení obrazu.",
         logoHint: "Uploaden jednou a uložen v widget - používá jakýkoli prvek obrazu, který nemá vlastní obraz, přes všechny rozložení. Nezávislé na stezkách souborů .pagx.",
         logoLabel: "Logo widget",
         whiteBg: "Bílé pozadí",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 bodů (velké formáty)",
         _24PtLargeFormats: "24 bodů (velké formáty)",
         layout: "{layout}",
-        bold: "+ tučně"
+        bold: "+ tučně",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

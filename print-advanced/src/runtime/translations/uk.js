@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (маршрут)",
         title: "{title}",
         unknownError: "Невідома помилка",
-        unserializableError: "несеріалізована помилка"
+        unserializableError: "несеріалізована помилка",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} з {pages}",
+        in: "в ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

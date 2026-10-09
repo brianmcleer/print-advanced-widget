@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Adicionar quantas fontes quiser - cada uma aparece no menu Fonte widget. Carregado por URL no momento da exportação - nada está incorporado no widget. Deve ser um TTF estático (não WOFF/WOFF2/OTF, não um link CSS do Google Fonts). De github.com/google/fonts use o URL Raw de um .ttf - prefira arquivos sob uma pasta estática/; alguns TTFs de variáveis não serão incorporados em PDF. URLs de página do GitHub são convertidos automaticamente em bruto. Um servidor web da cidade com um cabeçalho CORS também funciona (por exemplo, um Tahoma TTF licenciado). PDF e formatos de imagem incorporam os glifos reais; SVG faz referência à fonte apenas pelo nome.",
         allowAdvancedHint: "Desligado: os usuários escolhem apenas um layout, digitam um título, assistem à visualização da página e exportam (impressão rápida). On: uma seção de opções avançadas colapsadas adiciona a área de impressão, série de mapas, No mapa, texto da página, Estilo e cartões de saída.",
         logoSection: "Logotipo padrão",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Fonte do logótipo",
+        logoEmbedded: "Incorporar a imagem (por omissão)",
+        logoLinked: "Link para o URL da imagem",
+        logoSourceHint: "Usado por elementos de imagem sem sua própria imagem. A mudança de fontes limpa a imagem ou o link anterior.",
+        logoUrlLabel: "URL da imagem do logotipo",
+        logoUrlHint: "Use um URL de imagem HTTP(S) ou app-relative. Somente o link é salvo; a imagem é carregada ao exportar, não na visualização ao vivo. Os servidores externos devem permitir o CORS. As imagens não disponíveis usam o placeholder da imagem de layout.",
         logoHint: "Enviado uma vez e armazenado no widget - usado por qualquer elemento de imagem que não tenha imagem própria, em todos os layouts. Independente dos caminhos do arquivo .pagx.",
         logoLabel: "Logótipo do Widget",
         whiteBg: "Fundo branco",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (grandes formatos)",
         _24PtLargeFormats: "24 pt (grandes formatos)",
         layout: "{layout}",
-        bold: "+ negrito"
+        bold: "+ negrito",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

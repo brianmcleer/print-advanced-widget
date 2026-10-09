@@ -428,5 +428,12 @@ export default {
   _96Draft: '96 (draft)',
   title: '{title}',
   unknownError: 'unknown error',
-  unserializableError: 'unserializable error'
+  unserializableError: 'unserializable error',
+  continued: '(continued)',
+  pageName: '{pageName}',
+  pageOfPages: '{page} of {pages}',
+  in: 'in ·',
+  dpi: 'DPI ·',
+  keepsMapZoomLevel: 'keeps map zoom level',
+  printsWhatYouSee: 'prints what you see'
 }

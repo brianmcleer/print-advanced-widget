@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Voeg zoveel lettertypen toe als je wilt - elk verschijnt in het widget-lettertypemenu. Geladen door URL op exporttijd - er is niets ingebed in het widget. Moet een statische TTF zijn (niet WOFF/WOFF2/OTF, geen Google Fonts CSS-link). Van github.com/google/fonts gebruik de Raw URL van een .ttf - liever bestanden onder een statische/map; sommige variabele-font TTF's zullen niet in PDF worden opgenomen. GitHub pagina URL's worden automatisch omgezet naar rauw. Een City webserver met een CORS header werkt ook (bijvoorbeeld een Tahoma TTF met licentie). PDF en afbeeldingsformaten insluiten de echte glyphs; SVG verwijst alleen naar het lettertype op naam.",
         allowAdvancedHint: "Uit: gebruikers kiezen alleen een lay-out, typen een titel, bekijk de pagina voorvertoning en exporteren (snel afdrukken). Aan: een ingestorte sectie Geavanceerde opties voegt het Print gebied, Kaart serie, Op de kaart, Pagina tekst, Style en Output kaarten.",
         logoSection: "Standaard logo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Logobron",
+        logoEmbedded: "Afbeelding invoegen (standaard)",
+        logoLinked: "Verwijzing naar afbeeldingsURL",
+        logoSourceHint: "Gebruikt door beeldelementen zonder eigen beeld. Verwisselde bronnen wissen de vorige afbeelding of koppeling.",
+        logoUrlLabel: "Logo afbeelding URL",
+        logoUrlHint: "Gebruik een HTTP(S) of app-relatief image-URL. Alleen de koppeling wordt opgeslagen; de afbeelding wordt geladen bij het exporteren, niet in het live voorbeeld. Externe servers moeten CORS toestaan. Niet-beschikbare afbeeldingen gebruiken de layout van de plaatshouder.",
         logoHint: "Eenmaal geüpload en opgeslagen in de widget - gebruikt door elk beeldelement dat geen eigen afbeelding heeft, over alle lay-outs. Onafhankelijk van de .pagx bestandspaden.",
         logoLabel: "Widget-logo",
         whiteBg: "Witte achtergrond",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (grote formaten)",
         _24PtLargeFormats: "24 pt (grote formaten)",
         layout: "{layout}",
-        bold: "+ vet"
+        bold: "+ vet",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

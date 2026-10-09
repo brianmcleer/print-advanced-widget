@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Προσθέστε όσες γραμματοσειρές θέλετε - κάθε εμφανίζεται στο μενού γραμματοσειρά widget. Φορτωμένο από το URL κατά την εξαγωγή χρόνου - τίποτα δεν είναι ενσωματωμένο στο γραφικό συστατικό. Πρέπει να είναι ένα στατικό TTF (όχι WOFF/WOFF2/OTF, όχι ένα σύνδεσμο Google Fonts CSS). Από το github.com/google/fonts χρησιμοποιούν το Raw URL ενός .ttf - προτιμούν τα αρχεία κάτω από ένα στατικό/ φάκελο? Τα URL της σελίδας GitHub μετατρέπονται αυτόματα σε ωμά. Ένας εξυπηρετητής ιστού της πόλης με κεφαλίδα CORS λειτουργεί επίσης (π.χ. με άδεια Tahoma TTF). PDF και οι μορφές εικόνας ενσωματώνουν τα πραγματικά glyphs? SVG αναφορές η γραμματοσειρά μόνο με το όνομα.",
         allowAdvancedHint: "Εκτός: οι χρήστες επιλέγουν μόνο μια διάταξη, πληκτρολογήστε έναν τίτλο, δείτε την προεπισκόπηση σελίδας και την εξαγωγή (γρήγορη εκτύπωση). On: a criped Advanced options section adds the Print area, Map series, On the map, Page text, Style and Output cards.",
         logoSection: "Προκαθορισμένο λογότυπο",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Πηγή λογότυπου",
+        logoEmbedded: "Ενσωματωμένη εικόνα (προκαθορισμένη)",
+        logoLinked: "Σύνδεση με το URL της εικόνας",
+        logoSourceHint: "Χρησιμοποιείται από στοιχεία εικόνας χωρίς τη δική τους εικόνα. Η αλλαγή πηγών καθαρίζει την προηγούμενη εικόνα ή σύνδεση.",
+        logoUrlLabel: "URL εικόνας λογότυπου",
+        logoUrlHint: "Χρησιμοποιήστε ένα URL εικόνας HTTP(S) ή app-relative. Μόνο ο σύνδεσμος αποθηκεύεται: η εικόνα φορτώνεται κατά την εξαγωγή, όχι στη ζωντανή προεπισκόπηση. Οι εξωτερικοί εξυπηρετητές πρέπει να επιτρέπουν CORS. Μη διαθέσιμες εικόνες χρησιμοποιούν το χώρο της εικόνας διάταξης.",
         logoHint: "Αναρτήθηκε μία φορά και αποθηκεύτηκε στο widget - χρησιμοποιείται από οποιοδήποτε στοιχείο εικόνας που δεν έχει δική του εικόνα, σε όλες τις διατάξεις. Ανεξάρτητα από τις διαδρομές αρχείων .pagx.",
         logoLabel: "Λογότυπο συστατικού",
         whiteBg: "Λευκό φόντο",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (μεγάλες μορφές)",
         _24PtLargeFormats: "24 pt (μεγάλες μορφές)",
         layout: "{layout}",
-        bold: "+ έντονη"
+        bold: "+ έντονη",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

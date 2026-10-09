@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Tambahkan fonta sebanyak yang Anda suka - masing-masing muncul di menu fonta widget. Dimuat oleh URL pada waktu ekspor - tidak ada yang tertanam dalam widget. Harus berupa TTF statis (bukan WOFF / WOFF2 / OTF, bukan link Google Fonts CSS). Dari github.com / google / font gunakan URL Raw dari sebuah .ttf - lebih suka berkas dibawah sebuah statis / folder; beberapa variable - font TTTFs tidak akan embed dalam PDF. URL halaman GitHub dikonversi ke mentah secara otomatis. Server web Kota dengan header CORS juga bekerja (misalnya TTF Tahoma berlisensi). PDF dan format gambar memasukkan glyphs sebenarnya; SVG referensi fonta hanya dengan nama.",
         allowAdvancedHint: "Off: pengguna hanya memilih tata letak, ketik judul, menonton pratinjau halaman dan ekspor (cepat cetak). Pada: a collapsed Advanced option section add the Printer area, Map series, On the map, Page text, Style and Output cards.",
         logoSection: "Logo bawaan",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Sumber Logo",
+        logoEmbedded: "Tempelkan gambar (baku)",
+        logoLinked: "Taut ke URL gambar",
+        logoSourceHint: "Digunakan oleh elemen gambar tanpa citra mereka sendiri. Mengganti sumber membersihkan gambar atau tautan sebelumnya.",
+        logoUrlLabel: "URL gambar Logo",
+        logoUrlHint: "Gunakan sebuah URL image HTTP (S) atau app-relatif. Hanya taut yang disimpan; image dimuat ketika mengekspor, bukan dalam pratinjau langsung. Server eksternal harus mengijinkan CORS. Gambar tidak tersedia menggunakan placeholder tata letak.",
         logoHint: "Diunggah sekali dan disimpan dalam widget - digunakan oleh setiap elemen gambar yang tidak memiliki gambar sendiri, di semua layout. Independen dari jalur berkas .paux.",
         logoLabel: "logo Widget",
         whiteBg: "Latar belakang putih",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (format besar)",
         _24PtLargeFormats: "24 pt (format besar)",
         layout: "{layout}",
-        bold: "+ tebal"
+        bold: "+ tebal",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

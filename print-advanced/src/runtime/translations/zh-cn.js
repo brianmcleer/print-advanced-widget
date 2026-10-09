@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96(草案)",
         title: "{title}",
         unknownError: "未知错误",
-        unserializableError: "无序错误"
+        unserializableError: "无序错误",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page}/{pages}",
+        in: "* 妇女",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

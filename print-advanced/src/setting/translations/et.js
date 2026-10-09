@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Lisa nii palju fonte kui soovid - igaüks ilmub vidinate menüüs Font. Laaditakse URL- i abil eksportimise ajal - vidinasse ei ole midagi põimitud. Peab olema staatiline TTF (mitte WOFF/WOFF2/OTF, mitte Google Fonts CSS link). github.com/ google/ fonts kasutab .ttf toor- URL- i - eelista faile staatilise/ kataloogi all; mõned muutuja- fondid ei põimi PDF- i. GitHubi lehe URL-id teisendatakse automaatselt tooreks. Samuti töötab City veebiserver koos CORS päisega (nt litsentseeritud Tahoma TTF). PDF- ja pildivormingud põimivad tegelikke glüüfe; SVG viitab fondile ainult nime järgi.",
         allowAdvancedHint: "Väljas: kasutajad valivad ainult paigutuse, kirjutavad pealkirja, vaatavad lehe eelvaatlust ja ekspordivad (kiirtrükk). On: kokkuvarisenud Täpsemad valikud lisab sektsiooni Trükiala, Kaardiseeria, Kaardil, Lehekülje teksti, Stiili ja Väljundkaardid.",
         logoSection: "Vaikimisi logo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Logoallikas",
+        logoEmbedded: "Põimitud pilt (vaikimisi)",
+        logoLinked: "Link pildi URL-ile",
+        logoSourceHint: "Kasutatakse pildielementide poolt ilma oma pildita. Lähteallikate vahetamine puhastab eelmise pildi või lingi.",
+        logoUrlLabel: "Logopildi URL",
+        logoUrlHint: "Kasuta HTTP (S) või rakenduse-suhtelise pildi URL-i. Salvestatakse ainult link; pilt laaditakse eksportimisel, mitte elavas eelvaatluses. Välised serverid peavad lubama CORS-i. Mittekättesaadavad pildid kasutavad paigutuspildi kohahoidjat.",
         logoHint: "Üleslaaditud üks kord ja salvestatud vidinasse - seda kasutavad kõik pildielemendid, millel pole oma pilti, kõigis paigutustes. Sõltumata .pagx faili asukohtadest.",
         logoLabel: "Vidina logo",
         whiteBg: "Valge taust",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (suurformaat)",
         _24PtLargeFormats: "24 pt (suurformaat)",
         layout: "{layout}",
-        bold: "+ julge"
+        bold: "+ julge",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

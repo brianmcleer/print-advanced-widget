@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (projecte)",
         title: "{title}",
         unknownError: "error desconegut",
-        unserializableError: "Error no llegible"
+        unserializableError: "Error no llegible",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} de {pages}",
+        in: "in",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

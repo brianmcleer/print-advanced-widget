@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Додайте стільки шрифтів, як вам подобається - кожен з'являється в меню віджетів. Завантажений URL в час експорту - нічого не вкладається в віджет. Потрібні бути статичним TTF (не WOFF / WOFF2 / OOTF, а не посилання на Google Fonts). З github.com/google/fonts використовують Сиру URL .ttf - віддають перевагу файлам під статичною / папкою; деякі змінні шрифти TTF не будуть зібрані в PDF. URL-адреси сторінок GitHub автоматично перетворюються на сиру. Також працює веб-сервер з головуванням CORS (наприклад, ліцензований Tahoma TTF). Формати PDF та зображення, зібрані в реальний гліф; SVG посилання на шрифт тільки за назвою.",
         allowAdvancedHint: "Офф: користувачі тільки підбирають макет, введіть назву, див. попередній перегляд сторінки та експорт (кільковий друк). На мапі, текст сторінки, стиль та вихідні картки.",
         logoSection: "Логотип ВТС",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Логотип",
+        logoEmbedded: "Вбудувати зображення (default)",
+        logoLinked: "Посилання на URL-адресу зображення",
+        logoSourceHint: "Використовуються елементи зображення без власного зображення. Перемикач джерел очищає попередній образ або посилання.",
+        logoUrlLabel: "URL зображення логотипу",
+        logoUrlHint: "Використовуйте URL-адресу HTTP(S) або застосунок. Тільки збережено посилання; зображення завантажується при експорті, не в режимі реального попереднього перегляду. Зовнішні сервери повинні дозволити CORS. Недоступні зображення використовуються для розміщення макета.",
         logoHint: "Завантажено один раз і зберігається в віджеті - використовується будь-яким елементом зображення, який не має зображення власної, по всій макетах. Незалежно від шляхів .pagx.",
         logoLabel: "Логотип ВТС",
         whiteBg: "Білий фон",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 пт (великі формати)",
         _24PtLargeFormats: "24 пт (великі формати)",
         layout: "{layout}",
-        bold: "+ хв"
+        bold: "+ хв",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

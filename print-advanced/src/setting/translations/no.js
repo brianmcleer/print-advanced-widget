@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Legg til så mange fonter som du vil - hver vises i widget Font-menyen. Lastet av URL til eksporttid - ingenting er innebygd i widget. Må være en statisk TTF (ikke WOFF/WOFF2/OTF, ikke en Google Fonts CSS-lenke). Fra github.com/google/fonts bruker Raw URL av en .ttf - foretrekker filer under en statisk / mappe; noen variabel-font TTFs vil ikke være innebygd i PDF. GitHub-sideadresser konverteres til rå automatisk. En City webserver med en CORS-hode fungerer også (f.eks. en lisensiert Tahoma TTF). PDF- og bildeformatene innebygde de virkelige glyfene; SVG refererer kun skriften ved navn.",
         allowAdvancedHint: "Av: brukere velger bare en layout, skriver en tittel, ser siden forhåndsvisning og eksport (hastig utskrift). På: En sammenslått avansert innstillingsseksjon legger Print-området, Kart-serien, På kartet, Sidetekst, Stil og Utgangskort.",
         logoSection: "Standard logo",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Logokilde",
+        logoEmbedded: "Innebygget bilde (standard)",
+        logoLinked: "Link til bildeadresse",
+        logoSourceHint: "Brukes av bildeelementer uten eget bilde. Hvis du bytter kilder fjerner forrige bilde eller lenke.",
+        logoUrlLabel: "URL til logobilde",
+        logoUrlHint: "Bruk en HTTP(S) eller apprelasjonell bildeadresse. Bare lenken lagres; bildet lastes inn når du eksporterer, ikke i live forhåndsvisningen. Eksterne servere må tillate CORS. Utilgjengelige bilder bruker layoutbildeplassholderen.",
         logoHint: "Lastet opp en gang og lagret i widgeten - brukes av et hvilket som helst bildeelement som ikke har et eget bilde, på tvers av alle layouter. Uavhengig av .pagx filstier.",
         logoLabel: "Widget logo",
         whiteBg: "Hvit bakgrunn",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (store formater)",
         _24PtLargeFormats: "24 pt (store formater)",
         layout: "{layout}",
-        bold: "+ fet"
+        bold: "+ fet",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

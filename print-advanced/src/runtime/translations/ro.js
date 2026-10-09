@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (draft)",
         title: "{title}",
         unknownError: "Eroare necunoscută",
-        unserializableError: "eroare inoperabilă"
+        unserializableError: "eroare inoperabilă",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} din {pages}",
+        in: "în ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

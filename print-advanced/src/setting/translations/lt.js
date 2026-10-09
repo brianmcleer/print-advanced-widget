@@ -257,12 +257,12 @@ System.register([], function (e) {
         customFontHint: "Pridėti kuo daugiau šriftų, kaip jums patinka - kiekvienas pasirodo valdikliui šrifto meniu. Įkeltas URL eksporto metu - nieko nėra įterptas į valdikliui. Turi būti statinis TSF (ne WOFF / WOFF2 / OPF, ne \"Google\" šriftai CSS nuoroda). Nuo github.com / Google / šriftai naudoti Žaliavos URL .ttf - renkasi failus pagal statinį / aplanką; kai kurie variable- šriftas TTFs nebus įdėti PDF. GitHub puslapis URL konvertuojami į neapdorotus automatiškai. Miesto interneto serveris su CORS antrašte taip pat veikia (pvz., licencijuota Tahoma TTF). PDF ir paveikslėlių formatai pridėjo tikrus glifus; SVG nurodo šriftą tik pavadinimu.",
         allowAdvancedHint: "Išjungtas: vartotojai pasirinkti tik išdėstymą, įveskite pavadinimą, žiūrėti puslapio peržiūrą ir eksportuoti (greitai spausdinti). Dėl: žlugo Išplėstinė parinktys skyriuje prideda Spausdinti srityje, Žemėlapis serija, Žemėlapyje, Puslapis tekstas, Stilius ir Išėjimo kortelės.",
         logoSection: "Numatytas logotipas",
-        logoSourceLabel: "Logo source",
-        logoEmbedded: "Embed image (default)",
-        logoLinked: "Link to image URL",
-        logoSourceHint: "Used by picture elements without their own image. Switching sources clears the previous image or link.",
-        logoUrlLabel: "Logo image URL",
-        logoUrlHint: "Use an HTTP(S) or app-relative image URL. Only the link is saved; the image is loaded when exporting, not in the live preview. External servers must allow CORS. Unavailable images use the layout picture placeholder.",
+        logoSourceLabel: "Logotipas",
+        logoEmbedded: "Įdėtas atvaizdis (numatytasis)",
+        logoLinked: "Nuoroda į paveikslėlio URL",
+        logoSourceHint: "Naudojamas vaizdo elementų be savo paveikslėlio. Perjungiant šaltinius išvalomas ankstesnis vaizdas ar nuoroda.",
+        logoUrlLabel: "Logo atvaizdžio URL",
+        logoUrlHint: "Naudokite HTTP (S) arba app-relative vaizdo URL. Tik nuoroda yra išsaugota; vaizdas yra įkeltas eksportuojant, o ne tiesiogiai peržiūrėti. Išoriniai serveriai turi leisti CORS. Neprieinami paveikslėliai naudoti išdėstymo paveikslėlį laikiklis.",
         logoHint: "Įkeltas vieną kartą ir saugomi valdikliui - naudojamas bet vaizdo elemento, kuris neturi savo vaizdą, per visus maketus. Nepriklausomai nuo .pagx failų kelius.",
         logoLabel: "Valdiklio logotipas",
         whiteBg: "Baltas fonas",
@@ -336,7 +336,8 @@ System.register([], function (e) {
         _18PtLargeFormats: "18 pt (dideli formatai)",
         _24PtLargeFormats: "24 pt (dideli formatai)",
         layout: "{layout}",
-        bold: "+ paryškintas"
+        bold: "+ paryškintas",
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
       })
     }
   }

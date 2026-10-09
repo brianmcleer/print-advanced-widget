@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (צילום)",
         title: "{title}",
         unknownError: "טעות לא ידועה",
-        unserializableError: "טעות בלתי אפשרית"
+        unserializableError: "טעות בלתי אפשרית",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} מתוך {pages}",
+        in: "ב)",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

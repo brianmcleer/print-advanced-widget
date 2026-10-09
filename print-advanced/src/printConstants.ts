@@ -14,57 +14,57 @@ import { __t } from './runtime/i18n-t'
 export type OutputFormat = 'pdf' | 'png32' | 'png8' | 'jpg' | 'gif' | 'eps' | 'svg' | 'svgz' | 'aix' | 'tiff'
 
 export const FORMAT_LABELS: Array<{ value: OutputFormat, label: string, disabled?: boolean }> = [
-    { value: 'pdf', label: __t("portableDocumentFormatPdf") },
-    { value: 'png32', label: __t("_32BitPortableNetworkGraphicsPng32") },
-    { value: 'png8', label: __t("_8BitPortableNetworkGraphicsPng8") },
-    { value: 'jpg', label: __t("jointPhotographicExpertsGroupJpg") },
-    { value: 'gif', label: __t("graphicsInterchangeFormatGif") },
-    { value: 'eps', label: __t("encapsulatedPostScriptEps") },
-    { value: 'svg', label: __t("scalableVectorGraphicsSvg") },
-    { value: 'svgz', label: __t("compressedScalableVectorGraphicsSvgz") },
-    { value: 'aix', label: __t("adobeIllustratorExchangeAix"), disabled: true },
-    { value: 'tiff', label: __t("tagImageFileFormatTiff") }
+    { value: 'pdf', get label () { return __t("portableDocumentFormatPdf") } },
+    { value: 'png32', get label () { return __t("_32BitPortableNetworkGraphicsPng32") } },
+    { value: 'png8', get label () { return __t("_8BitPortableNetworkGraphicsPng8") } },
+    { value: 'jpg', get label () { return __t("jointPhotographicExpertsGroupJpg") } },
+    { value: 'gif', get label () { return __t("graphicsInterchangeFormatGif") } },
+    { value: 'eps', get label () { return __t("encapsulatedPostScriptEps") } },
+    { value: 'svg', get label () { return __t("scalableVectorGraphicsSvg") } },
+    { value: 'svgz', get label () { return __t("compressedScalableVectorGraphicsSvgz") } },
+    { value: 'aix', get label () { return __t("adobeIllustratorExchangeAix") }, disabled: true },
+    { value: 'tiff', get label () { return __t("tagImageFileFormatTiff") } }
 ]
 
 export const FONT_FAMILIES: Array<{ value: FontFamily, label: string }> = [
-    { value: 'sans', label: __t("sansSerifHelveticaArial") },
-    { value: 'serif', label: __t("serifTimes") },
-    { value: 'mono', label: __t("monospaceCourier") }
+    { value: 'sans', get label () { return __t("sansSerifHelveticaArial") } },
+    { value: 'serif', get label () { return __t("serifTimes") } },
+    { value: 'mono', get label () { return __t("monospaceCourier") } }
 ]
 
 export const NORTH_ARROW_STYLES: Array<{ value: NorthArrowStyle, label: string }> = [
-    { value: 'splitArrow', label: __t("splitArrow") },
-    { value: 'solidTriangle', label: __t("solidTriangle") },
-    { value: 'outlineArrow', label: __t("outlineTriangle") },
-    { value: 'needle', label: __t("needle") },
-    { value: 'simpleArrow', label: __t("simpleArrow") },
-    { value: 'chevron', label: __t("chevron") },
-    { value: 'meridian', label: __t("meridian") },
-    { value: 'compassStar', label: __t("compassStar") },
-    { value: 'compassRose', label: __t("compassRose") },
-    { value: 'starburst', label: __t("starburst") },
-    { value: 'circledArrow', label: __t("circledArrow") },
-    { value: 'filledCircleArrow', label: __t("filledCircle") }
+    { value: 'splitArrow', get label () { return __t("splitArrow") } },
+    { value: 'solidTriangle', get label () { return __t("solidTriangle") } },
+    { value: 'outlineArrow', get label () { return __t("outlineTriangle") } },
+    { value: 'needle', get label () { return __t("needle") } },
+    { value: 'simpleArrow', get label () { return __t("simpleArrow") } },
+    { value: 'chevron', get label () { return __t("chevron") } },
+    { value: 'meridian', get label () { return __t("meridian") } },
+    { value: 'compassStar', get label () { return __t("compassStar") } },
+    { value: 'compassRose', get label () { return __t("compassRose") } },
+    { value: 'starburst', get label () { return __t("starburst") } },
+    { value: 'circledArrow', get label () { return __t("circledArrow") } },
+    { value: 'filledCircleArrow', get label () { return __t("filledCircle") } }
 ]
 
 export const SCALE_BAR_STYLES: Array<{ value: ScaleBarStyle, label: string }> = [
-    { value: 'alternating', label: __t("alternating") },
-    { value: 'alternating2', label: __t("alternatingTicked") },
-    { value: 'doubleAlternating', label: __t("doubleAlternating") },
-    { value: 'hollow', label: __t("hollow") },
-    { value: 'hollowDouble', label: __t("doubleHollow") },
-    { value: 'singleDivision', label: __t("singleDivision") },
-    { value: 'line', label: __t("line") },
-    { value: 'line2', label: __t("lineLabelsBelow") },
-    { value: 'scaleLine', label: __t("scaleLine") },
-    { value: 'scaleLine2', label: __t("scaleLineCenter") },
-    { value: 'steppedLine', label: __t("steppedLine") },
-    { value: 'steppedFilled', label: __t("steppedFilled") }
+    { value: 'alternating', get label () { return __t("alternating") } },
+    { value: 'alternating2', get label () { return __t("alternatingTicked") } },
+    { value: 'doubleAlternating', get label () { return __t("doubleAlternating") } },
+    { value: 'hollow', get label () { return __t("hollow") } },
+    { value: 'hollowDouble', get label () { return __t("doubleHollow") } },
+    { value: 'singleDivision', get label () { return __t("singleDivision") } },
+    { value: 'line', get label () { return __t("line") } },
+    { value: 'line2', get label () { return __t("lineLabelsBelow") } },
+    { value: 'scaleLine', get label () { return __t("scaleLine") } },
+    { value: 'scaleLine2', get label () { return __t("scaleLineCenter") } },
+    { value: 'steppedLine', get label () { return __t("steppedLine") } },
+    { value: 'steppedFilled', get label () { return __t("steppedFilled") } }
 ]
 
 export const SCALE_BAR_UNITS: Array<{ value: ScaleBarUnits, label: string }> = [
-    { value: 'feet', label: __t("feet") },
-    { value: 'miles', label: __t("miles") },
-    { value: 'meters', label: __t("meters") },
-    { value: 'kilometers', label: __t("kilometers") }
+    { value: 'feet', get label () { return __t("feet") } },
+    { value: 'miles', get label () { return __t("miles") } },
+    { value: 'meters', get label () { return __t("meters") } },
+    { value: 'kilometers', get label () { return __t("kilometers") } }
 ]

@@ -332,5 +332,6 @@ export default {
     _18PtLargeFormats: '18 pt (large formats)',
     _24PtLargeFormats: '24 pt (large formats)',
     layout: '{layout}',
-    bold: '+ bold'
+    bold: '+ bold',
+    printAdvancedConfigVersion1: 'PrintAdvancedConfig version="1" ...>'
 }

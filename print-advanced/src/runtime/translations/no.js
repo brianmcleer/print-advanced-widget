@@ -415,7 +415,14 @@ System.register([], function (e) {
         _96Draft: "96 (kraft)",
         title: "{title}",
         unknownError: "ukjent feil",
-        unserializableError: "uiserbar feil"
+        unserializableError: "uiserbar feil",
+        continued: "(continued)",
+        pageName: "{pageName}",
+        pageOfPages: "{page} av {pages}",
+        in: "i ·",
+        dpi: "DPI ·",
+        keepsMapZoomLevel: "keeps map zoom level",
+        printsWhatYouSee: "prints what you see"
       })
     }
   }

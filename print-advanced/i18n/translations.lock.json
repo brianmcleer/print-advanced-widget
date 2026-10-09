@@ -3,8 +3,8 @@
   "generator": "exb-i18n-kit",
   "parts": {
     "runtime": {
-      "en": "cb32f5a54cd7",
-      "keys": 413,
+      "en": "f7fc6ed0d183",
+      "keys": 420,
       "hashes": {
         "_widgetLabel": "ae045c2fd9d4",
         "selectMapHint": "b434e85f7c4e",
@@ -418,20 +418,27 @@
         "_96Draft": "5b078ebeecb0",
         "title": "e40b3d8828fe",
         "unknownError": "af6321ca7a8b",
-        "unserializableError": "76e73551597a"
+        "unserializableError": "76e73551597a",
+        "continued": "6f89b090d5bb",
+        "pageName": "3369155d63a5",
+        "pageOfPages": "cbb802e12cf5",
+        "in": "1571e1d5ed6d",
+        "dpi": "9588acd90d49",
+        "keepsMapZoomLevel": "ff8dd308cc25",
+        "printsWhatYouSee": "9be732d7c1f5"
       },
       "locales": {
         "ar": {
-          "file": "0b08fd3b9e3a",
+          "file": "2f6dbe0eee35",
           "counts": {
-            "esri": 72,
+            "esri": 75,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -2124,29 +2131,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "خطأ مجهول",
+            "in": {
+              "t": "::",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "خطأ غير معقول",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "bg": {
-          "file": "5a49a3bd9d0c",
+          "file": "bd7bc512e4dd",
           "counts": {
-            "esri": 71,
+            "esri": 74,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -3829,43 +3831,38 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "неизвестна грешка",
+            "in": {
+              "t": "в ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "несериозна грешка",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "bs": {
-          "file": "800d09e069e2",
+          "file": "32679aec7cac",
           "counts": {
-            "esri": 65,
+            "esri": 66,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
             "machine": 0,
             "stale": 0,
-            "missing": 348
+            "missing": 354
           },
           "entries": {}
         },
         "ca": {
-          "file": "5362f30cce76",
+          "file": "fae70f116436",
           "counts": {
-            "esri": 71,
+            "esri": 74,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 341,
+            "machine": 340,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -5563,29 +5560,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "error desconegut",
+            "in": {
+              "t": "in",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "Error no llegible",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "cs": {
-          "file": "089fd4533ac8",
+          "file": "086d883d7589",
           "counts": {
-            "esri": 72,
+            "esri": 75,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -7278,29 +7270,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "neznámá chyba",
+            "in": {
+              "t": "v ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "neserializovatelná chyba",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "da": {
-          "file": "93b2b4d4354b",
+          "file": "4b81e460f282",
           "counts": {
-            "esri": 68,
-            "esri-check": 2,
+            "esri": 70,
+            "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 343,
+            "machine": 342,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -9008,29 +8995,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "ukendt fejl",
+            "in": {
+              "t": "I ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "userialiserbar fejl",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "de": {
-          "file": "5dcc0e5da8f6",
+          "file": "f718c1a6be00",
           "counts": {
-            "esri": 67,
+            "esri": 70,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 342,
+            "machine": 341,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -10733,29 +10715,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "Unbekannter Fehler",
+            "in": {
+              "t": "in ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "nichtialisierbarer Fehler",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "el": {
-          "file": "39b1590a5bad",
+          "file": "0f8e4a46867b",
           "counts": {
-            "esri": 71,
+            "esri": 74,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -12438,29 +12415,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "άγνωστο σφάλμα",
+            "in": {
+              "t": "στο ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "σφάλμα μη ανιχνεύσιμο",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "es": {
-          "file": "4ff8d1e0903b",
+          "file": "e142c498dbcf",
           "counts": {
-            "esri": 70,
+            "esri": 73,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -14143,29 +14115,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "error desconocido",
+            "in": {
+              "t": "en",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "error unserializable",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "et": {
-          "file": "d2cbd285e60b",
+          "file": "afd96ca912ca",
           "counts": {
-            "esri": 67,
-            "esri-check": 7,
+            "esri": 69,
+            "esri-check": 8,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 338,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -15853,29 +15820,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "tundmatu viga",
+            "in": {
+              "t": "·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "seeriaviisiline viga",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "fi": {
-          "file": "6f73f3cf28cd",
+          "file": "7a225cdf703d",
           "counts": {
-            "esri": 75,
+            "esri": 78,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -17558,29 +17520,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "tuntematon virhe",
+            "in": {
+              "t": "·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "epätavallinen virhe",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "fr": {
-          "file": "82ad398acf07",
+          "file": "bd23e27acbdf",
           "counts": {
-            "esri": 69,
+            "esri": 72,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 342,
+            "machine": 341,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -19283,29 +19240,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "erreur inconnue",
+            "in": {
+              "t": "en ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "Erreur non sérialisable",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "he": {
-          "file": "c5eea7e76f16",
+          "file": "d959087ed547",
           "counts": {
-            "esri": 69,
+            "esri": 72,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -20998,43 +20950,38 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "טעות לא ידועה",
+            "in": {
+              "t": "ב)",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "טעות בלתי אפשרית",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "hr": {
-          "file": "800d09e069e2",
+          "file": "32679aec7cac",
           "counts": {
-            "esri": 65,
+            "esri": 66,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
             "machine": 0,
             "stale": 0,
-            "missing": 348
+            "missing": 354
           },
           "entries": {}
         },
         "hu": {
-          "file": "3ec74c6bc19e",
+          "file": "368a6fb4fc3e",
           "counts": {
-            "esri": 75,
+            "esri": 78,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -22717,29 +22664,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "ismeretlen hiba",
+            "in": {
+              "t": "·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "nem sorozható hiba",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "id": {
-          "file": "ce686ad79a79",
+          "file": "3f9047740bf2",
           "counts": {
-            "esri": 67,
+            "esri": 70,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 344,
+            "machine": 343,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -24452,29 +24394,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "galat tak dikenal",
+            "in": {
+              "t": "di",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "kesalahan tidak serialisasi",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "it": {
-          "file": "d0663b71d5d3",
+          "file": "1e9e244b2c7b",
           "counts": {
-            "esri": 67,
+            "esri": 70,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 342,
+            "machine": 341,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -26177,29 +26114,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "errore sconosciuto",
+            "in": {
+              "t": "in ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "errore non serializzabile",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "ja": {
-          "file": "2b70f727afdc",
+          "file": "5cac2161fdb9",
           "counts": {
-            "esri": 70,
+            "esri": 73,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -27892,29 +27824,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "未知のエラー",
+            "in": {
+              "t": "お問い合わせ",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "unserializable エラー",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "ko": {
-          "file": "d05c295d7144",
+          "file": "1d44668db6c8",
           "counts": {
-            "esri": 72,
-            "esri-check": 1,
+            "esri": 74,
+            "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -29607,29 +29534,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "알 수없는 오류",
+            "in": {
+              "t": "·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "unserializable 오류",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "lt": {
-          "file": "60183a760b9b",
+          "file": "350c6a7ea2a0",
           "counts": {
-            "esri": 73,
+            "esri": 76,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -31312,29 +31234,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "nežinoma klaida",
+            "in": {
+              "t": "in",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "nenustatoma klaida",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "lv": {
-          "file": "02da654f11b5",
+          "file": "ac2aa53f2178",
           "counts": {
-            "esri": 73,
+            "esri": 76,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -33017,29 +32934,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "nezināma kļūda",
+            "in": {
+              "t": "·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "nepārspējama kļūda",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "no": {
-          "file": "da30b25a49c1",
+          "file": "9dfc7e4acda5",
           "counts": {
-            "esri": 72,
+            "esri": 75,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -34732,29 +34644,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "ukjent feil",
+            "in": {
+              "t": "i ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "uiserbar feil",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "nl": {
-          "file": "84aa39eb01d3",
+          "file": "ef94ec143341",
           "counts": {
-            "esri": 70,
+            "esri": 73,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 341,
+            "machine": 340,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -36452,29 +36359,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "onbekende fout",
+            "in": {
+              "t": "in ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "onuitwisbare fout",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "pl": {
-          "file": "67a17dd8e0b2",
+          "file": "112fbc635a9d",
           "counts": {
-            "esri": 69,
+            "esri": 72,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 338,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -38162,29 +38064,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "nieznany błąd",
+            "in": {
+              "t": "w ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "błąd niezserializowalny",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "pt-br": {
-          "file": "f11154084f79",
+          "file": "f86b928456c7",
           "counts": {
-            "esri": 69,
+            "esri": 72,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 338,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -39872,29 +39769,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "Erro desconhecido",
+            "in": {
+              "t": "Em ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "Erro inserializável.",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "pt-pt": {
-          "file": "da277f13345f",
+          "file": "7700a6c51b5b",
           "counts": {
-            "esri": 73,
+            "esri": 76,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 338,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -41582,29 +41474,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "erro desconhecido",
+            "in": {
+              "t": "em ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "erro inserializável",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "ro": {
-          "file": "16804337b3f0",
+          "file": "a0ae9f4463f6",
           "counts": {
-            "esri": 69,
+            "esri": 72,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 342,
+            "machine": 341,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -43307,29 +43194,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "Eroare necunoscută",
+            "in": {
+              "t": "în ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "eroare inoperabilă",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "ru": {
-          "file": "94d6d638f446",
+          "file": "949d72030742",
           "counts": {
-            "esri": 70,
+            "esri": 73,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -45012,29 +44894,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "Неизвестная ошибка",
+            "in": {
+              "t": "в ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "несериализируемая ошибка",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "sk": {
-          "file": "3223953fb7b8",
+          "file": "a45ead365bcf",
           "counts": {
-            "esri": 71,
+            "esri": 74,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 341,
+            "machine": 340,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -46732,29 +46609,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "neznáma chyba",
+            "in": {
+              "t": "v ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "neserializovateľná chyba",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "sl": {
-          "file": "56ecee5b712d",
+          "file": "d9cf2ebd365c",
           "counts": {
-            "esri": 72,
+            "esri": 75,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -48447,43 +48319,38 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "neznana napaka",
+            "in": {
+              "t": "v ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "Neizvedljiva napaka",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "sr": {
-          "file": "0b36fe948767",
+          "file": "76cb02476765",
           "counts": {
-            "esri": 64,
+            "esri": 65,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
             "machine": 0,
             "stale": 0,
-            "missing": 348
+            "missing": 354
           },
           "entries": {}
         },
         "sv": {
-          "file": "5e24ba7ebb1d",
+          "file": "b7c06df9dc38",
           "counts": {
-            "esri": 70,
+            "esri": 73,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 343,
+            "machine": 342,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -50191,29 +50058,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "Okänd fel",
+            "in": {
+              "t": "I ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "oserialiserbart fel",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "th": {
-          "file": "5cd831655ec6",
+          "file": "dff948f16ea3",
           "counts": {
-            "esri": 72,
+            "esri": 75,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -51896,29 +51758,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "ข้อผิดพลาดไม่ทราบสาเหตุ",
+            "in": {
+              "t": "ใน พ.ศ.",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "ข้อผิดพลาดที่ไม่สามารถตรวจสอบได้",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "tr": {
-          "file": "ddc7b5342b48",
+          "file": "61cc0d47d9e6",
           "counts": {
-            "esri": 70,
+            "esri": 73,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -53611,29 +53468,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "Bilinmeyen hata",
+            "in": {
+              "t": "·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "Başarısız olmayan hata",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "zh-cn": {
-          "file": "6e33e1659f86",
+          "file": "5bfd0f6be849",
           "counts": {
-            "esri": 68,
+            "esri": 71,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 341,
+            "machine": 340,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -55331,29 +55183,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "未知错误",
+            "in": {
+              "t": "* 妇女",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "无序错误",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "uk": {
-          "file": "d3180538f919",
+          "file": "6972831c9e87",
           "counts": {
-            "esri": 75,
+            "esri": 78,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -57036,29 +56883,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "Невідома помилка",
+            "in": {
+              "t": "в ·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "несеріалізована помилка",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "vi": {
-          "file": "76544aa2e2a9",
+          "file": "00dc4bd2e4ac",
           "counts": {
-            "esri": 73,
+            "esri": 76,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 337,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -58741,29 +58583,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "lỗi không rõ",
+            "in": {
+              "t": "in·",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "Lỗi không thể gửi đi được",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "zh-hk": {
-          "file": "7f60bb93e8f1",
+          "file": "cbf0d989656c",
           "counts": {
-            "esri": 73,
+            "esri": 76,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -60456,29 +60293,24 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "未知的錯誤",
+            "in": {
+              "t": "中",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "不串連的錯誤",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         },
         "zh-tw": {
-          "file": "7f60bb93e8f1",
+          "file": "cbf0d989656c",
           "counts": {
-            "esri": 73,
+            "esri": 76,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 339,
             "stale": 0,
-            "missing": 0
+            "missing": 5
           },
           "entries": {
             "_widgetLabel": {
@@ -62171,23 +62003,18 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
-            "unknownError": {
-              "t": "未知的錯誤",
+            "in": {
+              "t": "中",
               "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "不串連的錯誤",
-              "src": "machine",
-              "h": "76e73551597a"
+              "h": "1571e1d5ed6d"
             }
           }
         }
       }
     },
     "setting": {
-      "en": "e6d36ed79fa3",
-      "keys": 334,
+      "en": "e6dba792f3ce",
+      "keys": 335,
       "hashes": {
         "_widgetLabel": "ae045c2fd9d4",
         "mapSection": "ab478f3efc84",
@@ -62522,20 +62349,21 @@
         "_18PtLargeFormats": "2223f16b7922",
         "_24PtLargeFormats": "5e382381f93c",
         "layout": "33375e48fb94",
-        "bold": "2c890c44a0f4"
+        "bold": "2c890c44a0f4",
+        "printAdvancedConfigVersion1": "6ad3d89cde42"
       },
       "locales": {
         "ar": {
-          "file": "24583b16a2ef",
+          "file": "2986f02e934a",
           "counts": {
             "esri": 62,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -63558,6 +63386,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "المصدر",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "صورة مزروعة (قصير)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link to image URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "تستخدمها عناصر الصور بدون صورتها الخاصة وتوضح مصادر التبديل الصورة أو الصلة السابقة.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "صورة لوغو",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Use an HTTP(S) or app-relative image URL. ولا يُحفظ سوى الرابط؛ وتُحمَّل الصورة عند التصدير، وليس في الاستعراض المباشر. يجب على الخواديم الخارجية أن تسمح لـ ( CORS). الصور غير المتوفره تُستخدم مُحلّل الصور المُستبدلة",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "تم تحميلها مرة واحدة وخزنت في المستنقعات تستخدم من قبل أي عنصر صورة ليس لديه صورة خاصة به مستقلة عن مسارات الملف",
               "src": "machine",
@@ -63866,16 +63724,16 @@
           }
         },
         "bg": {
-          "file": "b464dcdc9c2d",
+          "file": "7c956b5c9182",
           "counts": {
             "esri": 60,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -64898,6 +64756,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Източник на лого",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Вграждане на изображение (по подразбиране)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Връзка към адрес на изображението",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Използва се от елементи без собствен образ. Превключването на източниците изчиства предишното изображение или линк.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Адрес на изображението на логото",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Използвайте HTTP(S) или приложение-относително изображение URL. Само линка се записва; изображението се зарежда при износ, а не при преглед на живо. Външните сървъри трябва да позволяват на CORS. Недостъпни изображения използват placeholder оформлението картина.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Качва се веднъж и се съхранява в джаджата - използва се от всеки елемент на картина, който няма собствено изображение, във всички макети. Независимо от .pagx файл пътеки.",
               "src": "machine",
@@ -65206,7 +65094,7 @@
           }
         },
         "bs": {
-          "file": "33f156688eff",
+          "file": "7103b3e3a61c",
           "counts": {
             "esri": 59,
             "esri-check": 0,
@@ -65215,21 +65103,21 @@
             "existing": 0,
             "machine": 0,
             "stale": 0,
-            "missing": 275
+            "missing": 276
           },
           "entries": {}
         },
         "ca": {
-          "file": "1e4d0e610118",
+          "file": "da43bfcfd31b",
           "counts": {
             "esri": 60,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 267,
+            "machine": 273,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -66262,6 +66150,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Font del Logotip",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Imatge embada (per omissió)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Enllaç a l' URL d' imatge",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Utilitzat per elements de la imatge sense la seva pròpia imatge. El canvi de fonts neteja la imatge o l' enllaç previ.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL de la imatge del Logotip",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Usa un URL d' imatge HTTP(S) o conforme amb l' aplicació. Només es desa l' enllaç; la imatge es carrega quan s' exporta, no en la vista prèvia en directe. Els servidors externs han de permetre CORS. Les imatges no disponibles usen el marcador de posició de la imatge de format.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Carregat una vegada i desat a l' estri - usat per qualsevol element de la imatge que no tingui la seva pròpia imatge, a través de tots els formats. independent dels camins dels fitxers.pagx.",
               "src": "machine",
@@ -66570,16 +66488,16 @@
           }
         },
         "cs": {
-          "file": "792a124b9865",
+          "file": "5c1b554dc018",
           "counts": {
             "esri": 58,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 266,
+            "machine": 272,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -67607,6 +67525,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Zdroj logo",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Vložený obrázek (přednastaveno)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Odkaz na URL obrázku",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Používané obrazovými prvky bez jejich vlastního obrazu. Přepínací zdroje vymažou předchozí obrázek nebo odkaz.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Name",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Použijte HTTP (S) nebo app- relative image URL. Pouze odkaz je uložen; obrázek se nahrává při exportu, ne v živé ukázce. Externí servery musí umožňovat CORS. Nedostupné obrázky používají držák na rozvržení obrazu.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Uploaden jednou a uložen v widget - používá jakýkoli prvek obrazu, který nemá vlastní obraz, přes všechny rozložení. Nezávislé na stezkách souborů .pagx.",
               "src": "machine",
@@ -67915,16 +67863,16 @@
           }
         },
         "da": {
-          "file": "a4f4a8afc17e",
+          "file": "8fe9c931c7c2",
           "counts": {
             "esri": 54,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 277,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -68972,6 +68920,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logokilde",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Indlejret billede (standard)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link til billed- URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Bruges af billedelementer uden eget billede. Skift kilder rydder det tidligere billede eller link.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logo- billed- URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Brug en HTTP (S) eller app- relativ billedURL. Kun linket gemmes; billedet indlæses ved eksport, ikke i den levende forhåndsvisning. Eksterne servere skal tillade CORS. Utilgængelige billeder bruger layout billede pladsholder.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Uploadet én gang og gemt i widget - bruges af ethvert billede element, der ikke har noget billede af sin egen, på tværs af alle layouts. Uafhængigt af .pagx fil stier.",
               "src": "machine",
@@ -69285,16 +69263,16 @@
           }
         },
         "de": {
-          "file": "8f7aa0d2b69f",
+          "file": "016598e8dae5",
           "counts": {
             "esri": 56,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 277,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -70342,6 +70320,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logoquelle",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Einbettungsbild (Standard)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link zum Bild URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Wird von Bildelementen ohne eigenes Bild verwendet. Der Wechsel der Quellen löscht das vorherige Bild oder den vorherigen Link.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logobild URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Verwenden Sie eine HTTP(S)- oder App-relative Image URL. Nur der Link wird gespeichert; das Bild wird beim Export geladen, nicht in der Live-Vorschau. Externe Server müssen CORS zulassen. Nicht verfügbare Bilder verwenden den Layoutbildplatzhalter.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Einmal hochgeladen und im Widget gespeichert - wird von jedem Bildelement verwendet, das über alle Layouts hinweg kein eigenes Bild hat. Unabhängig von den .pagx Dateipfaden.",
               "src": "machine",
@@ -70655,16 +70663,16 @@
           }
         },
         "el": {
-          "file": "9de3152f8d1f",
+          "file": "67daf1af90a5",
           "counts": {
             "esri": 56,
             "esri-check": 7,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -71687,6 +71695,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Πηγή λογότυπου",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Ενσωματωμένη εικόνα (προκαθορισμένη)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Σύνδεση με το URL της εικόνας",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Χρησιμοποιείται από στοιχεία εικόνας χωρίς τη δική τους εικόνα. Η αλλαγή πηγών καθαρίζει την προηγούμενη εικόνα ή σύνδεση.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL εικόνας λογότυπου",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Χρησιμοποιήστε ένα URL εικόνας HTTP(S) ή app-relative. Μόνο ο σύνδεσμος αποθηκεύεται: η εικόνα φορτώνεται κατά την εξαγωγή, όχι στη ζωντανή προεπισκόπηση. Οι εξωτερικοί εξυπηρετητές πρέπει να επιτρέπουν CORS. Μη διαθέσιμες εικόνες χρησιμοποιούν το χώρο της εικόνας διάταξης.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Αναρτήθηκε μία φορά και αποθηκεύτηκε στο widget - χρησιμοποιείται από οποιοδήποτε στοιχείο εικόνας που δεν έχει δική του εικόνα, σε όλες τις διατάξεις. Ανεξάρτητα από τις διαδρομές αρχείων .pagx.",
               "src": "machine",
@@ -71995,16 +72033,16 @@
           }
         },
         "es": {
-          "file": "6c2110e4f972",
+          "file": "1010ac20b317",
           "counts": {
             "esri": 54,
             "esri-check": 9,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -73027,6 +73065,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Fuente de logotipo",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Imagen en relieve (por defecto)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Enlace a la URL de la imagen",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Utilizado por elementos de imagen sin su propia imagen. Las fuentes de cambio aclaran la imagen o el enlace anterior.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Imagen de logotipo URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Usar una URL de imagen relacionada con HTTP(S). Sólo el enlace se guarda; la imagen se carga cuando se exporta, no en la vista previa en vivo. Los servidores externos deben permitir CORS. Las imágenes indisponibles utilizan el marcador de posición de diseño.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Subido una vez y almacenado en el widget - utilizado por cualquier elemento de imagen que no tiene imagen propia, a través de todos los diseños. Independiente de las vías de archivo .pagx.",
               "src": "machine",
@@ -73335,16 +73403,16 @@
           }
         },
         "et": {
-          "file": "1d6cdd4b4833",
+          "file": "a66b9a5ffead",
           "counts": {
             "esri": 61,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 266,
+            "machine": 272,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -74372,6 +74440,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logoallikas",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Põimitud pilt (vaikimisi)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link pildi URL-ile",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Kasutatakse pildielementide poolt ilma oma pildita. Lähteallikate vahetamine puhastab eelmise pildi või lingi.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logopildi URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Kasuta HTTP (S) või rakenduse-suhtelise pildi URL-i. Salvestatakse ainult link; pilt laaditakse eksportimisel, mitte elavas eelvaatluses. Välised serverid peavad lubama CORS-i. Mittekättesaadavad pildid kasutavad paigutuspildi kohahoidjat.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Üleslaaditud üks kord ja salvestatud vidinasse - seda kasutavad kõik pildielemendid, millel pole oma pilti, kõigis paigutustes. Sõltumata .pagx faili asukohtadest.",
               "src": "machine",
@@ -74680,16 +74778,16 @@
           }
         },
         "fi": {
-          "file": "c150059664cd",
+          "file": "bdc9d43b2ba6",
           "counts": {
             "esri": 63,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -75712,6 +75810,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logolähde",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Upota kuva (oletus)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Linkki kuvan URL-osoitteeseen",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Käytetään kuvaelementit ilman omaa kuvaa. Lähteen vaihtaminen tyhjentää edellisen kuvan tai linkin.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logokuvan URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Käytä HTTP(S) tai sovelluksen suhteellinen kuva URL. Vain linkki tallennetaan; kuva on ladattu viennin aikana, ei suorana esikatseluna. Ulkoisten palvelimien on sallittava CORS. Ei saatavilla kuvia käyttää layout kuvan paikkaholkin.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Ladattu kerran ja tallennettu widget - käyttää kaikki kuva elementti, joka ei ole kuva omasta, kaikki asettelut. Riippuen .pagx tiedostopolkuja.",
               "src": "machine",
@@ -76020,16 +76148,16 @@
           }
         },
         "fr": {
-          "file": "f2e95aee060f",
+          "file": "6dc190f7242b",
           "counts": {
             "esri": 55,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 272,
+            "machine": 278,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -77077,6 +77205,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Source du logo",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Image intégrée (par défaut)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Lien vers l'URL de l'image",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Utilisé par des éléments d'image sans leur propre image. Changer de source efface l'image ou le lien précédent.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL de l'image du logo",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Utilisez une URL d'image HTTP(S) ou app-relative. Seul le lien est enregistré ; l'image est chargée lors de l'exportation, pas dans l'aperçu en direct. Les serveurs externes doivent permettre CORS. Les images non disponibles utilisent le support de mise en page de l'image.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Téléchargé une fois et stocké dans le widget - utilisé par tout élément d'image qui n'a pas d'image propre, sur toutes les mises en page. Indépendamment des chemins de fichiers .pagx.",
               "src": "machine",
@@ -77395,16 +77553,16 @@
           }
         },
         "he": {
-          "file": "3fbbb8ccac56",
+          "file": "c6a21440535c",
           "counts": {
             "esri": 62,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -78427,6 +78585,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "מקור",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "תמונה (default)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "קישור לתמונה URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "בשימוש על ידי אלמנטים תמונה ללא תמונה משלהם. העברת מקורות מנקה את התמונה הקודמת או הקישור.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "צילום: URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "השתמש בכתובת HTTP(S) או App-relative Image URL. רק הקישור נשמר; התמונה עמוסה בעת הייצוא, לא בתצוגה מקדימה חיה. שרתים חיצוניים חייבים לאפשר ל-CorS. תמונות בלתי זמינות משתמשות באיש התמונה של הפריסה.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "שופץ פעם ומאוחסנים ב widget - בשימוש על ידי כל אלמנט תמונה שאין לו תמונה משלה, על פני כל הפריסה. עצמאי של מסלולי קובץ .pagx.",
               "src": "machine",
@@ -78735,7 +78923,7 @@
           }
         },
         "hr": {
-          "file": "33f156688eff",
+          "file": "7103b3e3a61c",
           "counts": {
             "esri": 59,
             "esri-check": 0,
@@ -78744,21 +78932,21 @@
             "existing": 0,
             "machine": 0,
             "stale": 0,
-            "missing": 275
+            "missing": 276
           },
           "entries": {}
         },
         "hu": {
-          "file": "3573153658ad",
+          "file": "c0a1400e5333",
           "counts": {
             "esri": 63,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -79781,6 +79969,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logóforrás",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Beágyazott kép (alapértelmezés)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Kapcsolat a kép URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Képelemek használják saját képük nélkül. A váltási források törlik az előző képet vagy linket.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logókép URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "HTTP (S) vagy app- relative képURL. Csak a link menthető meg; a kép az exportáláskor van betöltve, nem pedig az élő előnézetben. A külső szervereknek lehetővé kell tenniük a CORS használatát. A nem elérhető képek az elrendezés képtábláját használják.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Egyszer feltöltve, a widget-ben tárolva - minden olyan képelem használja, amely nem rendelkezik saját képpel, minden elrendezésben. Függetlenül a .pagx fájloktól.",
               "src": "machine",
@@ -80089,16 +80307,16 @@
           }
         },
         "id": {
-          "file": "d2c5259763e9",
+          "file": "48368bd3c8db",
           "counts": {
             "esri": 58,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 268,
+            "machine": 274,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -81136,6 +81354,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Sumber Logo",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Tempelkan gambar (baku)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Taut ke URL gambar",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Digunakan oleh elemen gambar tanpa citra mereka sendiri. Mengganti sumber membersihkan gambar atau tautan sebelumnya.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL gambar Logo",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Gunakan sebuah URL image HTTP (S) atau app-relatif. Hanya taut yang disimpan; image dimuat ketika mengekspor, bukan dalam pratinjau langsung. Server eksternal harus mengijinkan CORS. Gambar tidak tersedia menggunakan placeholder tata letak.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Diunggah sekali dan disimpan dalam widget - digunakan oleh setiap elemen gambar yang tidak memiliki gambar sendiri, di semua layout. Independen dari jalur berkas .paux.",
               "src": "machine",
@@ -81444,16 +81692,16 @@
           }
         },
         "it": {
-          "file": "5b4e5bb62359",
+          "file": "bd8d8c37d9a3",
           "counts": {
             "esri": 54,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 269,
+            "machine": 275,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -82491,6 +82739,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Fonte del logo",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Immagine incorporata (default)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link all'URL dell'immagine",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Utilizzato da elementi fotografici senza la propria immagine. Le fonti di commutazione cancellano l'immagine precedente o il link.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logo immagine URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Utilizzare un HTTP(S) o un URL di immagine relativo all'app. Solo il link viene salvato; l'immagine viene caricata quando si esporta, non in anteprima dal vivo. I server esterni devono consentire CORS. Le immagini non disponibili utilizzano il segnaposto dell'immagine del layout.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Caricato una volta e memorizzato nel widget - utilizzato da qualsiasi elemento immagine che non ha alcuna immagine propria, attraverso tutti i layout. Indipendentemente dai percorsi dei file .pagx.",
               "src": "machine",
@@ -82804,16 +83082,16 @@
           }
         },
         "ja": {
-          "file": "bc2a8d4f641b",
+          "file": "d4782d964061",
           "counts": {
             "esri": 62,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -83836,6 +84114,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "ロゴの源",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "埋め込み画像(デフォルト)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "画像URLへのリンク",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "自分のイメージなしで画像要素によって使用される。 ソースを切り替えると、以前の画像やリンクが消去されます。",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "ロゴイメージURL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "HTTP(S) や app-relative イメージ URL を使用します。 リンクのみが保存されます。ライブプレビューではなく、エクスポート時に画像が読み込まれます。 外部サーバーはCORSを許可しなければなりません。 レイアウト画像のプレースホルダーは利用できません。",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "一度アップロードしてウィジェットに保存 - すべてのレイアウトで、独自の画像を持たない任意の画像要素で使用されます。 .pagxファイルパスの独立。",
               "src": "machine",
@@ -84144,16 +84452,16 @@
           }
         },
         "ko": {
-          "file": "efda15d383ef",
+          "file": "7fc0497f5896",
           "counts": {
             "esri": 61,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -85176,6 +85484,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "로고 근원",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Embed 이미지 (과태)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "이미지 URL 링크",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "자신의 이미지없이 그림 요소에 의해 사용됩니다. 전환 소스는 이전 이미지 또는 링크를 삭제합니다.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "로고 이미지 URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "HTTP(S) 또는 app-relative 이미지 URL을 사용하십시오. 링크 만 저장됩니다. 이미지는 내보내기 할 때로드됩니다. 외부 서버는 CORS를 허용해야 합니다. 사용 가능한 이미지는 레이아웃 그림 placeholder를 사용합니다.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "한 번 업로드하고 위젯에 저장 - 모든 레이아웃에 걸쳐 자신의 이미지가없는 모든 그림 요소에 의해 사용됩니다. .pagx 파일 경로의 독립.",
               "src": "machine",
@@ -85484,16 +85822,16 @@
           }
         },
         "lt": {
-          "file": "b32abf301cac",
+          "file": "2e60d8093640",
           "counts": {
             "esri": 60,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -86516,6 +86854,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logotipas",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Įdėtas atvaizdis (numatytasis)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Nuoroda į paveikslėlio URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Naudojamas vaizdo elementų be savo paveikslėlio. Perjungiant šaltinius išvalomas ankstesnis vaizdas ar nuoroda.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logo atvaizdžio URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Naudokite HTTP (S) arba app-relative vaizdo URL. Tik nuoroda yra išsaugota; vaizdas yra įkeltas eksportuojant, o ne tiesiogiai peržiūrėti. Išoriniai serveriai turi leisti CORS. Neprieinami paveikslėliai naudoti išdėstymo paveikslėlį laikiklis.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Įkeltas vieną kartą ir saugomi valdikliui - naudojamas bet vaizdo elemento, kuris neturi savo vaizdą, per visus maketus. Nepriklausomai nuo .pagx failų kelius.",
               "src": "machine",
@@ -86824,16 +87192,16 @@
           }
         },
         "lv": {
-          "file": "b30adaba70ea",
+          "file": "70495dea5fbf",
           "counts": {
             "esri": 55,
             "esri-check": 8,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -87856,6 +88224,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logo avots",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Iegultais attēls (noklusētais)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Saite uz attēla URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Izmanto attēla elementi bez sava attēla. Pārslēdzot avotus, tiek notīrīts iepriekšējais attēls vai saite.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logo attēla URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Izmantojiet HTTP( S) vai lietotnes relatīvā attēla URL. Tiek saglabāta tikai saite; eksportējot attēls tiek ielādēts, nevis tiešraidē. Ārējiem serveriem jāļauj CORS. Nav pieejami attēli izmanto attēla izkārtojuma vietturi.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Augšupielādēja vienreiz un glabājas widget - izmanto jebkurš attēla elements, kas nav attēlu savu, pāri visiem izkārtojumiem. Neatkarīgi no .pagx failu ceļiem.",
               "src": "machine",
@@ -88164,16 +88562,16 @@
           }
         },
         "no": {
-          "file": "d8569d421977",
+          "file": "4f2d515efc4c",
           "counts": {
             "esri": 59,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 266,
+            "machine": 272,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -89201,6 +89599,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logokilde",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Innebygget bilde (standard)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link til bildeadresse",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Brukes av bildeelementer uten eget bilde. Hvis du bytter kilder fjerner forrige bilde eller lenke.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL til logobilde",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Bruk en HTTP(S) eller apprelasjonell bildeadresse. Bare lenken lagres; bildet lastes inn når du eksporterer, ikke i live forhåndsvisningen. Eksterne servere må tillate CORS. Utilgjengelige bilder bruker layoutbildeplassholderen.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Lastet opp en gang og lagret i widgeten - brukes av et hvilket som helst bildeelement som ikke har et eget bilde, på tvers av alle layouter. Uavhengig av .pagx filstier.",
               "src": "machine",
@@ -89509,16 +89937,16 @@
           }
         },
         "nl": {
-          "file": "27fd2c963a20",
+          "file": "7012e60d6146",
           "counts": {
             "esri": 59,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 267,
+            "machine": 273,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -90546,6 +90974,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logobron",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Afbeelding invoegen (standaard)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Verwijzing naar afbeeldingsURL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Gebruikt door beeldelementen zonder eigen beeld. Verwisselde bronnen wissen de vorige afbeelding of koppeling.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logo afbeelding URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Gebruik een HTTP(S) of app-relatief image-URL. Alleen de koppeling wordt opgeslagen; de afbeelding wordt geladen bij het exporteren, niet in het live voorbeeld. Externe servers moeten CORS toestaan. Niet-beschikbare afbeeldingen gebruiken de layout van de plaatshouder.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Eenmaal geüpload en opgeslagen in de widget - gebruikt door elk beeldelement dat geen eigen afbeelding heeft, over alle lay-outs. Onafhankelijk van de .pagx bestandspaden.",
               "src": "machine",
@@ -90859,16 +91317,16 @@
           }
         },
         "pl": {
-          "file": "d279545dbfea",
+          "file": "7a757a83abd8",
           "counts": {
             "esri": 52,
             "esri-check": 10,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 266,
+            "machine": 272,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -91896,6 +92354,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Źródło logo",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Zamieść obraz (domyślnie)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link do URL obrazka",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Używane przez elementy obrazu bez własnego obrazu. Przełączanie źródeł oczyszcza poprzedni obraz lub link.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL obrazka logo",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Użyj HTTP (S) lub względnego adresu URL obrazka. Tylko link jest zapisany; obraz jest wczytywany podczas eksportu, nie w podglądzie na żywo. Zewnętrzne serwery muszą umożliwiać CORS. Niedostępne obrazy korzystają z plakietki graficznej.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Wysłany raz i przechowywany w widżecie - używany przez dowolny element obrazu, który nie ma własnego obrazu, we wszystkich układach. Niezależnie od ścieżki pliku .pagx.",
               "src": "machine",
@@ -92204,16 +92692,16 @@
           }
         },
         "pt-br": {
-          "file": "c30be6aa4d7f",
+          "file": "1df612804c37",
           "counts": {
             "esri": 60,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 266,
+            "machine": 272,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -93236,6 +93724,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Fonte do logotipo",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Incorpore imagem (padrão)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link para URL da imagem",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Usado por elementos de imagem sem sua própria imagem. Trocando fontes limpa a imagem ou link anterior.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL da imagem do logotipo",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Use uma URL de imagem HTTP ou app-relative. Só o link é salvo, a imagem é carregada quando exporta, não na pré-visualização ao vivo. Servidores externos devem permitir CORS. Imagens indisponível usam o layout da imagem.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Carregado uma vez e armazenado no widget - usado por qualquer elemento de imagem que não tem imagem própria, em todos os layouts. Independente dos arquivos .pagx.",
               "src": "machine",
@@ -93549,16 +94067,16 @@
           }
         },
         "pt-pt": {
-          "file": "96b0e9b333cf",
+          "file": "e08e0cf97e76",
           "counts": {
             "esri": 60,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 266,
+            "machine": 272,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -94581,6 +95099,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Fonte do logótipo",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Incorporar a imagem (por omissão)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link para o URL da imagem",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Usado por elementos de imagem sem sua própria imagem. A mudança de fontes limpa a imagem ou o link anterior.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL da imagem do logotipo",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Use um URL de imagem HTTP(S) ou app-relative. Somente o link é salvo; a imagem é carregada ao exportar, não na visualização ao vivo. Os servidores externos devem permitir o CORS. As imagens não disponíveis usam o placeholder da imagem de layout.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Enviado uma vez e armazenado no widget - usado por qualquer elemento de imagem que não tenha imagem própria, em todos os layouts. Independente dos caminhos do arquivo .pagx.",
               "src": "machine",
@@ -94894,16 +95442,16 @@
           }
         },
         "ro": {
-          "file": "b7e0329c166d",
+          "file": "cd32930546b6",
           "counts": {
             "esri": 55,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 270,
+            "machine": 276,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -95946,6 +96494,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Sursă logo",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Imagine înglobată (default)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link către URL imagine",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Folosit de elemente de imagine fără propria lor imagine. Comutarea surselor șterge imaginea anterioară sau link-ul.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL imagine logo",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Utilizați un URL de imagine HTTP (S) sau app-relativ. Numai link-ul este salvat; imaginea este încărcată la export, nu în previzualizare live. Serverele externe trebuie să permită CORS. Imaginile nedisponibile folosesc suportul imaginii de aspect.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Încărcat o dată și stocat în widget - folosit de orice element de imagine care nu are nici o imagine proprie, în toate layout-urile. Independent de căile de fișiere .pagx.",
               "src": "machine",
@@ -96259,16 +96837,16 @@
           }
         },
         "ru": {
-          "file": "140e5d3f7bd4",
+          "file": "04d08712ea97",
           "counts": {
             "esri": 53,
             "esri-check": 10,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -97291,6 +97869,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Источник логотипа",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Встроенное изображение (по умолчанию)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Ссылка на URL изображения",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Используется элементами изображения без собственного изображения. Переключение источников очищает прежнее изображение или ссылку.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Логотип изображения URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Используйте HTTP (S) или относительный URL-адрес изображения приложения. Сохраняется только ссылка; изображение загружается при экспорте, а не в режиме реального времени. Внешние серверы должны разрешать CORS. Недоступные изображения используют заполнитель макета изображения.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Загружается один раз и хранится в виджете – используется любой элемент изображения, не имеющий собственного изображения, по всем макетам. Независимо от .pagx-файлов.",
               "src": "machine",
@@ -97599,16 +98207,16 @@
           }
         },
         "sk": {
-          "file": "826aee731f72",
+          "file": "13613423eef1",
           "counts": {
             "esri": 60,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 266,
+            "machine": 272,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -98636,6 +99244,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Zdroj loga",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Vložiť obrázok (predvolený)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Odkaz na URL obrázku",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Používané obrazovými prvkami bez vlastného obrazu. Prepínanie zdrojov vylučuje predchádzajúci obrázok alebo odkaz.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logo URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Použiť HTTP (S) alebo app-relative obrazovú URL. Iba odkaz je uložený; obrázok je načítaný pri exporte, nie v priamom náhľade. Externé servery musia povoliť CORS. Nedostupné obrázky používajú dispozičný obrázok.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Nahrané raz a uložené do widgetu - použité akýmkoľvek obrazovým prvkom, ktorý nemá vlastný obrázok, vo všetkých rozloženiach. Nezávislá od .pagx súborových ciest.",
               "src": "machine",
@@ -98944,16 +99582,16 @@
           }
         },
         "sl": {
-          "file": "d1926cd3904b",
+          "file": "886e6072856c",
           "counts": {
             "esri": 58,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 267,
+            "machine": 273,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -99986,6 +100624,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Vir znaka",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Vgrajena slika (privzeto)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Povezava na URL slike",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Uporabljajo ga slikovni elementi brez lastne podobe. Preklop virov očisti prejšnjo sliko ali povezavo.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL slike logotipa",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Uporabite HTTP(S) ali relativni slikovni URL. Samo povezava je shranjena; slika je naložena pri izvozu, ne v živo predogled. Zunanji strežniki morajo dovoliti CORS. Nerazpoložljive slike uporabljajo prostor za postavitev slike.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Naloženo enkrat in shranjeno v widget - ki ga uporablja kateri koli element slike, ki nima svoje slike, v vseh razporedih. Ne glede na .pagx poti datotek.",
               "src": "machine",
@@ -100294,7 +100962,7 @@
           }
         },
         "sr": {
-          "file": "720313ea54d8",
+          "file": "9a98d9fd3bdd",
           "counts": {
             "esri": 58,
             "esri-check": 1,
@@ -100303,21 +100971,21 @@
             "existing": 0,
             "machine": 0,
             "stale": 0,
-            "missing": 275
+            "missing": 276
           },
           "entries": {}
         },
         "sv": {
-          "file": "9f8c178b3e59",
+          "file": "61a222d789c6",
           "counts": {
             "esri": 55,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 273,
+            "machine": 279,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -101375,6 +102043,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logo source",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Inbäddad bild (standard)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Länk till bild URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Används av bildelement utan egen bild. Byta källor rensar den tidigare bilden eller länken.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logo bild URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Använd en HTTP(S) eller app-relativ bild URL. Endast länken sparas; bilden laddas när du exporterar, inte i live förhandsvisningen. Externa servrar måste tillåta CORS. Otillgängliga bilder använder layoutbildplatshållaren.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Uppladdad en gång och lagrad i widgeten - som används av något bildelement som inte har någon bild av sin egen, över alla layouter. Oberoende av .pagx-filvägarna.",
               "src": "machine",
@@ -101688,16 +102386,16 @@
           }
         },
         "th": {
-          "file": "91e81bb26fc8",
+          "file": "4d22a9e9ef00",
           "counts": {
             "esri": 60,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -102720,6 +103418,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "แหล่งปูมบันทึก",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "ภาพฝังตัว (ค่าปริยาย)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "เชื่อมโยงไปยังที่อยู่ URL ของภาพ",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "ถูกใช้โดยองค์ประกอบภาพ ที่ไม่มีภาพของตัวเอง กําลังสลับแหล่งเก็บภาพหรือที่อยู่เชื่อมโยงก่อนหน้า",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "ที่อยู่ URL ของอิมเมจโลโก",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "ใช้ที่อยู่ URL ของภาพแบบ HTTP (S) หรือที่อยู่ URL ของโปรแกรม บันทึกส่วนเชื่อมโยงเท่านั้น; ภาพจะถูกโหลดเมื่อส่งออก, ไม่ใช่ในการแสดงภาพตัวอย่าง เซิร์ฟเวอร์ภายนอกต้องอนุญาตให้ทํางาน ภาพที่ไม่สามารถเรียกข้อมูลได้ ใช้ตัวแสดงตําแหน่งภาพในผังแป้นพิมพ์",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "อัปโหลดและเก็บไว้ในวิดเจ็ต - ที่ใช้โดยองค์ประกอบภาพใด ๆ ที่ไม่มีภาพของตัวเอง ทั่วผังแป้นพิมพ์ทั้งหมด พาธของแฟ้ม PAgx ที่อิสระ",
               "src": "machine",
@@ -103028,16 +103756,16 @@
           }
         },
         "tr": {
-          "file": "53b02f7ab45c",
+          "file": "0efc05ae52c1",
           "counts": {
             "esri": 59,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 266,
+            "machine": 272,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -104065,6 +104793,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Logo kaynağı",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Embed image (default)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Link to image URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Kendi imajı olmadan resim elementleri tarafından kullanılır. Anahtarlama kaynakları önceki resmi veya bağlantıyı açıklar.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "Logo görüntüsü URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "HTTP (S) veya app-relative image URL kullanın. Sadece bağlantı kurtarılır; görüntü ihracat yaparken yüklenir, canlı önizlemede değil. Dış sunucular KURUMSALS'a izin vermelidir. Mevcut olmayan görüntüler tablo yer sahibini kullanır.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Bir kez ve widget'da depolanır - kendi imajı olmayan herhangi bir resim elemanı tarafından kullanılır, tüm yapılar boyunca. .pagx dosya yollarından bağımsız olarak.",
               "src": "machine",
@@ -104373,16 +105131,16 @@
           }
         },
         "zh-cn": {
-          "file": "ee4f7a961e76",
+          "file": "18e41a2361f7",
           "counts": {
             "esri": 56,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 267,
+            "machine": 273,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -105415,6 +106173,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "日志来源",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "嵌入图像( 默认)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "链接到图像 URL",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "被图片元素使用,没有自己的图像. 切换源清除上一个图像或链接.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "日志图像 URL",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "使用 HTTP( S) 或应用关联图像 URL 。 只有链接被保存;图像在导出时被加载,而不是在直播预览中. 外部服务器必须允许 CORS. 无法获取的图像使用布局图片占位符 。",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "上传一次并存储在部件中 - 被任何没有自己图像的图片元素所使用, 覆盖所有布局 。 独立于.pagx文件路径.",
               "src": "machine",
@@ -105723,16 +106511,16 @@
           }
         },
         "uk": {
-          "file": "ba63e0323878",
+          "file": "18828e26ed47",
           "counts": {
             "esri": 63,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -106755,6 +107543,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Логотип",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Вбудувати зображення (default)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Посилання на URL-адресу зображення",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Використовуються елементи зображення без власного зображення. Перемикач джерел очищає попередній образ або посилання.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL зображення логотипу",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Використовуйте URL-адресу HTTP(S) або застосунок. Тільки збережено посилання; зображення завантажується при експорті, не в режимі реального попереднього перегляду. Зовнішні сервери повинні дозволити CORS. Недоступні зображення використовуються для розміщення макета.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Завантажено один раз і зберігається в віджеті - використовується будь-яким елементом зображення, який не має зображення власної, по всій макетах. Незалежно від шляхів .pagx.",
               "src": "machine",
@@ -107063,16 +107881,16 @@
           }
         },
         "vi": {
-          "file": "8e9cd65fc120",
+          "file": "7be4f9e3ef07",
           "counts": {
             "esri": 60,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -108095,6 +108913,36 @@
               "src": "machine",
               "h": "49fbb643c54c"
             },
+            "logoSourceLabel": {
+              "t": "Nguồn đăng nhập",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "Đang nhúng ảnh (mặc định)",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "Liên kết tới URL ảnh",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "Dùng bởi các yếu tố hình ảnh không có hình ảnh riêng. Đang chuyển đổi các nguồn làm sạch ảnh hay liên kết trước.",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "URL ảnh đăng nhập",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "Dùng một địa chỉ Mạng ảnh định dạng HTTP (S) hay ứng dụng. Chỉ lưu liên kết; ảnh được nạp khi xuất khẩu, không phải trong ô xem thử trực tiếp. Máy phục vụ bên ngoài phải cho phép CORS. Ảnh không sẵn sàng dùng bộ giữ chỗ hình bố trí.",
+              "src": "machine",
+              "h": "205eb45c7b33"
+            },
             "logoHint": {
               "t": "Tải lên một lần và lưu trong ô điều khiển - được dùng bởi bất cứ phần tử hình ảnh nào không có ảnh của riêng nó, qua mọi bố trí. Độc lập các đường dẫn tập tin .pagx.",
               "src": "machine",
@@ -108403,16 +109251,16 @@
           }
         },
         "zh-hk": {
-          "file": "e30d49491d3a",
+          "file": "ed6b3077a309",
           "counts": {
             "esri": 63,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -109434,6 +110282,36 @@
               "t": "預設標籤",
               "src": "machine",
               "h": "49fbb643c54c"
+            },
+            "logoSourceLabel": {
+              "t": "紀錄來源",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "嵌入影像( 預設 )",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "連結到影像網址",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "由圖片元素使用, 切換來源清除先前的影像或連結 。",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "紀錄影像網址",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "使用 HTTP( S) 或相關影像網址 。 只有連結被儲存; 影像在匯出時被載入, 而不是在直播預覽中 。 外部伺服器必須允許 CORS 。 不可用的影像使用佈局圖占位符 。",
+              "src": "machine",
+              "h": "205eb45c7b33"
             },
             "logoHint": {
               "t": "上傳一次並儲存在元件中 - 由任何沒有自己影像的圖片元素使用, 遍及所有布局 。 独立于 .pagx 檔案路徑 。",
@@ -109743,16 +110621,16 @@
           }
         },
         "zh-tw": {
-          "file": "e30d49491d3a",
+          "file": "ed6b3077a309",
           "counts": {
             "esri": 63,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 265,
+            "machine": 271,
             "stale": 0,
-            "missing": 6
+            "missing": 1
           },
           "entries": {
             "_widgetLabel": {
@@ -110774,6 +111652,36 @@
               "t": "預設標籤",
               "src": "machine",
               "h": "49fbb643c54c"
+            },
+            "logoSourceLabel": {
+              "t": "紀錄來源",
+              "src": "machine",
+              "h": "74087991c5e9"
+            },
+            "logoEmbedded": {
+              "t": "嵌入影像( 預設 )",
+              "src": "machine",
+              "h": "a87e3fa64f08"
+            },
+            "logoLinked": {
+              "t": "連結到影像網址",
+              "src": "machine",
+              "h": "d13948e756d5"
+            },
+            "logoSourceHint": {
+              "t": "由圖片元素使用, 切換來源清除先前的影像或連結 。",
+              "src": "machine",
+              "h": "7668030f1ad6"
+            },
+            "logoUrlLabel": {
+              "t": "紀錄影像網址",
+              "src": "machine",
+              "h": "59499a40bed5"
+            },
+            "logoUrlHint": {
+              "t": "使用 HTTP( S) 或相關影像網址 。 只有連結被儲存; 影像在匯出時被載入, 而不是在直播預覽中 。 外部伺服器必須允許 CORS 。 不可用的影像使用佈局圖占位符 。",
+              "src": "machine",
+              "h": "205eb45c7b33"
             },
             "logoHint": {
               "t": "上傳一次並儲存在元件中 - 由任何沒有自己影像的圖片元素使用, 遍及所有布局 。 独立于 .pagx 檔案路徑 。",
