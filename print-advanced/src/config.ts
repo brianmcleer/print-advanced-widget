@@ -376,6 +376,10 @@ export interface Config {
   /** Widget-level logo (PNG dataURL). Used by any picture element without its
    *  own attached image - independent of the pagx's file paths. */
   defaultLogo?: string
+  /** Embedded by default; URL mode stores only a link and loads it at export time. */
+  defaultLogoSource?: 'embedded' | 'url'
+  /** HTTP(S) or app-relative image URL. The host must allow CORS. */
+  defaultLogoUrl?: string
   /** Default font family for all page text (title, labels, footer) across
    *  every output format. Runtime Advanced options can override per export. */
   defaultFontFamily?: FontFamily

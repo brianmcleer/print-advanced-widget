@@ -1701,8 +1701,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       if (this.state.sbStyle) options.scaleBarStyle = this.state.sbStyle as any
       if (this.state.sbUnits) options.scaleBarUnits = this.state.sbUnits as any
       if (this.state.sbUnits2 && (this.state.sbStyle === 'doubleAlternating' || this.state.sbStyle === 'hollowDouble')) options.scaleBarUnits2 = this.state.sbUnits2 as any
-      const cfgLogo = (this.props.config as any)?.defaultLogo
-      if (cfgLogo) options.defaultLogo = cfgLogo
+      if (this.props.config?.defaultLogoSource === 'url') {
+        options.defaultLogoUrl = this.props.config.defaultLogoUrl
+      } else {
+        options.defaultLogo = this.props.config?.defaultLogo
+      }
       if (this.meEnabled()) {
         if (this.state.locked && this.lockedCenter && this.lockedScale) {
           options.scaleMode = 'fixed'
@@ -2570,8 +2573,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       }
       if (this.state.author) options.author = this.state.author
       if (this.state.copyright) options.copyright = this.state.copyright
-      const cfgLogo = (this.props.config as any)?.defaultLogo
-      if (cfgLogo) options.defaultLogo = cfgLogo
+      if (this.props.config?.defaultLogoSource === 'url') {
+        options.defaultLogoUrl = this.props.config.defaultLogoUrl
+      } else {
+        options.defaultLogo = this.props.config?.defaultLogo
+      }
       options.includeLegend = this.state.includeLegend
       // data-driven pages get a locator overview per page (main Overview
       // switch); grid series print their key map instead
@@ -2858,8 +2864,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (this.state.sbStyle) options.scaleBarStyle = this.state.sbStyle as any
     if (this.state.sbUnits) options.scaleBarUnits = this.state.sbUnits as any
     if (this.state.sbUnits2 && (this.state.sbStyle === 'doubleAlternating' || this.state.sbStyle === 'hollowDouble')) options.scaleBarUnits2 = this.state.sbUnits2 as any
-    const cfgLogo = (this.props.config as any)?.defaultLogo
-    if (cfgLogo) options.defaultLogo = cfgLogo
+    if (this.props.config?.defaultLogoSource === 'url') {
+      options.defaultLogoUrl = this.props.config.defaultLogoUrl
+    } else {
+      options.defaultLogo = this.props.config?.defaultLogo
+    }
     if (this.meEnabled()) {
       if (this.state.locked && this.lockedCenter && this.lockedScale) {
         options.scaleMode = 'fixed'; options.fixedScale = this.lockedScale; options.lockedCenter = this.lockedCenter

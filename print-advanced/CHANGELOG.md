@@ -2,6 +2,18 @@
 
 Newest first. Every release bumps `manifest.json` and `package.json` together.
 
+## 1.15.0 (2026-10-09)
+
+### Added
+
+- Optional linked default logo: choose **Link to image URL** in widget settings and use an HTTP(S) URL or a relative path to a published app resource. Only the URL is stored in app config. Existing embedded logos remain the default.
+
+### Changed
+
+- Switching logo sources clears the previous embedded image or link. Save and republish to remove the base64 logo from the app config.
+- Linked logos load only when an export picture needs the default image, then normalize to PNG for PDF, SVG and raster outputs. The live preview uses a placeholder instead of fetching the linked logo. Pictures with their own images still take precedence.
+- Failed, blocked or timed-out logo loads retain the existing picture placeholder without stopping the export. Cross-origin image servers must allow CORS.
+
 ## 1.14.2 (2026-10-02)
 
 - Fixed: exports above 96 DPI came out with a blank map frame on Web Mercator maps (and any map not in a geographic coordinate system). When the capture view was re-sized for the print resolution, its center was put back as a plain `[x, y]` array, which the Maps SDK reads as longitude and latitude, so the view landed far off the map. The center is now put back as the Point it was read from. Reported in issue #5 by ncramer11, with the diagnosis.

@@ -37,6 +37,23 @@ Two print sources are available:
 - Grids your way: graticule, measured or reference grid with any line color, width, opacity and pattern, ticks and crosses, custom interval, label color, size, bold, halo, sides, along-the-edge side labels, DMS, decimal minutes or decimal degrees, number formats, corner coordinates, and reference cell ids. Admins set the layout default, users restyle it in the Grid style panel. Works on rotated maps, projected maps and every map series sheet.
 - Legend filters: hide layers not drawn at the print scale (on by default) and hide layers with no features in the print area (off by default).
 
+## Default logo: embed or link
+
+In widget settings, under **Default logo**, choose **Embed image (default)** to
+keep the image with the app, or **Link to image URL** to store only a URL. Existing
+embedded logos continue to work. Switching sources clears the previous image or
+link, so switching to URL mode removes the base64 logo from the saved app config.
+Save and republish the app to apply that reduction.
+
+Linked images can use HTTPS URLs or relative paths to published app resources
+(resolved against the app document URL). Same-origin resources are easiest;
+external servers must allow CORS. The image is downloaded only when an export
+needs a default picture, then embedded into PDF, SVG and raster outputs. The live
+preview uses a picture placeholder for linked logos. Pictures with their own
+attached images take precedence. Unavailable or blocked logos use the existing
+picture placeholder; they do not stop the export. URL mode depends on the image
+remaining available when printing; embedding remains the portable option.
+
 ## Requirements
 
 - ArcGIS Experience Builder Developer Edition 1.19 to 1.21 (React 19). EB 1.18 and earlier (React 18) are not supported.

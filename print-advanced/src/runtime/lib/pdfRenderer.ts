@@ -39,6 +39,7 @@ const gifenc = require('gifenc')
 // them without pulling this module's esri/* imports into the settings bundle.
 // Re-exported here so runtime imports keep working unchanged.
 import { OutputFormat } from '../../printConstants'
+import { createLinkedLogoResolver } from './linkedLogo'
 import { __t, __tc } from '../i18n-t'
 export { FORMAT_LABELS, FONT_FAMILIES, NORTH_ARROW_STYLES, SCALE_BAR_STYLES, SCALE_BAR_UNITS } from '../../printConstants'
 export type { OutputFormat } from '../../printConstants'
@@ -52,6 +53,8 @@ export interface RenderOptions {
     scaleBarUnits2?: ScaleBarUnits
     /** Widget-level logo dataURL; used by picture elements without their own image. */
     defaultLogo?: string
+    /** Linked logo, resolved only when an export picture needs it. */
+    defaultLogoUrl?: string
     /** Page-wide typeface for all text elements and labels. */
     fontFamily?: FontFamily
     /** Custom font fetched by URL at export time (TTF). Overrides fontFamily. */
@@ -5825,6 +5828,7 @@ export async function composePage(
     title: string,
     opts: RenderOptions = {}
 ): Promise<void> {
+    const linkedLogo = createLinkedLogoResolver(opts.defaultLogoUrl)
     // Coordinate tokens on a projected capture need the SDK projection
     // engine; load it once here (async) so token resolution stays sync.
     let toWgs84: TextTokens['toWgs84']
@@ -5989,7 +5993,9 @@ export async function composePage(
                 break
             case 'picture':
                 layer(PAGE_LAYERS.graphics)
-                await drawPictureEl(d, el as PictureEl, opts.defaultLogo)
+                await drawPictureEl(d, el as PictureEl,
+                    (el as PictureEl).dataUrl ? undefined :
+                        (opts.defaultLogoUrl ? await linkedLogo() : opts.defaultLogo))
                 break
             case 'legend':
                 {
@@ -6518,7 +6524,7 @@ export async function renderPagePreview (
         notes.push('legend on additional pages')
         rows = []
     }
-    let opts: RenderOptions = { ...options, overview: undefined, gridGeomOverride: undefined, onPanelComputed: undefined }
+    let opts: RenderOptions = { ...options, defaultLogoUrl: undefined, overview: undefined, gridGeomOverride: undefined, onPanelComputed: undefined }
     // adjacent legend panel: the same shrink the export applies
     if (rows.length && lc && lc.enabled && !hasLegendEl && String(lc.position || '').endsWith('Panel')) {
         const others = (useLayout.elements || [])

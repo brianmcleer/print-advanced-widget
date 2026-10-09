@@ -585,10 +585,20 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
     }
 
     setDefaultLogo = (dataUrl: string | undefined): void => {
-        const base: any = (this.props.config as any) || Immutable({})
+        const base: any = ((this.props.config as any) || Immutable({})).without('defaultLogoUrl').set('defaultLogoSource', 'embedded')
         this.props.onSettingChange({
             id: this.props.id,
             config: dataUrl ? base.set('defaultLogo', dataUrl) : base.without('defaultLogo')
+        })
+    }
+
+    setLogoSource = (source: 'embedded' | 'url'): void => {
+        const base: any = (this.props.config as any) || Immutable({})
+        // Keep only the active source so URL mode actually shrinks app config.
+        this.props.onSettingChange({
+            id: this.props.id,
+            config: base.without(source === 'url' ? 'defaultLogo' : 'defaultLogoUrl')
+                .set('defaultLogoSource', source)
         })
     }
 
@@ -2107,26 +2117,46 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
 
                 <SettingSection title={messages.logoSection}>
                     <SettingRow>
-                        <div className='pd-hint'>{messages.logoHint}</div>
+                        <div className='pd-hint'>{messages.logoSourceHint}</div>
                     </SettingRow>
-                    <SettingRow>
-                        <div className='pd-pic'>
-                            {(this.props.config as any)?.defaultLogo
-                                ? <img src={(this.props.config as any).defaultLogo} alt={messages.logoLabel} />
-                                : <span aria-hidden='true' style={{ width: '2.25rem', textAlign: 'center' }}>{__t("uiNone")}</span>}
-                            <span className='pd-pic-name'>{messages.logoLabel}</span>
-                            <Button size='sm'
-                                aria-label={((this.props.config as any)?.defaultLogo ? messages.replaceImage : messages.attachImage) + ': ' + messages.logoLabel}
-                                onClick={() => this.logoInputRef.current?.click()}>
-                                {(this.props.config as any)?.defaultLogo ? messages.replaceImage : messages.attachImage}
-                            </Button>
-                            {(this.props.config as any)?.defaultLogo && (
+                    <SettingRow flow='wrap' label={messages.logoSourceLabel}>
+                        <Select size='sm' className='w-100' aria-label={messages.logoSourceLabel}
+                            value={this.props.config?.defaultLogoSource || 'embedded'}
+                            onChange={(e: any) => this.setLogoSource(e.target.value)}>
+                            <option value='embedded'>{messages.logoEmbedded}</option>
+                            <option value='url'>{messages.logoLinked}</option>
+                        </Select>
+                    </SettingRow>
+                    {this.props.config?.defaultLogoSource === 'url' ? (
+                        <React.Fragment>
+                            <SettingRow flow='wrap' label={messages.logoUrlLabel}>
+                                <TextInput size='sm' className='w-100' aria-label={messages.logoUrlLabel}
+                                    value={this.props.config?.defaultLogoUrl || ''}
+                                    placeholder='https://example.com/logo.png'
+                                    onChange={(e: any) => this.setCfg('defaultLogoUrl', e.target.value.trim())} />
+                            </SettingRow>
+                            <SettingRow><div className='pd-hint'>{messages.logoUrlHint}</div></SettingRow>
+                        </React.Fragment>
+                    ) : (
+                        <SettingRow>
+                            <div className='pd-pic'>
+                                {(this.props.config as any)?.defaultLogo
+                                    ? <img src={(this.props.config as any).defaultLogo} alt={messages.logoLabel} />
+                                    : <span aria-hidden='true' style={{ width: '2.25rem', textAlign: 'center' }}>{__t("uiNone")}</span>}
+                                <span className='pd-pic-name'>{messages.logoLabel}</span>
                                 <Button size='sm'
-                                    aria-label={messages.clear + ': ' + messages.logoLabel}
-                                    onClick={() => this.setDefaultLogo(undefined)}>{messages.clear}</Button>
+                                    aria-label={((this.props.config as any)?.defaultLogo ? messages.replaceImage : messages.attachImage) + ': ' + messages.logoLabel}
+                                    onClick={() => this.logoInputRef.current?.click()}>
+                                    {(this.props.config as any)?.defaultLogo ? messages.replaceImage : messages.attachImage}
+                                </Button>
+                                {(this.props.config as any)?.defaultLogo && (
+                                    <Button size='sm'
+                                        aria-label={messages.clear + ': ' + messages.logoLabel}
+                                        onClick={() => this.setDefaultLogo(undefined)}>{messages.clear}</Button>
                             )}
                         </div>
                     </SettingRow>
+                    )}
                 </SettingSection>
 
                 <SettingSection title={messages.ieSection}>
