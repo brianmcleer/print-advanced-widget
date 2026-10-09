@@ -1604,6 +1604,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   /** Translate one help string and fill any {token} placeholders. */
   private helpT = (id: string, values?: Record<string, string>): string => {
+    const __intl: any = (this.props as any).intl; if (__intl && typeof __intl.formatMessage === "function") { try { return __intl.formatMessage({ id, defaultMessage: (defaultMessages as any)[id] ?? id }, values) } catch (e) { } }
     let s = String((defaultMessages as any)[id] || '')
     if (values) {
       for (const k of Object.keys(values)) s = s.split('{' + k + '}').join(values[k])
