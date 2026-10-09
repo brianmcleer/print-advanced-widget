@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 pt (大きいフォーマット)",
         layout: "{layout}",
         bold: "+ 太字",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "PrintAdvancedConfig バージョン=\"1\" ...>"
       })
     }
   }

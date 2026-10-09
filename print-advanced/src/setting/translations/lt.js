@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 pt (dideli formatai)",
         layout: "{layout}",
         bold: "+ paryškintas",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "PrintAdvancedConfig versija = \"1\"... >"
       })
     }
   }

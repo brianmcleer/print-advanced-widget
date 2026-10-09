@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "خطأ مجهول",
         unserializableError: "خطأ غير معقول",
-        continued: "(continued)",
+        continued: "(تابع)",
         pageName: "{pageName}",
         pageOfPages: "{page} من {pages}",
         in: "::",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "إدارة شؤون الإعلام",
+        keepsMapZoomLevel: "الحفاظ على مستوى زوم الخرائط",
+        printsWhatYouSee: "بصمات ما تراه"
       })
     }
   }

@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 pt (μεγάλες μορφές)",
         layout: "{layout}",
         bold: "+ έντονη",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "ΕκτύπωσηAdvancedConfig version=\"1\" ...>"
       })
     }
   }

@@ -429,16 +429,16 @@
       },
       "locales": {
         "ar": {
-          "file": "2f6dbe0eee35",
+          "file": "9f595fb60e65",
           "counts": {
             "esri": 75,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -2131,24 +2131,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(تابع)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "::",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "إدارة شؤون الإعلام",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "الحفاظ على مستوى زوم الخرائط",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "بصمات ما تراه",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "bg": {
-          "file": "bd7bc512e4dd",
+          "file": "a3b1bc3d11c2",
           "counts": {
             "esri": 74,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -3831,10 +3856,35 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(продължение)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "в ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "поддържа нивото на увеличение на картата",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "Отпечатва това, което виждате.",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
@@ -3853,16 +3903,16 @@
           "entries": {}
         },
         "ca": {
-          "file": "fae70f116436",
+          "file": "a6fe11b979a1",
           "counts": {
             "esri": 74,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 345,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -5560,24 +5610,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(Canadà)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "in",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "PPP",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "manté el nivell d' apropament del mapa",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "imprimeix el que veieu",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "cs": {
-          "file": "086d883d7589",
+          "file": "b49830d6e50f",
           "counts": {
             "esri": 75,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -7270,24 +7345,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(pokračování)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "v ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "udržuje úroveň přiblížení mapy",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "tiskne to, co vidíte.",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "da": {
-          "file": "4b81e460f282",
+          "file": "6198e925a593",
           "counts": {
             "esri": 70,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 342,
+            "machine": 347,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -8995,24 +9095,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(fortsat)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "I ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "holder kort zoom niveau",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "udskriver hvad du ser",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "de": {
-          "file": "f718c1a6be00",
+          "file": "dfe20d2da620",
           "counts": {
             "esri": 70,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 341,
+            "machine": 346,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -10715,24 +10840,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(Fortsetzung)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "in ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "hält Map Zoom Level",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "Drucken, was Sie sehen",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "el": {
-          "file": "0f8e4a46867b",
+          "file": "710c0c180e15",
           "counts": {
             "esri": 74,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -12415,24 +12565,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(συνέχεια)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "στο ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "ΔΠΙ ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "διατηρεί το επίπεδο εστίασης του χάρτη",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "εκτυπώνει ό, τι βλέπετε",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "es": {
-          "file": "e142c498dbcf",
+          "file": "612b79f85336",
           "counts": {
             "esri": 73,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -14115,24 +14290,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(continuación)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "en",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "mantiene el nivel de zoom de mapa",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "imprime lo que ves",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "et": {
-          "file": "afd96ca912ca",
+          "file": "ff494f90b901",
           "counts": {
             "esri": 69,
             "esri-check": 8,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 343,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -15820,24 +16020,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(jätkab)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "hoiab kaardi suurenduse taset",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "trükid, mida näed",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "fi": {
-          "file": "7a225cdf703d",
+          "file": "59ef9d79b09c",
           "counts": {
             "esri": 78,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -17520,24 +17745,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(jatkoa)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "pitää kartan zoomin tason",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "tulostaa mitä näet",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "fr": {
-          "file": "bd23e27acbdf",
+          "file": "b422b60525b5",
           "counts": {
             "esri": 72,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 341,
+            "machine": 346,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -19240,24 +19490,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(suite)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "en ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "maintient le niveau de zoom de la carte",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "imprime ce que vous voyez",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "he": {
-          "file": "d959087ed547",
+          "file": "b24dd50c806b",
           "counts": {
             "esri": 72,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -20950,10 +21225,35 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(המשך)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "ב)",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "עקבו אחרי Map Zoom Level",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "הדפסת מה שרואים",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
@@ -20972,16 +21272,16 @@
           "entries": {}
         },
         "hu": {
-          "file": "368a6fb4fc3e",
+          "file": "50eb0d025152",
           "counts": {
             "esri": 78,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -22664,24 +22964,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(folytatás)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "make map zoom szint",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "kinyomtatja, amit lát.",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "id": {
-          "file": "3f9047740bf2",
+          "file": "5c1e3c68dd5d",
           "counts": {
             "esri": 70,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 343,
+            "machine": 348,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -24394,24 +24719,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(Berlanjut)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "di",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "menjaga tingkat perbesaran peta",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "cetakan apa yang Anda lihat",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "it": {
-          "file": "1e9e244b2c7b",
+          "file": "8669abfbea9f",
           "counts": {
             "esri": 70,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 341,
+            "machine": 346,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -26114,24 +26464,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(Seguito)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "in ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "mantiene la mappa",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "stampa quello che vedi",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "ja": {
-          "file": "5cac2161fdb9",
+          "file": "3cdeae3456b2",
           "counts": {
             "esri": 73,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -27824,24 +28199,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(続き)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "お問い合わせ",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI・",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "地図のズームレベルを保つ",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "あなたが見るものをプリント",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "ko": {
-          "file": "1d44668db6c8",
+          "file": "a088d46df534",
           "counts": {
             "esri": 74,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -29534,24 +29934,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(지속)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "지도 급상승 수준 유지",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "당신이 보는 것을 인쇄",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "lt": {
-          "file": "350c6a7ea2a0",
+          "file": "2801839f027a",
           "counts": {
             "esri": 76,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -31234,24 +31659,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(tęsinys)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "in",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "išlaiko žemėlapio didinimo lygį",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "atspaudai ką matai",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "lv": {
-          "file": "ac2aa53f2178",
+          "file": "76f3f2c43ff9",
           "counts": {
             "esri": 76,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -32934,24 +33384,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(turpinājums)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "uztur kartes tālummaiņu",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "izdrukā to, ko redzat",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "no": {
-          "file": "9dfc7e4acda5",
+          "file": "c39334aaaaa2",
           "counts": {
             "esri": 75,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -34644,24 +35119,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(fortsatt)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "i ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "holde kart zoom nivå",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "Skriv ut det du ser",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "nl": {
-          "file": "ef94ec143341",
+          "file": "66caf3861fbe",
           "counts": {
             "esri": 73,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 345,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -36359,24 +36859,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(vervolg)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "in ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "houdt map zoomniveau",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "drukt af wat je ziet",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "pl": {
-          "file": "112fbc635a9d",
+          "file": "e2126b1c078c",
           "counts": {
             "esri": 72,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 343,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -38064,24 +38589,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(ciąg dalszy)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "w ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "zachowuje poziom powiększenia mapy",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "drukuje to co widzisz",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "pt-br": {
-          "file": "f86b928456c7",
+          "file": "23a4c20aaf0a",
           "counts": {
             "esri": 72,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 343,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -39769,24 +40319,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(continuação)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "Em ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "Mantém o zoom do mapa no nível.",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "imprime o que você vê.",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "pt-pt": {
-          "file": "7700a6c51b5b",
+          "file": "7e7a53aa5f78",
           "counts": {
             "esri": 76,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 338,
+            "machine": 343,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -41474,24 +42049,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(continuação)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "em ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "mantém o nível de zoom do mapa",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "imprime o que vê",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "ro": {
-          "file": "a0ae9f4463f6",
+          "file": "2423f979ae70",
           "counts": {
             "esri": 72,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 341,
+            "machine": 346,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -43194,24 +43794,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(continuare)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "în ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "păstrează nivelul de zoom hartă",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "Amprente ceea ce vezi",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "ru": {
-          "file": "949d72030742",
+          "file": "aec5be8c695e",
           "counts": {
             "esri": 73,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -44894,24 +45519,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(продолжение)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "в ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "Сохраняет уровень зума карты",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "Печать того, что вы видите",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "sk": {
-          "file": "a45ead365bcf",
+          "file": "cfc7b52a981d",
           "counts": {
             "esri": 74,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 345,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -46609,24 +47259,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(pokračovanie)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "v ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "udržuje úroveň priblíženia mapy",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "odtlačky, čo vidíte",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "sl": {
-          "file": "d9cf2ebd365c",
+          "file": "f75015b9c068",
           "counts": {
             "esri": 75,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -48319,10 +48994,35 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(nadaljevanje)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "v ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "dpi ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "ohranja stopnjo povečave zemljevida",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "Natisni, kar vidiš.",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
@@ -48341,16 +49041,16 @@
           "entries": {}
         },
         "sv": {
-          "file": "b7c06df9dc38",
+          "file": "8bc8e68a6f01",
           "counts": {
             "esri": 73,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 342,
+            "machine": 347,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -50058,24 +50758,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(fortsatt)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "I ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "Håller kartläggningen zoomnivå",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "printar vad du ser",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "th": {
-          "file": "dff948f16ea3",
+          "file": "51e0c54b26b1",
           "counts": {
             "esri": 75,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -51758,24 +52483,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(ต่อ)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "ใน พ.ศ.",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI พิมพ์",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "รักษาระดับการย่อ/ ขยายของแผนที่",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "ลายนิ้วมือที่คุณเห็น",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "tr": {
-          "file": "61cc0d47d9e6",
+          "file": "309a1f7b2f03",
           "counts": {
             "esri": 73,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -53468,24 +54218,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(kontinued)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "Harita zoom seviyesi tutar",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "Gördüğün şey",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "zh-cn": {
-          "file": "5bfd0f6be849",
+          "file": "1b2997d472cf",
           "counts": {
             "esri": 71,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 340,
+            "machine": 345,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -55183,24 +55958,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(续)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "* 妇女",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "• 新闻部",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "保持地图缩放级别",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "打印您看到的",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "uk": {
-          "file": "6972831c9e87",
+          "file": "1f232cd1a7dc",
           "counts": {
             "esri": 78,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -56883,24 +57683,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(продовження)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "в ·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "зберігає рівень масштабу карти",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "друкує те, що ви бачите",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "vi": {
-          "file": "00dc4bd2e4ac",
+          "file": "13b3bcc1af4d",
           "counts": {
             "esri": 76,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 337,
+            "machine": 342,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -58583,24 +59408,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(Tiếp tục)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "in·",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI·",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "giữ mức phóng đại bản đồ",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "In những gì bạn thấy",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "zh-hk": {
-          "file": "cbf0d989656c",
+          "file": "b8322124c242",
           "counts": {
             "esri": 76,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -60293,24 +61143,49 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(续)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "中",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ─",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "保持地圖縮放等級",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "打印您看到的",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         },
         "zh-tw": {
-          "file": "cbf0d989656c",
+          "file": "b8322124c242",
           "counts": {
             "esri": 76,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 339,
+            "machine": 344,
             "stale": 0,
-            "missing": 5
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -62003,10 +62878,35 @@
               "src": "machine",
               "h": "e40b3d8828fe"
             },
+            "continued": {
+              "t": "(续)",
+              "src": "machine",
+              "h": "6f89b090d5bb"
+            },
+            "pageName": {
+              "t": "{pageName}",
+              "src": "machine",
+              "h": "3369155d63a5"
+            },
             "in": {
               "t": "中",
               "src": "machine",
               "h": "1571e1d5ed6d"
+            },
+            "dpi": {
+              "t": "DPI ─",
+              "src": "machine",
+              "h": "9588acd90d49"
+            },
+            "keepsMapZoomLevel": {
+              "t": "保持地圖縮放等級",
+              "src": "machine",
+              "h": "ff8dd308cc25"
+            },
+            "printsWhatYouSee": {
+              "t": "打印您看到的",
+              "src": "machine",
+              "h": "9be732d7c1f5"
             }
           }
         }
@@ -62354,16 +63254,16 @@
       },
       "locales": {
         "ar": {
-          "file": "2986f02e934a",
+          "file": "1183f8ea29f6",
           "counts": {
             "esri": 62,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -63720,20 +64620,25 @@
               "t": "+ جريئة",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "نسخة مطبوعة",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "bg": {
-          "file": "7c956b5c9182",
+          "file": "3330edc6ad80",
           "counts": {
             "esri": 60,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -65090,6 +65995,11 @@
               "t": "+ получер",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "Print AdvancedConfig version=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
@@ -65108,16 +66018,16 @@
           "entries": {}
         },
         "ca": {
-          "file": "da43bfcfd31b",
+          "file": "1bb37f970a1c",
           "counts": {
             "esri": 60,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 273,
+            "machine": 274,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -66484,20 +67394,25 @@
               "t": "+ negreta",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "Imprimeix la versió=\" 1,\"...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "cs": {
-          "file": "5c1b554dc018",
+          "file": "fd9205427a66",
           "counts": {
             "esri": 58,
             "esri-check": 4,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 272,
+            "machine": 273,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -67859,20 +68774,25 @@
               "t": "+ tučně",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig verze = \"1\"... >",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "da": {
-          "file": "8fe9c931c7c2",
+          "file": "b8618dc5d824",
           "counts": {
             "esri": 54,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 277,
+            "machine": 278,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -69259,6 +70179,11 @@
               "t": "+ fed",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version = \"1\"... >",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
@@ -69270,9 +70195,9 @@
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 277,
+            "machine": 278,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -70659,20 +71584,25 @@
               "t": "+ fett",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "el": {
-          "file": "67daf1af90a5",
+          "file": "af1345e0d633",
           "counts": {
             "esri": 56,
             "esri-check": 7,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -72029,20 +72959,25 @@
               "t": "+ έντονη",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "ΕκτύπωσηAdvancedConfig version=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "es": {
-          "file": "1010ac20b317",
+          "file": "2ab218f76699",
           "counts": {
             "esri": 54,
             "esri-check": 9,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -73399,6 +74334,11 @@
               "t": "+ negrita",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version=\"1\" ...",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
@@ -73410,9 +74350,9 @@
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 272,
+            "machine": 273,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -74774,6 +75714,11 @@
               "t": "+ julge",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
@@ -74785,9 +75730,9 @@
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -76144,20 +77089,25 @@
               "t": "+ lihava",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "fr": {
-          "file": "6dc190f7242b",
+          "file": "43aa8ad07bb6",
           "counts": {
             "esri": 55,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 278,
+            "machine": 279,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -77549,20 +78499,25 @@
               "t": "+ gras",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "ImprimerAvancéVersionConfig...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "he": {
-          "file": "c6a21440535c",
+          "file": "f040a7821af4",
           "counts": {
             "esri": 62,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -78919,6 +79874,11 @@
               "t": "נועז +",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintedConfig version...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
@@ -78937,16 +79897,16 @@
           "entries": {}
         },
         "hu": {
-          "file": "c0a1400e5333",
+          "file": "d14820070ee6",
           "counts": {
             "esri": 63,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -80303,20 +81263,25 @@
               "t": "+ félkövér",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version = \"1\"... >",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "id": {
-          "file": "48368bd3c8db",
+          "file": "73e45a83ac56",
           "counts": {
             "esri": 58,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 274,
+            "machine": 275,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -81688,20 +82653,25 @@
               "t": "+ tebal",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintdevicedConfig versi = \"1\"... >",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "it": {
-          "file": "bd8d8c37d9a3",
+          "file": "0e4ee73ac1eb",
           "counts": {
             "esri": 54,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 275,
+            "machine": 276,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -83078,20 +84048,25 @@
               "t": "+ in grassetto",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "Versione config=\"1\"...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "ja": {
-          "file": "d4782d964061",
+          "file": "fde74554c4d9",
           "counts": {
             "esri": 62,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -84448,20 +85423,25 @@
               "t": "+ 太字",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig バージョン=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "ko": {
-          "file": "7fc0497f5896",
+          "file": "85f843b3f09f",
           "counts": {
             "esri": 61,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -85818,20 +86798,25 @@
               "t": "+ 대담한",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig 버전=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "lt": {
-          "file": "2e60d8093640",
+          "file": "dd6be0f9c0bc",
           "counts": {
             "esri": 60,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -87188,6 +88173,11 @@
               "t": "+ paryškintas",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig versija = \"1\"... >",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
@@ -87199,9 +88189,9 @@
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -88558,20 +89548,25 @@
               "t": "+ treknraksts",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "no": {
-          "file": "4f2d515efc4c",
+          "file": "8316ecf04e4e",
           "counts": {
             "esri": 59,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 272,
+            "machine": 273,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -89933,20 +90928,25 @@
               "t": "+ fet",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig versjon=\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "nl": {
-          "file": "7012e60d6146",
+          "file": "ce42da01ebf0",
           "counts": {
             "esri": 59,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 273,
+            "machine": 274,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -91313,20 +92313,25 @@
               "t": "+ vet",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig versie=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "pl": {
-          "file": "7a757a83abd8",
+          "file": "2759dbf0fa24",
           "counts": {
             "esri": 52,
             "esri-check": 10,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 272,
+            "machine": 273,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -92688,20 +93693,25 @@
               "t": "+ pogrubiona",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version = \"1\"... >",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "pt-br": {
-          "file": "1df612804c37",
+          "file": "08124c708e68",
           "counts": {
             "esri": 60,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 272,
+            "machine": 273,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -94063,20 +95073,25 @@
               "t": "Mais ousado.",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig versão=\"1\">",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "pt-pt": {
-          "file": "e08e0cf97e76",
+          "file": "8980a9a300ad",
           "counts": {
             "esri": 60,
             "esri-check": 2,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 272,
+            "machine": 273,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -95438,20 +96453,25 @@
               "t": "+ negrito",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig versão=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "ro": {
-          "file": "cd32930546b6",
+          "file": "b19ff4d5dc55",
           "counts": {
             "esri": 55,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 276,
+            "machine": 277,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -96833,20 +97853,25 @@
               "t": "+ aldine",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig versiunea=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "ru": {
-          "file": "04d08712ea97",
+          "file": "51badd583bef",
           "counts": {
             "esri": 53,
             "esri-check": 10,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -98203,6 +99228,11 @@
               "t": "+ смелый",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig версия=\"1\"",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
@@ -98214,9 +99244,9 @@
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 272,
+            "machine": 273,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -99578,6 +100608,11 @@
               "t": "+ tučný",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
@@ -99589,9 +100624,9 @@
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 273,
+            "machine": 274,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -100958,6 +101993,11 @@
               "t": "+ krepko",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version=\"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
@@ -100976,16 +102016,16 @@
           "entries": {}
         },
         "sv": {
-          "file": "61a222d789c6",
+          "file": "812ec7da9e42",
           "counts": {
             "esri": 55,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 279,
+            "machine": 280,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -102382,20 +103422,25 @@
               "t": "+ djärv",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig version=\"1\"...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "th": {
-          "file": "4d22a9e9ef00",
+          "file": "9c4161eb7ac8",
           "counts": {
             "esri": 60,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -103752,20 +104797,25 @@
               "t": "ตัวหนา",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "พิมพ์ AdvanedConfig รุ่น = \"1\".>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "tr": {
-          "file": "0efc05ae52c1",
+          "file": "e857a985fe6a",
           "counts": {
             "esri": 59,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 272,
+            "machine": 273,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -105127,20 +106177,25 @@
               "t": "+ cesur",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "YazdırAdvancedConfig version=\"\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "zh-cn": {
-          "file": "18e41a2361f7",
+          "file": "8546468181af",
           "counts": {
             "esri": 56,
             "esri-check": 5,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 273,
+            "machine": 274,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -106507,20 +107562,25 @@
               "t": "+ 粗体键",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig 版本=\"1\"...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "uk": {
-          "file": "18828e26ed47",
+          "file": "8376aab5340a",
           "counts": {
             "esri": 63,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -107877,20 +108937,25 @@
               "t": "+ хв",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "ДрукAdvancedConfig версія=\"1\" ... >",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "vi": {
-          "file": "7be4f9e3ef07",
+          "file": "cf48c4988bb2",
           "counts": {
             "esri": 60,
             "esri-check": 3,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -109247,20 +110312,25 @@
               "t": "+ đậm",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig phiên bản = \"1\" ...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "zh-hk": {
-          "file": "ed6b3077a309",
+          "file": "2af48bbb6187",
           "counts": {
             "esri": 63,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -110617,20 +111687,25 @@
               "t": "+ 粗体",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig 版本=\"1\"...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         },
         "zh-tw": {
-          "file": "ed6b3077a309",
+          "file": "2af48bbb6187",
           "counts": {
             "esri": 63,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 271,
+            "machine": 272,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -111987,6 +113062,11 @@
               "t": "+ 粗体",
               "src": "machine",
               "h": "2c890c44a0f4"
+            },
+            "printAdvancedConfigVersion1": {
+              "t": "PrintAdvancedConfig 版本=\"1\"...>",
+              "src": "machine",
+              "h": "6ad3d89cde42"
             }
           }
         }

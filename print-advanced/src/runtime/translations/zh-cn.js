@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "未知错误",
         unserializableError: "无序错误",
-        continued: "(continued)",
+        continued: "(续)",
         pageName: "{pageName}",
         pageOfPages: "{page}/{pages}",
         in: "* 妇女",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "• 新闻部",
+        keepsMapZoomLevel: "保持地图缩放级别",
+        printsWhatYouSee: "打印您看到的"
       })
     }
   }

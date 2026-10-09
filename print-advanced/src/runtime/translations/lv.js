@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "nezināma kļūda",
         unserializableError: "nepārspējama kļūda",
-        continued: "(continued)",
+        continued: "(turpinājums)",
         pageName: "{pageName}",
         pageOfPages: "{page} no {pages}",
         in: "·",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "DPI",
+        keepsMapZoomLevel: "uztur kartes tālummaiņu",
+        printsWhatYouSee: "izdrukā to, ko redzat"
       })
     }
   }

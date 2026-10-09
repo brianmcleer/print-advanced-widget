@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "未知のエラー",
         unserializableError: "unserializable エラー",
-        continued: "(continued)",
+        continued: "(続き)",
         pageName: "{pageName}",
         pageOfPages: "{page} / {pages}",
         in: "お問い合わせ",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "DPI・",
+        keepsMapZoomLevel: "地図のズームレベルを保つ",
+        printsWhatYouSee: "あなたが見るものをプリント"
       })
     }
   }

@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "알 수없는 오류",
         unserializableError: "unserializable 오류",
-        continued: "(continued)",
+        continued: "(지속)",
         pageName: "{pageName}",
         pageOfPages: "{page} / {pages}",
         in: "·",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "지도 급상승 수준 유지",
+        printsWhatYouSee: "당신이 보는 것을 인쇄"
       })
     }
   }

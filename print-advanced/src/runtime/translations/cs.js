@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "neznámá chyba",
         unserializableError: "neserializovatelná chyba",
-        continued: "(continued)",
+        continued: "(pokračování)",
         pageName: "{pageName}",
         pageOfPages: "{page} z {pages}",
         in: "v ·",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "udržuje úroveň přiblížení mapy",
+        printsWhatYouSee: "tiskne to, co vidíte."
       })
     }
   }

@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "neznana napaka",
         unserializableError: "Neizvedljiva napaka",
-        continued: "(continued)",
+        continued: "(nadaljevanje)",
         pageName: "{pageName}",
         pageOfPages: "{page} od {pages}",
         in: "v ·",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "dpi ·",
+        keepsMapZoomLevel: "ohranja stopnjo povečave zemljevida",
+        printsWhatYouSee: "Natisni, kar vidiš."
       })
     }
   }

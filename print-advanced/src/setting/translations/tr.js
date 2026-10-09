@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 pt (large formatları)",
         layout: "{layout}",
         bold: "+ cesur",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "YazdırAdvancedConfig version=\"\" ...>"
       })
     }
   }

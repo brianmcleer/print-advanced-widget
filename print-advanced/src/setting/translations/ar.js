@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 pt (large formats)",
         layout: "{layout}",
         bold: "+ جريئة",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "نسخة مطبوعة"
       })
     }
   }

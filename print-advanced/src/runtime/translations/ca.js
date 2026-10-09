@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "error desconegut",
         unserializableError: "Error no llegible",
-        continued: "(continued)",
+        continued: "(Canadà)",
         pageName: "{pageName}",
         pageOfPages: "{page} de {pages}",
         in: "in",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "PPP",
+        keepsMapZoomLevel: "manté el nivell d' apropament del mapa",
+        printsWhatYouSee: "imprimeix el que veieu"
       })
     }
   }

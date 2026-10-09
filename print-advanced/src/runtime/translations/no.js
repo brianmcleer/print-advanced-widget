@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "ukjent feil",
         unserializableError: "uiserbar feil",
-        continued: "(continued)",
+        continued: "(fortsatt)",
         pageName: "{pageName}",
         pageOfPages: "{page} av {pages}",
         in: "i ·",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "holde kart zoom nivå",
+        printsWhatYouSee: "Skriv ut det du ser"
       })
     }
   }

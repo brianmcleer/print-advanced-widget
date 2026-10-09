@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 pt (grandes formatos)",
         layout: "{layout}",
         bold: "Mais ousado.",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "PrintAdvancedConfig versão=\"1\">"
       })
     }
   }

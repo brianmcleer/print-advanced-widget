@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "ismeretlen hiba",
         unserializableError: "nem sorozható hiba",
-        continued: "(continued)",
+        continued: "(folytatás)",
         pageName: "{pageName}",
         pageOfPages: "{page}/{pages}",
         in: "·",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "DPI",
+        keepsMapZoomLevel: "make map zoom szint",
+        printsWhatYouSee: "kinyomtatja, amit lát."
       })
     }
   }

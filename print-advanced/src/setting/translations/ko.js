@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 pt (큰 체재)",
         layout: "{layout}",
         bold: "+ 대담한",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "PrintAdvancedConfig 버전=\"1\" ...>"
       })
     }
   }

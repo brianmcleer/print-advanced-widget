@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "ข้อผิดพลาดไม่ทราบสาเหตุ",
         unserializableError: "ข้อผิดพลาดที่ไม่สามารถตรวจสอบได้",
-        continued: "(continued)",
+        continued: "(ต่อ)",
         pageName: "{pageName}",
         pageOfPages: "{page} จาก {pages}",
         in: "ใน พ.ศ.",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "DPI พิมพ์",
+        keepsMapZoomLevel: "รักษาระดับการย่อ/ ขยายของแผนที่",
+        printsWhatYouSee: "ลายนิ้วมือที่คุณเห็น"
       })
     }
   }

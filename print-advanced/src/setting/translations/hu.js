@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 pt (nagyformátumú)",
         layout: "{layout}",
         bold: "+ félkövér",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "PrintAdvancedConfig version = \"1\"... >"
       })
     }
   }

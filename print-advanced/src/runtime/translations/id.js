@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "galat tak dikenal",
         unserializableError: "kesalahan tidak serialisasi",
-        continued: "(continued)",
+        continued: "(Berlanjut)",
         pageName: "{pageName}",
         pageOfPages: "{page} dari {pages}",
         in: "di",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "DPI",
+        keepsMapZoomLevel: "menjaga tingkat perbesaran peta",
+        printsWhatYouSee: "cetakan apa yang Anda lihat"
       })
     }
   }

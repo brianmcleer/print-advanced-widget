@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "неизвестна грешка",
         unserializableError: "несериозна грешка",
-        continued: "(continued)",
+        continued: "(продължение)",
         pageName: "{pageName}",
         pageOfPages: "{page} от {pages}",
         in: "в ·",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "поддържа нивото на увеличение на картата",
+        printsWhatYouSee: "Отпечатва това, което виждате."
       })
     }
   }

@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "tundmatu viga",
         unserializableError: "seeriaviisiline viga",
-        continued: "(continued)",
+        continued: "(jätkab)",
         pageName: "{pageName}",
         pageOfPages: "{page} / {pages}",
         in: "·",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "DPI",
+        keepsMapZoomLevel: "hoiab kaardi suurenduse taset",
+        printsWhatYouSee: "trükid, mida näed"
       })
     }
   }

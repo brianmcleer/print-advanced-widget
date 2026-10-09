@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "Okänd fel",
         unserializableError: "oserialiserbart fel",
-        continued: "(continued)",
+        continued: "(fortsatt)",
         pageName: "{pageName}",
         pageOfPages: "{page} av {pages}",
         in: "I ·",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "Håller kartläggningen zoomnivå",
+        printsWhatYouSee: "printar vad du ser"
       })
     }
   }

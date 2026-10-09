@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "Eroare necunoscută",
         unserializableError: "eroare inoperabilă",
-        continued: "(continued)",
+        continued: "(continuare)",
         pageName: "{pageName}",
         pageOfPages: "{page} din {pages}",
         in: "în ·",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "păstrează nivelul de zoom hartă",
+        printsWhatYouSee: "Amprente ceea ce vezi"
       })
     }
   }

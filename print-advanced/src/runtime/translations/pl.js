@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "nieznany błąd",
         unserializableError: "błąd niezserializowalny",
-        continued: "(continued)",
+        continued: "(ciąg dalszy)",
         pageName: "{pageName}",
         pageOfPages: "{page} z {pages}",
         in: "w ·",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "zachowuje poziom powiększenia mapy",
+        printsWhatYouSee: "drukuje to co widzisz"
       })
     }
   }

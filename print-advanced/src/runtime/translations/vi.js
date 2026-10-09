@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "lỗi không rõ",
         unserializableError: "Lỗi không thể gửi đi được",
-        continued: "(continued)",
+        continued: "(Tiếp tục)",
         pageName: "{pageName}",
         pageOfPages: "{page} / {pages}",
         in: "in·",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "DPI·",
+        keepsMapZoomLevel: "giữ mức phóng đại bản đồ",
+        printsWhatYouSee: "In những gì bạn thấy"
       })
     }
   }

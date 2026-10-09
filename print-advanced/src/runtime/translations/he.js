@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "טעות לא ידועה",
         unserializableError: "טעות בלתי אפשרית",
-        continued: "(continued)",
+        continued: "(המשך)",
         pageName: "{pageName}",
         pageOfPages: "{page} מתוך {pages}",
         in: "ב)",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "DPI",
+        keepsMapZoomLevel: "עקבו אחרי Map Zoom Level",
+        printsWhatYouSee: "הדפסת מה שרואים"
       })
     }
   }

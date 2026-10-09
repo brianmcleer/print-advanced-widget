@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "nežinoma klaida",
         unserializableError: "nenustatoma klaida",
-        continued: "(continued)",
+        continued: "(tęsinys)",
         pageName: "{pageName}",
         pageOfPages: "{page} iš {pages}",
         in: "in",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "išlaiko žemėlapio didinimo lygį",
+        printsWhatYouSee: "atspaudai ką matai"
       })
     }
   }

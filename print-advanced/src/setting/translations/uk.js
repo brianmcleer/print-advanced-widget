@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 пт (великі формати)",
         layout: "{layout}",
         bold: "+ хв",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "ДрукAdvancedConfig версія=\"1\" ... >"
       })
     }
   }

@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 bodů (velké formáty)",
         layout: "{layout}",
         bold: "+ tučně",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "PrintAdvancedConfig verze = \"1\"... >"
       })
     }
   }

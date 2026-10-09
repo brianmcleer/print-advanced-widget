@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "tuntematon virhe",
         unserializableError: "epätavallinen virhe",
-        continued: "(continued)",
+        continued: "(jatkoa)",
         pageName: "{pageName}",
         pageOfPages: "{page}/{pages}",
         in: "·",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "pitää kartan zoomin tason",
+        printsWhatYouSee: "tulostaa mitä näet"
       })
     }
   }

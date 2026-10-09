@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "未知的錯誤",
         unserializableError: "不串連的錯誤",
-        continued: "(continued)",
+        continued: "(续)",
         pageName: "{pageName}",
         pageOfPages: "{page}/{pages}",
         in: "中",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "DPI ─",
+        keepsMapZoomLevel: "保持地圖縮放等級",
+        printsWhatYouSee: "打印您看到的"
       })
     }
   }

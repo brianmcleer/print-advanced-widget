@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "Bilinmeyen hata",
         unserializableError: "Başarısız olmayan hata",
-        continued: "(continued)",
+        continued: "(kontinued)",
         pageName: "{pageName}",
         pageOfPages: "{page} / {pages}",
         in: "·",
         dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        keepsMapZoomLevel: "Harita zoom seviyesi tutar",
+        printsWhatYouSee: "Gördüğün şey"
       })
     }
   }

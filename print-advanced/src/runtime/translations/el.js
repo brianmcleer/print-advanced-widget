@@ -416,13 +416,13 @@ System.register([], function (e) {
         title: "{title}",
         unknownError: "άγνωστο σφάλμα",
         unserializableError: "σφάλμα μη ανιχνεύσιμο",
-        continued: "(continued)",
+        continued: "(συνέχεια)",
         pageName: "{pageName}",
         pageOfPages: "{page} από {pages}",
         in: "στο ·",
-        dpi: "DPI ·",
-        keepsMapZoomLevel: "keeps map zoom level",
-        printsWhatYouSee: "prints what you see"
+        dpi: "ΔΠΙ ·",
+        keepsMapZoomLevel: "διατηρεί το επίπεδο εστίασης του χάρτη",
+        printsWhatYouSee: "εκτυπώνει ό, τι βλέπετε"
       })
     }
   }

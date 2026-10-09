@@ -337,7 +337,7 @@ System.register([], function (e) {
         _24PtLargeFormats: "24 pt ( formate mari)",
         layout: "{layout}",
         bold: "+ aldine",
-        printAdvancedConfigVersion1: "PrintAdvancedConfig version=\"1\" ...>"
+        printAdvancedConfigVersion1: "PrintAdvancedConfig versiunea=\"1\" ...>"
       })
     }
   }
