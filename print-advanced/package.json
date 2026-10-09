@@ -24,5 +24,10 @@
   },
   "overrides": {
     "dompurify": "^3.4.16"
+  },
+  "pnpm": {
+    "overrides": {
+      "dompurify": "^3.4.16"
+    }
   }
 }
