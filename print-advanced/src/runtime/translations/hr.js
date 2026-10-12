@@ -358,7 +358,7 @@ System.register([], function (e) {
         helpTroubleNoDownload: "Ništa nije preuzeto: možda ga je vaš preglednik blokirao. Potražite blokiranu obavijest o preuzimanju u traci adrese, ili kliknite na ime datoteke pod Nedavni izvoz opet.",
         helpTroubleService: "Usluga ispisa nije uspjela: poslužitelj je odbio posao ili tajmed out. Pokušajte ponovno, a ako stalno ne uspije prebaciti Format na PDF i izvoziti manju stranicu.",
         helpTroubleContact: "Još uvijek zaglavi? Kontaktirajte GIS Division i spomenuti Print Advanced widget i ovu aplikaciju.",
-        helpTipsTitle: "Dobro je znati.",
+        helpTipsTitle: "Dobro je znati",
         helpTips1: "Ništa što ovdje promijenite ne utječe na samu kartu ili bilo koga drugog. To samo mijenja stranicu koju ćete napraviti.",
         helpTips2: "Izvezite koliko god puta želite. Promijenite jednu stvar, izvezite opet, i usporedite dvije datoteke.",
         helpTips3: "Preskoči bilo koju oznaku na ovoj ploči za jednolinijsko objašnjenje bez otvaranja ovog vodiča.",

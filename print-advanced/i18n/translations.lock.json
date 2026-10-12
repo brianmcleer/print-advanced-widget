@@ -3889,14 +3889,14 @@
           }
         },
         "bs": {
-          "file": "9c24832d0243",
+          "file": "3549c4eb913c",
           "counts": {
-            "esri": 66,
+            "esri": 75,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 354,
+            "machine": 345,
             "stale": 0,
             "missing": 0
           },
@@ -4981,35 +4981,10 @@
               "src": "machine",
               "h": "c0507b41b9e0"
             },
-            "helpNoMatches": {
-              "t": "Ništa u vodiču ne odgovara toj riječi.",
-              "src": "machine",
-              "h": "3fe179f75330"
-            },
-            "firstRunTitle": {
-              "t": "Novi ovdje?",
-              "src": "machine",
-              "h": "b81f2e17e001"
-            },
             "firstRunBody": {
               "t": "Neka mapa izgleda onako kako želite, izaberite raspored, unesite naslov mape, zatim pritisnite Export. Vaša datoteka se pojavljuje na dnu panela.",
               "src": "machine",
               "h": "d71ae43106a6"
-            },
-            "firstRunHelpLink": {
-              "t": "Otvori vodič.",
-              "src": "machine",
-              "h": "2447dd6134ea"
-            },
-            "firstRunDismiss": {
-              "t": "Otpust",
-              "src": "machine",
-              "h": "70afe9eff3f2"
-            },
-            "helpStartTitle": {
-              "t": "Počnite ovdje: tri koraka",
-              "src": "machine",
-              "h": "789320b4831d"
             },
             "helpStart1": {
               "t": "Uvećaj i zumiraj mapu na ono što želiš na stranici. Ono što vidiš je šta štampa.",
@@ -5331,11 +5306,6 @@
               "src": "machine",
               "h": "dfd625acb0ca"
             },
-            "helpTroubleTitle": {
-              "t": "Ako nešto nije u redu",
-              "src": "machine",
-              "h": "6f7fec3ff1e0"
-            },
             "helpTroubleBlank": {
               "t": "Područje karte je prazno ili sivo: mapa nije završila crtanje. Pričekajte dok mapa ne bude mirna i svaki sloj se pojavio, a zatim ponovo izvozite.",
               "src": "machine",
@@ -5400,11 +5370,6 @@
               "t": "Još uvijek zapeo? Kontaktirajte GIS diviziju i spomenite Print Advanced grafički element i ovu aplikaciju.",
               "src": "machine",
               "h": "4be1bb0120c1"
-            },
-            "helpTipsTitle": {
-              "t": "Dobro je znati.",
-              "src": "machine",
-              "h": "79fc372dc790"
             },
             "helpTips1": {
               "t": "Ništa što promijenite ovdje ne utječe na samu mapu ili bilo koga drugog.",
@@ -5630,16 +5595,6 @@
               "t": "{title}",
               "src": "machine",
               "h": "e40b3d8828fe"
-            },
-            "unknownError": {
-              "t": "nepoznata greška",
-              "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "Neserijalizacijska greška",
-              "src": "machine",
-              "h": "76e73551597a"
             },
             "continued": {
               "t": "(Nastavak)",
@@ -23029,14 +22984,14 @@
           }
         },
         "hr": {
-          "file": "658138e8df9d",
+          "file": "7387d5d869de",
           "counts": {
-            "esri": 66,
+            "esri": 75,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 354,
+            "machine": 345,
             "stale": 0,
             "missing": 0
           },
@@ -24121,35 +24076,10 @@
               "src": "machine",
               "h": "c0507b41b9e0"
             },
-            "helpNoMatches": {
-              "t": "Ništa u vodiču ne odgovara toj riječi. Pokušajte drugi, ili otvorite dijelove iznad.",
-              "src": "machine",
-              "h": "3fe179f75330"
-            },
-            "firstRunTitle": {
-              "t": "Novi ovdje?",
-              "src": "machine",
-              "h": "b81f2e17e001"
-            },
             "firstRunBody": {
               "t": "Dobiti kartu gleda na način na koji želite, odabrati raspored, utipkati naslov mape, a zatim pritisnite Izvoz. Vaša datoteka se pojavljuje na dnu ploče.",
               "src": "machine",
               "h": "d71ae43106a6"
-            },
-            "firstRunHelpLink": {
-              "t": "Otvori vodič.",
-              "src": "machine",
-              "h": "2447dd6134ea"
-            },
-            "firstRunDismiss": {
-              "t": "Otpust",
-              "src": "machine",
-              "h": "70afe9eff3f2"
-            },
-            "helpStartTitle": {
-              "t": "Počnite ovdje: tri koraka",
-              "src": "machine",
-              "h": "789320b4831d"
             },
             "helpStart1": {
               "t": "Uvećaj i zumiraj kartu do onoga što želiš na stranici. Ono što vidiš je ono što ispisuje.",
@@ -24471,11 +24401,6 @@
               "src": "machine",
               "h": "dfd625acb0ca"
             },
-            "helpTroubleTitle": {
-              "t": "Ako nešto izgleda loše",
-              "src": "machine",
-              "h": "6f7fec3ff1e0"
-            },
             "helpTroubleBlank": {
               "t": "Područje karte je prazno ili sivo: karta nije završila crtanje. Pričekajte dok se mapa ne smiri i svaki sloj se pojavio, a zatim ponovno izvoziti.",
               "src": "machine",
@@ -24540,11 +24465,6 @@
               "t": "Još uvijek zaglavi? Kontaktirajte GIS Division i spomenuti Print Advanced widget i ovu aplikaciju.",
               "src": "machine",
               "h": "4be1bb0120c1"
-            },
-            "helpTipsTitle": {
-              "t": "Dobro je znati.",
-              "src": "machine",
-              "h": "79fc372dc790"
             },
             "helpTips1": {
               "t": "Ništa što ovdje promijenite ne utječe na samu kartu ili bilo koga drugog. To samo mijenja stranicu koju ćete napraviti.",
@@ -24770,16 +24690,6 @@
               "t": "{title}",
               "src": "machine",
               "h": "e40b3d8828fe"
-            },
-            "unknownError": {
-              "t": "nepoznata greška",
-              "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "Neserijalizacijska greška",
-              "src": "machine",
-              "h": "76e73551597a"
             },
             "continued": {
               "t": "(Nastavak)",
@@ -52569,14 +52479,14 @@
           }
         },
         "sr": {
-          "file": "76634e73f785",
+          "file": "c5b449dc09fb",
           "counts": {
-            "esri": 65,
+            "esri": 74,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 354,
+            "machine": 345,
             "stale": 0,
             "missing": 0
           },
@@ -53661,35 +53571,10 @@
               "src": "machine",
               "h": "c0507b41b9e0"
             },
-            "helpNoMatches": {
-              "t": "Ništa u vodièu ne odgovara toj reèi.",
-              "src": "machine",
-              "h": "3fe179f75330"
-            },
-            "firstRunTitle": {
-              "t": "Novi ovde?",
-              "src": "machine",
-              "h": "b81f2e17e001"
-            },
             "firstRunBody": {
               "t": "Neka mapa izgleda onako kako želite, izaberite raspored, ukucajte naslov mape, onda pritisnite Export. Vaš fajl se pojavljuje na dnu panela.",
               "src": "machine",
               "h": "d71ae43106a6"
-            },
-            "firstRunHelpLink": {
-              "t": "Otvori vodiè.",
-              "src": "machine",
-              "h": "2447dd6134ea"
-            },
-            "firstRunDismiss": {
-              "t": "Otpust.",
-              "src": "machine",
-              "h": "70afe9eff3f2"
-            },
-            "helpStartTitle": {
-              "t": "Poènite ovde: tri koraka.",
-              "src": "machine",
-              "h": "789320b4831d"
             },
             "helpStart1": {
               "t": "Zumiraj mapu do onoga što želiš na stranici.",
@@ -54011,11 +53896,6 @@
               "src": "machine",
               "h": "dfd625acb0ca"
             },
-            "helpTroubleTitle": {
-              "t": "Ako nešto nije u redu",
-              "src": "machine",
-              "h": "6f7fec3ff1e0"
-            },
             "helpTroubleBlank": {
               "t": "Područje mape je prazno ili sivo: mapa nije završila crtanje.",
               "src": "machine",
@@ -54080,11 +53960,6 @@
               "t": "Još uvek zaglavljen? Kontaktirajte GIS diviziju i pomenite Print Advanced widget i ovu aplikaciju.",
               "src": "machine",
               "h": "4be1bb0120c1"
-            },
-            "helpTipsTitle": {
-              "t": "Dobro je znati.",
-              "src": "machine",
-              "h": "79fc372dc790"
             },
             "helpTips1": {
               "t": "Ništa što promenite ovde ne utièe na samu mapu ili bilo koga drugog.",
@@ -54310,16 +54185,6 @@
               "t": "{title}",
               "src": "machine",
               "h": "e40b3d8828fe"
-            },
-            "unknownError": {
-              "t": "nepoznata greška",
-              "src": "machine",
-              "h": "af6321ca7a8b"
-            },
-            "unserializableError": {
-              "t": "Neserijalizacijska greška",
-              "src": "machine",
-              "h": "76e73551597a"
             },
             "continued": {
               "t": "(Nastavak)",
@@ -71319,12 +71184,12 @@
         "bs": {
           "file": "ac66a0e962ae",
           "counts": {
-            "esri": 59,
+            "esri": 60,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 276,
+            "machine": 275,
             "stale": 0,
             "missing": 0
           },
@@ -72173,11 +72038,6 @@
               "t": "Prekidači nivoa motora za datoteke koje ovaj grafički element piše. Svi su sigurni za odlazak.",
               "src": "machine",
               "h": "2ca12aee589e"
-            },
-            "showHelpLabel": {
-              "t": "Pokaži vodič za pomoć",
-              "src": "machine",
-              "h": "03e9f0b81336"
             },
             "showHelpHint": {
               "t": "Dugme znaka pitanja koje otvara vodič za inwidget. Vodič opisuje samo kontrole koje su ovdje uključene.",
@@ -86579,12 +86439,12 @@
         "hr": {
           "file": "87fb308724af",
           "counts": {
-            "esri": 59,
+            "esri": 60,
             "esri-check": 0,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 276,
+            "machine": 275,
             "stale": 0,
             "missing": 0
           },
@@ -87433,11 +87293,6 @@
               "t": "Prekidači razine motora za datoteke koje ovaj widget piše. Svi su sigurni za odlazak onakvi kakvi jesu.",
               "src": "machine",
               "h": "2ca12aee589e"
-            },
-            "showHelpLabel": {
-              "t": "Prikaži vodič pomoći",
-              "src": "machine",
-              "h": "03e9f0b81336"
             },
             "showHelpHint": {
               "t": "Tipka s znakom pitanja koja otvara vodič s in-widgetom. Vodič opisuje samo kontrole koje su ovdje uključene.",
@@ -110079,12 +109934,12 @@
         "sr": {
           "file": "89a4961a274d",
           "counts": {
-            "esri": 58,
+            "esri": 59,
             "esri-check": 1,
             "community": 0,
             "manual": 0,
             "existing": 0,
-            "machine": 276,
+            "machine": 275,
             "stale": 0,
             "missing": 0
           },
@@ -110933,11 +110788,6 @@
               "t": "Prekidaèi na nivou motora za fajlove koje ovaj vidžet piše.",
               "src": "machine",
               "h": "2ca12aee589e"
-            },
-            "showHelpLabel": {
-              "t": "Pokaži vodič za pomoć",
-              "src": "machine",
-              "h": "03e9f0b81336"
             },
             "showHelpHint": {
               "t": "Uputstvo samo opisuje kontrole koje su ukljuèene ovde.",
