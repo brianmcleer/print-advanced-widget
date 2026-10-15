@@ -23,7 +23,7 @@ Two print sources are available:
 - Author, copyright, and attribution tokens.
 - Legend and map only export, with optional pixel sizing for map only.
 - Multiple custom fonts by URL, including Google Fonts import.
-- Recent exports list with per item remove and a clear all button.
+- Your files list: every finished file stays available while the app is open (even after the panel is closed and reopened), marked Ready with the time, page count and size; click the name to open it in a new tab or Save to download it again; Details shows the technical facts and any notes about the file.
 - Per control visibility and export defaults set by an administrator in the settings panel.
 - XML import and export of the entire configuration, so a setup can be moved between apps.
 - GeoPDF output: every PDF map frame carries its coordinate system and corner coordinates (ISO 32000 geospatial), so Avenza Maps shows a blue dot, Acrobat reads coordinates, and ArcGIS Pro, QGIS and GDAL place the PDF on the ground. Map series georeference every sheet and the index page. On by default; a settings switch turns it off.

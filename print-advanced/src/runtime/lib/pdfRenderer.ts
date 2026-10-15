@@ -2087,7 +2087,7 @@ export async function renderSeries(
     finishSeriesVectors(idxPlan, idxCap, idxOpts, vectorRaster)
     if (vectorRaster.size) {
         const why = Array.from(vectorRaster.entries()).map(([t, r]) => t + ' (' + r + ')').join(', ')
-        warnings.push('Printed as pixels: ' + why + '.')
+        warnings.push('Drawn as a picture instead of editable lines and shapes: ' + why + '.')
     }
     doc.addPage([pageW, pageH].sort((a, b) => a - b) as any, pageW >= pageH ? 'landscape' : 'portrait')
     let idxOptsG: RenderOptions = idxOpts
@@ -6903,7 +6903,7 @@ export async function renderLayout(
         onProgress('Vector: ' + drawn.length + ' layer(s), ' + nFeat.toLocaleString(__locale()) + ' feature(s)' +
             (vectorPlan.raster.length ? '; raster: ' + why : '') + '.')
         if (vectorPlan.raster.length) {
-            cap.warning = (cap.warning ? cap.warning + ' ' : '') + 'Printed as pixels: ' + why + '.'
+            cap.warning = (cap.warning ? cap.warning + ' ' : '') + 'Drawn as a picture instead of editable lines and shapes: ' + why + '.'
         }
     }
     if (!panelPlacement) legendRows = await legendRowsPromise

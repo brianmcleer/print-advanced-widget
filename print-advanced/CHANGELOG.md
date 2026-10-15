@@ -2,6 +2,23 @@
 
 Newest first. Every release bumps `manifest.json` and `package.json` together.
 
+## 1.16.0 (2026-10-15)
+
+### Changed
+
+- Recent exports reworked as **Your files**, written for anyone from the public to GIS staff:
+  - Each file is its own two-line card: the file type, the name, and a Save button on the first line; **Ready**, the time it finished, the page count and the size (412 KB, 5.0 MB) on the second. The name no longer disappears when the summary is long.
+  - Click the file name to open it in a new browser tab (PDF, PNG, JPG, GIF, SVG); Save downloads a copy again. Other types (TIFF, KMZ, EPS, AIX) save from the name as well.
+  - Files stay in the list while the app is open, even after the Print panel is closed and reopened. Before, closing the panel threw every file away. Reloading the page still empties the list, and the list says so.
+  - Technical facts (file type, resolution, printed scale, pages, size, print service template, finish time) moved behind a **Details** toggle on each file.
+  - Notes about a file (a layer drawn as a picture in a vector export, a legend that did not fit, a grid that was skipped, a capped series) no longer run across the summary line. They sit under Details, which reads Details (1) when there are any, each note on its own line.
+  - The vector export note now reads "Drawn as a picture instead of editable lines and shapes" instead of "Printed as pixels".
+  - Clear is now Clear list, and its tooltip says saved files are not touched.
+- Help guide: Getting started, Getting your file and If something looks wrong updated for the new list.
+- Progress messages while an export runs (Drawing the map at 200 DPI, Capturing the map image, Exporting page 3 of 12, Saving the PDF, and the rest) now follow the app language. The renderer still reports in English; the widget matches each line and re-says it from the translation files, so the progress bars that read those lines keep working.
+- All 39 language files carry the new Your files, Details and progress strings, plus corrected one-word translations the machine pass got wrong (Ready, Open in several languages).
+- Accessibility: file name and Save carry the file name in their accessible names; Details is a real button with aria-expanded and aria-controls; the Ready line is in the polite live region so screen readers hear a finished file once.
+
 ## 1.15.0 (2026-10-09)
 
 ### Added

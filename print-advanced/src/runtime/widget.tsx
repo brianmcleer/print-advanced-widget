@@ -149,8 +149,38 @@ interface State {
   outWkid: string
   helpOpen: boolean
   helpHintDismissed: boolean
-  results: Array<{ name: string, url: string, meta: string }>
+  results: PrintResult[]
+  /** The renderer's own (English) progress line; `status` is its app-language
+   *  text. Progress parsing reads this one, so translation never breaks it. */
+  statusRaw: string
+  /** Result rows (by url) whose Details are expanded. */
+  resultsOpen: string[]
 }
+
+/** One finished export in the Recent exports list. `meta` is the one-line
+ *  plain summary everyone reads; `details` are the technical facts (DPI,
+ *  scale, pages) and `notes` the things worth knowing about this file, both
+ *  behind a Details toggle so a casual user is never shown jargon. */
+export interface PrintResult {
+  name: string
+  url: string
+  /** Completed, ms since epoch. */
+  at: number
+  /** Short plain summary: file size, pages. */
+  meta: string
+  details: string[]
+  notes: string[]
+}
+
+/** Finished files survive the panel closing and reopening: an Experience
+ *  Builder widget unmounts when its panel closes, so without this a user who
+ *  closed Print to look at the map lost every file in the list. Keyed by
+ *  widget id, held for the life of the page (blob: URLs stay valid until the
+ *  user removes them, clears the list, or reloads the app). */
+const __resultStore: Record<string, PrintResult[]> = {}
+
+/** File types a browser can show in a tab; anything else saves straight to disk. */
+const VIEWABLE_EXT = /\.(pdf|png|jpe?g|gif|svgz?)$/i
 
 /** Browser key for the first-run help hint, so a user is offered the guide
  *  once and never nagged again. Namespaced by widget so two Print Advanced
@@ -260,7 +290,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       // AllWidgetProps<ImmutableObject<T>> with T unbound), so every
       // property read on it errors. Emits no JavaScript.
       helpHintDismissed: readHelpHint((props as any).id),
-      results: []
+      results: __resultStore[(props as any).id] || [],
+      statusRaw: '',
+      resultsOpen: []
     }
     this.state = { ...this.state, format: this.initialFormat() }
   }
@@ -517,7 +549,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const pct = st.total > 0 ? Math.round((st.done / st.total) * 100) : 0
     const eta = this.seriesTimeLeft(st)
     const sub = String(this.state.status || '')
-    const showSub = sub && !/^Exporting page \d+ of \d+/i.test(sub) && !/^Creating index page/i.test(sub) && !/^Saving PDF/i.test(sub)
+    const raw = String(this.state.statusRaw || '')
+    const showSub = sub && !/^Exporting page \d+ of \d+/i.test(raw) && !/^Creating index page/i.test(raw) && !/^Saving PDF/i.test(raw)
     const segs = st.total <= 60
     const count = String(messages.seriesStepCount).replace('{done}', String(st.done)).replace('{total}', String(st.total))
     return (
@@ -1106,7 +1139,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (this.visObserver) { try { this.visObserver.disconnect() } catch (e) { /* noop */ } this.visObserver = null }
     this.clearPreview(); this.clearSeriesPreview(); this.stopPreviewWatch()
     this.stopLegendWatch()
-    this.revokeResultUrls(this.state.results)
+    // finished files are NOT revoked here: the panel closing is not the
+    // user asking to lose their files (see __resultStore)
+    __resultStore[this.props.id] = this.state.results
   }
 
   /** Legend responds to what is on the map: watch layer visibility so the
@@ -1341,20 +1376,79 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   clearResults = (): void => {
     this.revokeResultUrls(this.state.results)
-    this.setState({ results: [] })
+    this.setResults([])
   }
 
   removeResult = (index: number): void => {
     const gone = this.state.results.filter((_, i) => i === index)
     this.revokeResultUrls(gone)
-    this.setState({ results: this.state.results.filter((_, i) => i !== index) })
+    this.setResults(this.state.results.filter((_, i) => i !== index))
+  }
+
+  /** Results live in state AND the page-level store, so they are still
+   *  there after the panel is closed and reopened. */
+  private setResults = (results: PrintResult[]): void => {
+    __resultStore[this.props.id] = results
+    const keep = results.map(r => r.url)
+    this.setState({ results, resultsOpen: this.state.resultsOpen.filter(u => keep.indexOf(u) >= 0) })
+  }
+
+  toggleResultDetails = (url: string): void => {
+    const open = this.state.resultsOpen
+    this.setState({ resultsOpen: open.indexOf(url) >= 0 ? open.filter(u => u !== url) : [...open, url] })
   }
 
   /** Prepend a result, evicting (and revoking) anything past the cap. */
-  private pushResult = (item: { name: string, url: string, meta: string }): Array<{ name: string, url: string, meta: string }> => {
+  private pushResult = (item: PrintResult): PrintResult[] => {
     const next = [item, ...this.state.results]
     this.revokeResultUrls(next.slice(8))
-    return next.slice(0, 8)
+    const kept = next.slice(0, 8)
+    __resultStore[this.props.id] = kept
+    return kept
+  }
+
+  /** "412 KB" / "5.0 MB" for the list; never raw kilobytes past a megabyte. */
+  private fmtSize = (kb: number | undefined): string => {
+    const n = Number(kb) || 0
+    if (!n) return ''
+    if (n < 1000) return n.toLocaleString(__locale()) + ' KB'
+    return (Math.round(n / 1024 * 10) / 10).toLocaleString(__locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MB'
+  }
+
+  /** Clock time a file finished, in the user's locale (2:14 PM, 14:14). */
+  private fmtTime = (ms: number): string => {
+    try { return new Date(ms).toLocaleTimeString(__locale(), { hour: 'numeric', minute: '2-digit' }) } catch (e) { return '' }
+  }
+
+  /** Renderer warnings arrive as one string joined with ' · '; split them so
+   *  each reads as its own note under Details. */
+  private splitNotes = (warning?: string): string[] =>
+    String(warning || '').split(' · ').map(s => s.trim()).filter(Boolean)
+
+  /** Build one list entry from an export result; `meta` is the plain line
+   *  everyone sees, the rest sits behind Details. */
+  private makeResult = (r: {
+    name: string, url: string, sizeKb?: number, pages?: number, dpi?: number,
+    scale?: number, source?: string, warning?: string, extraNotes?: string[]
+  }): PrintResult => {
+    const m = __pm
+    const meta = [
+      r.pages ? String(m.resultPages).replace('{n}', String(r.pages)) : '',
+      this.fmtSize(r.sizeKb)
+    ].filter(Boolean).join(' · ')
+    const details = [
+      String(m.resultDetailFile).replace('{v}', this.resultKind(r.name)),
+      r.dpi ? String(m.resultDetailDpi).replace('{v}', String(r.dpi)) : '',
+      r.scale ? String(m.resultDetailScale).replace('{v}', '1:' + Math.round(r.scale).toLocaleString(__locale())) : '',
+      r.pages ? String(m.resultDetailPages).replace('{v}', String(r.pages)) : '',
+      r.sizeKb ? String(m.resultDetailSize).replace('{v}', r.sizeKb.toLocaleString(__locale()) + ' KB') : '',
+      r.source ? String(m.resultDetailSource).replace('{v}', r.source) : '',
+      String(m.resultDetailTime).replace('{v}', this.fmtTime(Date.now()))
+    ].filter(Boolean)
+    return {
+      name: r.name, url: r.url, at: Date.now(), meta, details,
+      notes: [...(r.extraNotes || []), ...this.splitNotes(r.warning)]
+    }
   }
 
   runServicePrint = async (): Promise<void> => {
@@ -1363,7 +1457,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     const url = this.serviceUrl()
     if (!url) { this.setState({ error: __pm.svcNoUrl }); return }
     this.beacon?.action('print-service')
-    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, status: __pm.svcSubmitting })
+    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, statusRaw: '', status: __pm.svcSubmitting })
     try {
       const fmt = this.state.format === 'aix' ? 'aix' : this.state.format
       const template = new PrintTemplate({
@@ -1392,7 +1486,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       this.setState({
         busy: false, status: '',
         lastResult: name + '  ·  ' + (this.state.svcTemplate || this.serviceTemplates()[0]),
-        results: this.pushResult({ name: name + '.' + (this.state.format || 'pdf'), url: outUrl, meta: __pm.svcResultMeta })
+        results: this.pushResult(this.makeResult({
+          name: name + '.' + (this.state.format || 'pdf'), url: outUrl, dpi: Number(this.state.dpi) || 96,
+          source: __pm.svcResultMeta + ': ' + (this.state.svcTemplate || this.serviceTemplates()[0] || '')
+        }))
       })
       try { window.open(outUrl, '_blank') } catch (e) { /* popup blocked; link is in the list */ }
     } catch (err: any) {
@@ -1690,7 +1787,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     if (!jimuMapView || !jimuMapView.view || !layout) return
 
     this.beacon?.action('export', this.state.format)
-    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, status: __t("preparing") })
+    this.beginBusyClock(); this.setState({ busy: true, error: null, note: '', lastResult: null, statusRaw: '', status: __t("preparing") })
     try {
       const maxImagePx = Number((this.props.config as any)?.maxImagePx) || 0 // 0 = auto (GPU-detected)
       const effLayout = this.state.dpi
@@ -1818,7 +1915,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         this.buildFileName(layout),
         maxImagePx,
         options,
-        (msg: string) => this.setState({ status: msg })
+        (msg: string) => this.setState({ status: this.progressText(msg), statusRaw: msg })
       )
       this.setState({
         busy: false,
@@ -1826,7 +1923,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         lastResult: result.fileName + '  ·  ' + result.effectiveDpi + ' DPI  ·  1:' +
           result.printedScale.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','),
         results: result.url
-          ? this.pushResult({ name: result.fileName, url: result.url, meta: result.effectiveDpi + ' DPI · ' + (result.sizeKb || 0) + ' KB' + (result.warning ? ' · ' + result.warning : '') })
+          ? this.pushResult(this.makeResult({
+            name: result.fileName, url: result.url, sizeKb: result.sizeKb,
+            dpi: result.effectiveDpi, scale: result.printedScale, warning: result.warning
+          }))
           : this.state.results
       })
     } catch (err: any) {
@@ -2628,7 +2728,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           }
         }, options,
         (msg: string) => {
-          this.setState({ status: msg })
+          this.setState({ status: this.progressText(msg), statusRaw: msg })
           const pm = /^Exporting page (\d+) of (\d+)/i.exec(msg || '')
           if (pm) this.highlightSeriesTile(tiles, parseInt(pm[1], 10))
         },
@@ -2638,13 +2738,15 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         busy: false,
         status: '',
         seriesStep: null,
-        results: this.pushResult({
+        results: this.pushResult(this.makeResult({
           name: result.fileName,
           url: result.url,
-          meta: result.pages + ' pages \u00b7 ' + result.sizeKb + ' KB' +
-            (featTotal > cap ? ' \u00b7 ' + String(__pm.seriesCapped || '').replace('{cap}', String(cap)).replace('{n}', String(featTotal)) : '') +
-            (result.warning ? ' \u00b7 ' + result.warning : '')
-        })
+          sizeKb: result.sizeKb,
+          pages: result.pages,
+          dpi: Number(this.state.dpi) || undefined,
+          warning: result.warning,
+          extraNotes: featTotal > cap ? [String(__pm.seriesCapped || '').replace('{cap}', String(cap)).replace('{n}', String(featTotal))] : []
+        }))
       }, () => this.updateSeriesPreview())
     } catch (err: any) {
       if (!(err && err.message === 'SERIES_CANCELLED')) this.beacon?.error(err, 'export-series')
@@ -2698,8 +2800,32 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .pd-q-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
     .pd-q-title { font-size: 11px; font-weight: 700; color: var(--ref-palette-neutral-1100, #333); display: flex; align-items: center; gap: 6px; }
     .pd-q-count { background: var(--sys-color-primary-main, #076fe5); color: #fff; border-radius: 9px; font-size: 10px; font-weight: 700; padding: 0 6px; line-height: 15px; min-width: 15px; text-align: center; }
-    .pd-q-list { list-style: none; margin: 0; padding: 0; max-height: 132px; overflow: auto; }
+    .pd-q-list { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow: auto; }
     .pd-q-row { display: flex; align-items: center; gap: 7px; font-size: 11px; padding: 4px 2px; border-radius: 4px; }
+    .pd-q-done { display: block; padding: 5px 2px; }
+    .pd-q-line { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .pd-q-sub { margin-top: 2px; padding-left: 2px; justify-content: space-between; }
+    .pd-q-ready { font-weight: 700; color: var(--sys-color-success-dark, #2e7d32); }
+    .pd-q-act { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600;
+      color: var(--sys-color-primary-main, #076fe5); text-decoration: none; padding: 2px 6px; border-radius: 3px;
+      border: 1px solid var(--sys-color-primary-main, #076fe5); background: transparent; line-height: 1.3; }
+    .pd-q-act:hover { background: #eef4fb; background: color-mix(in srgb, var(--sys-color-primary-main, #0079c1) 12%, var(--sys-color-surface-paper, #fff)); text-decoration: none; }
+    .pd-q-act:focus-visible { outline: 2px solid var(--sys-color-primary-main, #076fe5); outline-offset: 1px; }
+    .pd-q-details { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 2px; border: none; background: transparent;
+      cursor: pointer; font-size: 10px; padding: 1px 2px; color: var(--ref-palette-neutral-1000, #6a6a6a); border-radius: 3px; }
+    .pd-q-details:hover { color: var(--ref-palette-neutral-1200, #2b2b2b); text-decoration: underline; }
+    .pd-q-details:focus-visible { outline: 2px solid var(--ref-palette-neutral-1100, #4a4a4a); outline-offset: 1px; }
+    .pd-q-details.has-notes { color: var(--sys-color-warning-dark, #8a6d00); font-weight: 600; }
+    .pd-q-chev { display: inline-flex; }
+    .pd-q-detailbox { margin: 4px 0 2px 2px; padding: 5px 8px; font-size: 10.5px; border-radius: 4px;
+      background: var(--ref-palette-neutral-200, #f6f6f6); border: 1px solid var(--ref-palette-neutral-400, #e2e2e2); }
+    .pd-q-notes, .pd-q-facts { list-style: none; margin: 0; padding: 0; }
+    .pd-q-notes li { padding: 1px 0 1px 14px; position: relative; color: var(--ref-palette-neutral-1200, #2b2b2b); }
+    .pd-q-notes li::before { content: '!'; position: absolute; left: 0; top: 1px; width: 10px; text-align: center; font-weight: 700;
+      color: var(--sys-color-warning-dark, #8a6d00); }
+    .pd-q-notes + .pd-q-facts { margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--ref-palette-neutral-500, #d5d5d5); }
+    .pd-q-facts li { padding: 1px 0; color: var(--ref-palette-neutral-1000, #6a6a6a); }
+    .pd-q-foot { margin-top: 4px; font-size: 10px; color: var(--ref-palette-neutral-1000, #6a6a6a); }
     .pd-q-row + .pd-q-row { border-top: 1px solid var(--ref-palette-neutral-300, #f0f0f0); }
     .pd-q-active { color: var(--ref-palette-neutral-1100, #444); }
     .pd-q-new { animation: pdQFlash 1.6s ease-out 1; }
@@ -2822,10 +2948,158 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
   `
 
+  /** The renderer reports progress in English (it has no component tree).
+   *  Each line is matched here and re-said in the app language; a line with
+   *  no match is shown as it came. Numbers inside stay as the renderer
+   *  formatted them. */
+  private static readonly PROGRESS: Array<[RegExp, string, string[]]> = [
+    [/^Legend: hid (\d+) row\(s\) not drawn at 1:(.+)\.$/, 'progLegendHidScale', ['n', 'scale']],
+    [/^Legend: hid (\d+) row\(s\) with no features in the print area\.$/, 'progLegendHidEmpty', ['n']],
+    [/^Legend: checking which layers/, 'progLegendChecking', []],
+    [/^Placing legend panel/, 'progLegendPanel', []],
+    [/^Building legend/, 'progBuildingLegend', []],
+    [/^Exporting page (\d+) of (\d+)/, 'progExportingPage', ['i', 'n']],
+    [/^Rendering overview map for page (\d+)/, 'progOverviewPage', ['i']],
+    [/^Rendering overview map at 1:(.+?)\u2026$/, 'progOverviewScale', ['scale']],
+    [/^Creating index page/, 'progIndexPage', []],
+    [/^Waiting for basemap tiles/, 'progIndexWait', []],
+    [/^GeoPDF: (\d+) of (\d+) map pages georeferenced/, 'progGeoPdfPages', ['done', 'n']],
+    [/^GeoPDF: map frame georeferenced(.*)\.$/, 'progGeoPdfFrame', ['wkid']],
+    [/^GeoPDF skipped/, 'progGeoPdfSkipped', []],
+    [/^Composing legend page (\d+) of (\d+)/, 'progLegendPage', ['i', 'n']],
+    [/^Composing page/, 'progComposing', []],
+    [/^Saving PDF/, 'progSavingPdf', []],
+    [/^Map capture capped at (\d+) px \((.+)\); effective (\d+) DPI\.$/, 'progCaptureCapped', ['px', 'why', 'dpi']],
+    [/^Rendering map at (\d+) DPI/, 'progRenderingMap', ['dpi']],
+    [/^Map is still drawing after 45 s; capturing anyway\. ?(.*)$/, 'progStillDrawing', ['warning']],
+    [/^Capturing map image/, 'progCapturing', []],
+    [/^Rendering imagery at print scale/, 'progRenderImagery', []],
+    [/^Rendering symbols at print size/, 'progRenderSymbols', []],
+    [/^Print-scale pass failed/, 'progPrintScaleFailed', []],
+    [/^Vector layers: querying (\d+) layer\(s\)/, 'progVectorQuery', ['n']],
+    [/^Vector: (\d+) layer\(s\), (.+?) feature\(s\)(?:; raster: (.+))?\.$/, 'progVectorDone', ['layers', 'features', 'raster']],
+    [/^Grid skipped/, 'progGridSkipped', []],
+    [/^Adding graticule \(projecting/, 'progGraticuleProj', []],
+    [/^Graticule produced no lines/, 'progGraticuleNone', []],
+    [/^Graticule unavailable/, 'progGraticuleUnavail', []],
+    [/^Adding reference grid/, 'progGridRef', []],
+    [/^Adding graticule/, 'progGridGraticule', []],
+    [/^Adding measured grid/, 'progGridMeasured', []],
+    [/^Loading font (.+)\u2026$/, 'progLoadingFont', ['name']],
+    [/^PDF layers: (.+)\.$/, 'progPdfLayers', ['names']],
+    [/^Encoding (\S+)/, 'progEncoding', ['format']],
+    [/^Page raster capped at (\d+) px for this device.s memory; (\d+) DPI/, 'progPageCapped', ['px', 'dpi']],
+    [/^Georeferencing for Google Earth/, 'progGeoKmz', []],
+    [/^Packaging KMZ/, 'progPackagingKmz', []],
+    [/^Wrote KMZ for Google Earth \((\d+) KB\)/, 'progWroteKmz', ['kb']],
+    [/^KMZ unavailable/, 'progKmzUnavail', []],
+    [/^Wrote GeoTIFF \(coordinate system embedded, EPSG:(\d+)(.*)\)\.$/, 'progWroteGeoTiff', ['epsg', 'rot']],
+    [/^Wrote world file (\S+(?: \+ \.prj)?)(.*)\.$/, 'progWroteWorld', ['name', 'rot']]
+  ]
+
+  /** Reasons inside "Map capture capped at" get their own keys. */
+  private static readonly CAP_WHY: Array<[RegExp, string]> = [
+    [/memory limit/, 'progCapWhyDevice'], [/settings limit/, 'progCapWhySettings'], [/graphics card/, 'progCapWhyGpu']
+  ]
+
+  progressText = (msg: string): string => {
+    const raw = String(msg || '')
+    for (const [re, key, names] of Widget.PROGRESS) {
+      const m = re.exec(raw)
+      if (!m) continue
+      const values: any = {}
+      names.forEach((nm, k) => { values[nm] = m[k + 1] == null ? '' : m[k + 1] })
+      if (key === 'progCaptureCapped') {
+        const w = Widget.CAP_WHY.find(([r]) => r.test(values.why))
+        if (w) values.why = __t(w[1])
+      }
+      if (key === 'progVectorDone') {
+        values.raster = values.raster ? __t('progVectorRaster', { why: values.raster }) : ''
+      }
+      if (key === 'progGeoPdfFrame') {
+        const wk = /WKID (\d+)/.exec(values.wkid || '')
+        values.wkid = wk ? __t('progGeoPdfWkid', { wkid: wk[1] }) : ''
+      }
+      if (key === 'progWroteGeoTiff' || key === 'progWroteWorld') {
+        const rt = /rotated (.+?)\u00b0/.exec(values.rot || '')
+        values.rot = rt ? __t('progRotated', { deg: rt[1] }) : ''
+      }
+      return __t(key, values)
+    }
+    return raw
+  }
+
   /** File-type pill text from a result name. */
   resultKind = (name: string): string => {
     const m = /\.([a-z0-9]+)$/i.exec(name || '')
     return m ? m[1].toUpperCase() : 'FILE'
+  }
+
+  /** One finished file in the list. Reads top to bottom for anyone:
+   *    line 1  PDF  ArcGIS Web Map.pdf              Save  x
+   *    line 2  Ready 2:14 PM · 7 pages · 5.0 MB     Details
+   *  The name opens the file in a new tab (viewable types) or saves it;
+   *  Save always downloads; Details shows the technical facts and any notes. */
+  renderResultRow = (r: PrintResult, i: number, messages: any): React.ReactNode => {
+    const viewable = VIEWABLE_EXT.test(r.name)
+    const open = this.state.resultsOpen.indexOf(r.url) >= 0
+    const hasDetails = (r.details && r.details.length > 0) || (r.notes && r.notes.length > 0)
+    const detailsId = this.uid('qd-' + i)
+    const noteCount = (r.notes || []).length
+    return (
+      <li key={r.url + r.name} className={'pd-q-row pd-q-done' + (i === 0 && !this.state.busy ? ' pd-q-new' : '')}>
+        <div className='pd-q-line'>
+          <span className='pd-q-pill' aria-hidden='true'>{this.resultKind(r.name)}</span>
+          <Tooltip title={viewable ? messages.resultOpenTip : messages.resultSaveTip} placement='top'>
+            {viewable
+              ? <a className='pd-q-name' href={r.url} target='_blank' rel='noopener noreferrer'
+                  aria-label={messages.resultOpen + ': ' + r.name}>{r.name}</a>
+              : <a className='pd-q-name' href={r.url} download={r.name}
+                  aria-label={messages.resultSave + ': ' + r.name}>{r.name}</a>}
+          </Tooltip>
+          <Tooltip title={messages.resultSaveTip} placement='top'>
+            <a className='pd-q-act' href={r.url} download={r.name} aria-label={messages.resultSave + ': ' + r.name}>
+              <CalciteIcon icon='download' scale='s' />
+              <span>{messages.resultSave}</span>
+            </a>
+          </Tooltip>
+          <button type='button' className='pd-results-del' title={messages.resultRemove}
+            aria-label={messages.resultRemove + ': ' + r.name}
+            onClick={() => this.removeResult(i)}><span aria-hidden='true'>×</span></button>
+        </div>
+        <div className='pd-q-line pd-q-sub'>
+          <span className='pd-q-meta'>
+            <span className='pd-q-ready'>{messages.resultsReady}</span>
+            {' ' + this.fmtTime(r.at)}
+            {r.meta ? ' · ' + r.meta : ''}
+          </span>
+          {hasDetails && (
+            <button type='button' className={'pd-q-details' + (noteCount ? ' has-notes' : '')}
+              aria-expanded={open} aria-controls={detailsId}
+              onClick={() => this.toggleResultDetails(r.url)}>
+              {noteCount
+                ? String(messages.resultDetailsN).replace('{n}', String(noteCount))
+                : messages.resultDetails}
+              <span className='pd-q-chev' aria-hidden='true'>{open ? <DownOutlined size={10} /> : <RightOutlined size={10} />}</span>
+            </button>
+          )}
+        </div>
+        {hasDetails && open && (
+          <div id={detailsId} className='pd-q-detailbox'>
+            {noteCount > 0 && (
+              <ul className='pd-q-notes' aria-label={messages.resultNotesHead}>
+                {r.notes.map((n, k) => <li key={k}>{n}</li>)}
+              </ul>
+            )}
+            {r.details.length > 0 && (
+              <ul className='pd-q-facts' aria-label={messages.resultDetails}>
+                {r.details.map((d, k) => <li key={k}>{d}</li>)}
+              </ul>
+            )}
+          </div>
+        )}
+      </li>
+    )
   }
 
   /** The export dock: pinned beneath the scrolling options so the Export
@@ -3072,7 +3346,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                 const elapsed = Math.max(0, Math.round((Date.now() - this.busyStart) / 1000))
                 const mm = Math.floor(elapsed / 60); const ss = String(elapsed % 60).padStart(2, '0')
                 if (this.state.seriesStep) return this.renderSeriesProgress(this.state.seriesStep, messages, mm + ':' + ss)
-                const m = /page (\d+) of (\d+)/i.exec(this.state.status || '')
+                const m = /page (\d+) of (\d+)/i.exec(this.state.statusRaw || '')
                 const frac = m ? Math.min(0.97, (parseInt(m[1], 10) - 1) / (parseInt(m[2], 10) + 1)) : -1
                 return (
                   <li className='pd-q-row pd-q-active pd-q-busy'>
@@ -3092,17 +3366,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
                   </li>
                 )
               })()}
-              {this.state.results.map((r, i) => (
-                <li key={r.url + r.name} className={'pd-q-row' + (i === 0 && !this.state.busy ? ' pd-q-new' : '')}>
-                  <span className='pd-q-pill' aria-hidden='true'>{this.resultKind(r.name)}</span>
-                  <a className='pd-q-name' href={r.url} download={r.name}>{r.name}</a>
-                  <span className='pd-q-meta'>{r.meta}</span>
-                  <button type='button' className='pd-results-del' title={messages.resultRemove}
-                    aria-label={messages.resultRemove + ': ' + r.name}
-                    onClick={() => this.removeResult(i)}><span aria-hidden='true'>×</span></button>
-                </li>
-              ))}
+              {this.state.results.map((r, i) => this.renderResultRow(r, i, messages))}
             </ul>
+            {this.state.results.length > 0 && !this.state.busy && (
+              <div className='pd-q-foot'>{messages.resultsKeepNote}</div>
+            )}
           </div>
         )}
       </div>
