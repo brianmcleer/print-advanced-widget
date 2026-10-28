@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "In attesa dei tile della mappa di base sulla pagina indice…",
         progGeoPdfPages: "GeoPDF: {done} di {n} pagine mappa georeferenziate.",
         progGeoPdfFrame: "GeoPDF: riquadro mappa georeferenziato{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "GeoPDF ignorato: gli angoli della mappa non possono essere posizionati sul globo.",
         progLegendPage: "Composizione pagina legenda {i} di {n}…",
         progComposing: "Composizione della pagina…",

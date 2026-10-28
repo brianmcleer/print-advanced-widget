@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Đang chờ các ô bản đồ nền trên trang chỉ mục…",
         progGeoPdfPages: "GeoPDF: đã tham chiếu địa lý {done}/{n} trang bản đồ.",
         progGeoPdfFrame: "GeoPDF: khung bản đồ đã được tham chiếu địa lý{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "Đã bỏ qua GeoPDF: không thể đặt các góc bản đồ lên quả địa cầu.",
         progLegendPage: "Đang dựng trang chú giải {i}/{n}…",
         progComposing: "Đang dựng trang…",

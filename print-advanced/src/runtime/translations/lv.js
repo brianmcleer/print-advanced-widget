@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Gaida pamatkartes flīzes rādītāja lapai…",
         progGeoPdfPages: "GeoPDF: ģeoreferencētas {done} no {n} kartes lapām.",
         progGeoPdfFrame: "GeoPDF: kartes rāmis ģeoreferencēts{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF izlaists: kartes stūrus nevarēja novietot uz globusa.",
         progLegendPage: "Veido leģendas lapu {i} no {n}…",
         progComposing: "Veido lapu…",

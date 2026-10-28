@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Attente des tuiles du fond de carte sur la page d'index…",
         progGeoPdfPages: "GeoPDF : {done} page(s) de carte sur {n} géoréférencée(s).",
         progGeoPdfFrame: "GeoPDF : cadre de carte géoréférencé{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "GeoPDF ignoré : les coins de la carte n'ont pas pu être placés sur le globe.",
         progLegendPage: "Composition de la page de légende {i} sur {n}…",
         progComposing: "Composition de la page…",

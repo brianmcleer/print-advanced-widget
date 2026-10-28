@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Čekanje pločica podloge za stranicu indeksa…",
         progGeoPdfPages: "GeoPDF: georeferencirano {done} od {n} stranica karte.",
         progGeoPdfFrame: "GeoPDF: okvir karte georeferenciran{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF preskočen: uglovi karte nisu se mogli smjestiti na globus.",
         progLegendPage: "Sastavljanje stranice legende {i} od {n}…",
         progComposing: "Sastavljanje stranice…",

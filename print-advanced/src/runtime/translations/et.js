@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Registrilehe aluskaardi paanide ootamine…",
         progGeoPdfPages: "GeoPDF: {done}/{n} kaardilehte georefereeritud.",
         progGeoPdfFrame: "GeoPDF: kaardiraam georefereeritud{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "GeoPDF jäeti vahele: kaardi nurki ei õnnestunud gloobusele paigutada.",
         progLegendPage: "Legendilehe {i}/{n} koostamine…",
         progComposing: "Lehekülje koostamine…",

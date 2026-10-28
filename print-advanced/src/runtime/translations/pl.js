@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Oczekiwanie na kafelki mapy bazowej na stronie indeksu…",
         progGeoPdfPages: "GeoPDF: {done} z {n} stron mapy ma georeferencję.",
         progGeoPdfFrame: "GeoPDF: ramka mapy ma georeferencję{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "Pominięto GeoPDF: nie udało się umieścić narożników mapy na globie.",
         progLegendPage: "Składanie strony legendy {i} z {n}…",
         progComposing: "Składanie strony…",

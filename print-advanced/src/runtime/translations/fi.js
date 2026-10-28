@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Odotetaan taustakartan ruutuja hakemistosivulle…",
         progGeoPdfPages: "GeoPDF: {done}/{n} karttasivua georeferoitu.",
         progGeoPdfFrame: "GeoPDF: karttakehys georeferoitu{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "GeoPDF ohitettiin: kartan kulmia ei voitu sijoittaa maapallolle.",
         progLegendPage: "Kootaan selitesivua {i}/{n}…",
         progComposing: "Kootaan sivua…",

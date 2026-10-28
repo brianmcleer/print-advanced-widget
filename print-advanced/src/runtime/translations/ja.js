@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "索引ページのベースマップ タイルを待っています…",
         progGeoPdfPages: "GeoPDF: {n} ページ中 {done} ページのマップにジオリファレンスを付けました。",
         progGeoPdfFrame: "GeoPDF: マップ フレームにジオリファレンスを付けました{wkid}。",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid}) )",
         progGeoPdfSkipped: "GeoPDF をスキップしました: マップの四隅を地球上に配置できませんでした。",
         progLegendPage: "凡例ページ {i}/{n} を構成しています…",
         progComposing: "ページを構成しています…",

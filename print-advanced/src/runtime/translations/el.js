@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Αναμονή για πλακίδια υποβάθρου στη σελίδα ευρετηρίου…",
         progGeoPdfPages: "GeoPDF: {done} από {n} σελίδες χάρτη γεωαναφέρθηκαν.",
         progGeoPdfFrame: "GeoPDF: το πλαίσιο χάρτη γεωαναφέρθηκε{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "Το GeoPDF παραλείφθηκε: οι γωνίες του χάρτη δεν μπόρεσαν να τοποθετηθούν στην υδρόγειο.",
         progLegendPage: "Σύνθεση σελίδας υπομνήματος {i} από {n}…",
         progComposing: "Σύνθεση σελίδας…",

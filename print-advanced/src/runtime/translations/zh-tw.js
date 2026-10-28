@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "正在等待索引頁的底圖圖磚…",
         progGeoPdfPages: "GeoPDF：{n} 個地圖頁面中已有 {done} 個完成地理對位。",
         progGeoPdfFrame: "GeoPDF：地圖框已完成地理對位{wkid}。",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "已略過 GeoPDF：無法將地圖角點定位到地球上。",
         progLegendPage: "正在組合圖例頁 {i}，共 {n} 頁…",
         progComposing: "正在組合頁面…",

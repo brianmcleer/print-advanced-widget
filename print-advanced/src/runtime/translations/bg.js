@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Изчакване на плочките на базовата карта за индексната страница…",
         progGeoPdfPages: "GeoPDF: {done} от {n} страници с карта са георефереирани.",
         progGeoPdfFrame: "GeoPDF: рамката на картата е георефереирана{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF е пропуснат: ъглите на картата не можаха да се поставят върху глобуса.",
         progLegendPage: "Съставяне на страница с легенда {i} от {n}…",
         progComposing: "Съставяне на страницата…",

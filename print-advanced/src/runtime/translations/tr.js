@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Dizin sayfası için altlık harita karoları bekleniyor…",
         progGeoPdfPages: "GeoPDF: {n} harita sayfasından {done} tanesi coğrafi olarak referanslandı.",
         progGeoPdfFrame: "GeoPDF: harita çerçevesi coğrafi olarak referanslandı{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF atlandı: harita köşeleri küre üzerine yerleştirilemedi.",
         progLegendPage: "Lejant sayfası {i}/{n} düzenleniyor…",
         progComposing: "Sayfa düzenleniyor…",

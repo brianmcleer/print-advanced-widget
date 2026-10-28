@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Čakanie na dlaždice podkladovej mapy pre stranu registra…",
         progGeoPdfPages: "GeoPDF: {done} z {n} strán mapy georeferencovaných.",
         progGeoPdfFrame: "GeoPDF: rám mapy georeferencovaný{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF preskočené: rohy mapy sa nepodarilo umiestniť na glóbus.",
         progLegendPage: "Skladanie strany legendy {i} z {n}…",
         progComposing: "Skladanie strany…",

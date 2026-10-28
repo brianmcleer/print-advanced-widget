@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Esperant les tessel·les del mapa base a la pàgina d'índex…",
         progGeoPdfPages: "GeoPDF: {done} de {n} pàgines de mapa georeferenciades.",
         progGeoPdfFrame: "GeoPDF: marc del mapa georeferenciat{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF omès: les cantonades del mapa no s'han pogut situar al globus.",
         progLegendPage: "Component la pàgina de llegenda {i} de {n}…",
         progComposing: "Component la pàgina…",

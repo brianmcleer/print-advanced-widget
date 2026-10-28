@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Venter på grundkortets fliser til indekssiden…",
         progGeoPdfPages: "GeoPDF: {done} af {n} kortsider georefereret.",
         progGeoPdfFrame: "GeoPDF: kortrammen er georefereret{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF sprunget over: kortets hjørner kunne ikke placeres på kloden.",
         progLegendPage: "Sammensætter signaturforklaringsside {i} af {n}…",
         progComposing: "Sammensætter siden…",

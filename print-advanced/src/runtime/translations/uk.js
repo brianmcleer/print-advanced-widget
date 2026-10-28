@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Очікування тайлів базової карти для сторінки покажчика…",
         progGeoPdfPages: "GeoPDF: прив'язано {done} з {n} сторінок карти.",
         progGeoPdfFrame: "GeoPDF: фрейм карти прив'язано{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid}й",
         progGeoPdfSkipped: "GeoPDF пропущено: кути карти не вдалося розмістити на глобусі.",
         progLegendPage: "Компонування сторінки легенди {i} з {n}…",
         progComposing: "Компонування сторінки…",

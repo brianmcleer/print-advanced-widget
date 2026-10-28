@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "正在等待索引页的底图切片…",
         progGeoPdfPages: "GeoPDF：{n} 个地图页面中已有 {done} 个完成地理配准。",
         progGeoPdfFrame: "GeoPDF：地图框已完成地理配准{wkid}。",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID语: {wkid}(中文(简体) ).",
         progGeoPdfSkipped: "已跳过 GeoPDF：无法将地图角点定位到地球上。",
         progLegendPage: "正在组合图例页 {i}，共 {n} 页…",
         progComposing: "正在组合页面…",

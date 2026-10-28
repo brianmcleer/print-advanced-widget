@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "กำลังรอไทล์แผนที่ฐานบนหน้าดัชนี…",
         progGeoPdfPages: "GeoPDF: อ้างอิงพิกัดแล้ว {done} จาก {n} หน้าแผนที่",
         progGeoPdfFrame: "GeoPDF: อ้างอิงพิกัดกรอบแผนที่แล้ว{wkid}",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "ข้าม GeoPDF: ไม่สามารถวางมุมของแผนที่บนลูกโลกได้",
         progLegendPage: "กำลังจัดหน้าคำอธิบายสัญลักษณ์ {i} จาก {n}…",
         progComposing: "กำลังจัดหน้า…",

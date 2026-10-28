@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "ממתין לאריחי מפת הבסיס בעמוד האינדקס…",
         progGeoPdfPages: "GeoPDF: {done} מתוך {n} עמודי מפה עברו ייחוס גיאוגרפי.",
         progGeoPdfFrame: "GeoPDF: מסגרת המפה עברה ייחוס גיאוגרפי{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "GeoPDF דולג: לא ניתן היה למקם את פינות המפה על הגלובוס.",
         progLegendPage: "הרכבת עמוד מקרא {i} מתוך {n}…",
         progComposing: "הרכבת העמוד…",

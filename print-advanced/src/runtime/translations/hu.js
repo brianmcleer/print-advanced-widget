@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Várakozás az alaptérkép csempéire az indexoldalhoz…",
         progGeoPdfPages: "GeoPDF: {done} / {n} térképoldal georeferált.",
         progGeoPdfFrame: "GeoPDF: a térképkeret georeferált{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "GeoPDF kihagyva: a térkép sarkait nem sikerült a földgömbön elhelyezni.",
         progLegendPage: "{i}. jelmagyarázat-oldal összeállítása a(z) {n} közül…",
         progComposing: "Oldal összeállítása…",

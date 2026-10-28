@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Se așteaptă dalele hărții de bază pentru pagina de index…",
         progGeoPdfPages: "GeoPDF: {done} din {n} pagini de hartă georeferențiate.",
         progGeoPdfFrame: "GeoPDF: cadrul hărții georeferențiat{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF omis: colțurile hărții nu au putut fi plasate pe glob.",
         progLegendPage: "Se compune pagina de legendă {i} din {n}…",
         progComposing: "Se compune pagina…",

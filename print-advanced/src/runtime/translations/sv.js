@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Väntar på baskartans rutor för indexsidan…",
         progGeoPdfPages: "GeoPDF: {done} av {n} kartsidor georefererade.",
         progGeoPdfFrame: "GeoPDF: kartramen georefererad{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid}) )",
         progGeoPdfSkipped: "GeoPDF hoppades över: kartans hörn kunde inte placeras på jordklotet.",
         progLegendPage: "Sätter samman teckenförklaringssida {i} av {n}…",
         progComposing: "Sätter samman sidan…",

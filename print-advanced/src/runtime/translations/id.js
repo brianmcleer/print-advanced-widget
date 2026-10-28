@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Menunggu tile peta dasar di halaman indeks…",
         progGeoPdfPages: "GeoPDF: {done} dari {n} halaman peta telah digeoreferensi.",
         progGeoPdfFrame: "GeoPDF: bingkai peta telah digeoreferensi{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF dilewati: sudut peta tidak dapat ditempatkan di bola dunia.",
         progLegendPage: "Menyusun halaman legenda {i} dari {n}…",
         progComposing: "Menyusun halaman…",

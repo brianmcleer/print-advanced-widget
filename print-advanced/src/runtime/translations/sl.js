@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Čakanje na ploščice podlage za stran kazala…",
         progGeoPdfPages: "GeoPDF: georeferenciranih {done} od {n} strani zemljevida.",
         progGeoPdfFrame: "GeoPDF: okvir zemljevida georeferenciran{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "GeoPDF preskočen: vogalov zemljevida ni bilo mogoče postaviti na globus.",
         progLegendPage: "Sestavljanje strani legende {i} od {n}…",
         progComposing: "Sestavljanje strani…",

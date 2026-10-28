@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Laukiama pagrindo žemėlapio plytelių rodyklės puslapiui…",
         progGeoPdfPages: "GeoPDF: geografiškai susieta {done} iš {n} žemėlapio puslapių.",
         progGeoPdfFrame: "GeoPDF: žemėlapio rėmelis geografiškai susietas{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF praleistas: žemėlapio kampų nepavyko išdėstyti gaublyje.",
         progLegendPage: "Komponuojamas {i} legendos puslapis iš {n}…",
         progComposing: "Komponuojamas puslapis…",

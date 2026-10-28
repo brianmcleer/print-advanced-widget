@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "색인 페이지의 베이스맵 타일을 기다리는 중…",
         progGeoPdfPages: "GeoPDF: 지도 페이지 {n}개 중 {done}개에 지리 참조를 적용했습니다.",
         progGeoPdfFrame: "GeoPDF: 지도 프레임에 지리 참조를 적용했습니다{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid}·",
         progGeoPdfSkipped: "GeoPDF 건너뜀: 지도 모서리를 지구본에 배치할 수 없습니다.",
         progLegendPage: "{n}개 중 {i}번째 범례 페이지를 구성하는 중…",
         progComposing: "페이지를 구성하는 중…",

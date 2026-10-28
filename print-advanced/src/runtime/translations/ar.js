@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "انتظار مربعات خريطة الأساس في صفحة الفهرس…",
         progGeoPdfPages: "GeoPDF: تم الإسناد الجغرافي لـ {done} من {n} صفحات خريطة.",
         progGeoPdfFrame: "GeoPDF: تم الإسناد الجغرافي لإطار الخريطة{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID) {wkid})",
         progGeoPdfSkipped: "تم تخطي GeoPDF: تعذر وضع زوايا الخريطة على الكرة الأرضية.",
         progLegendPage: "تكوين صفحة مفتاح الخريطة {i} من {n}…",
         progComposing: "تكوين الصفحة…",

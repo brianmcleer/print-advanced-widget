@@ -164,7 +164,7 @@ System.register([], function (e) {
         progIndexWait: "Čekání na dlaždice podkladové mapy pro stránku rejstříku…",
         progGeoPdfPages: "GeoPDF: {done} z {n} stránek mapy georeferencováno.",
         progGeoPdfFrame: "GeoPDF: rámec mapy georeferencován{wkid}.",
-        progGeoPdfWkid: " (WKID {wkid})",
+        progGeoPdfWkid: "(WKID {wkid})",
         progGeoPdfSkipped: "GeoPDF přeskočeno: rohy mapy nebylo možné umístit na glóbus.",
         progLegendPage: "Skládání stránky legendy {i} z {n}…",
         progComposing: "Skládání stránky…",

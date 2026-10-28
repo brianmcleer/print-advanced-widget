@@ -494,16 +494,16 @@
       },
       "locales": {
         "ar": {
-          "file": "531089e09141",
+          "file": "acde4a60388d",
           "counts": {
             "esri": 77,
             "esri-check": 1,
             "community": 0,
             "manual": 68,
             "existing": 0,
-            "machine": 338,
+            "machine": 339,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -1180,6 +1180,11 @@
               "t": "GeoPDF: تم الإسناد الجغرافي لإطار الخريطة{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "تم تخطي GeoPDF: تعذر وضع زوايا الخريطة على الكرة الأرضية.",
@@ -2539,16 +2544,16 @@
           }
         },
         "bg": {
-          "file": "5fff4edf43d6",
+          "file": "7c5b98ca8054",
           "counts": {
             "esri": 75,
             "esri-check": 4,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 335,
+            "machine": 336,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -3225,6 +3230,11 @@
               "t": "GeoPDF: рамката на картата е георефереирана{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF е пропуснат: ъглите на картата не можаха да се поставят върху глобуса.",
@@ -4579,16 +4589,16 @@
           }
         },
         "bs": {
-          "file": "87d1cd49a8fa",
+          "file": "b895961d1a09",
           "counts": {
             "esri": 77,
             "esri-check": 0,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 338,
+            "machine": 339,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -5260,6 +5270,11 @@
               "t": "GeoPDF: okvir karte georeferenciran{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF preskočen: uglovi karte nisu se mogli smjestiti na globus.",
@@ -6629,16 +6644,16 @@
           }
         },
         "ca": {
-          "file": "64ec1004ca7f",
+          "file": "49d1e43eaa78",
           "counts": {
             "esri": 76,
             "esri-check": 1,
             "community": 0,
             "manual": 68,
             "existing": 0,
-            "machine": 339,
+            "machine": 340,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -7310,6 +7325,11 @@
               "t": "GeoPDF: marc del mapa georeferenciat{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF omès: les cantonades del mapa no s'han pogut situar al globus.",
@@ -8679,16 +8699,16 @@
           }
         },
         "cs": {
-          "file": "054bef88b08d",
+          "file": "6d5485819740",
           "counts": {
             "esri": 76,
             "esri-check": 1,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -9365,6 +9385,11 @@
               "t": "GeoPDF: rámec mapy georeferencován{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF přeskočeno: rohy mapy nebylo možné umístit na glóbus.",
@@ -10729,16 +10754,16 @@
           }
         },
         "da": {
-          "file": "b24a100f3a65",
+          "file": "b49a672c0fd3",
           "counts": {
             "esri": 72,
             "esri-check": 3,
             "community": 0,
             "manual": 68,
             "existing": 0,
-            "machine": 341,
+            "machine": 342,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -11425,6 +11450,11 @@
               "t": "GeoPDF: kortrammen er georefereret{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF sprunget over: kortets hjørner kunne ikke placeres på kloden.",
@@ -12789,16 +12819,16 @@
           }
         },
         "de": {
-          "file": "397c14648c74",
+          "file": "2e3474436a7e",
           "counts": {
             "esri": 72,
             "esri-check": 4,
             "community": 0,
             "manual": 67,
             "existing": 0,
-            "machine": 340,
+            "machine": 342,
             "stale": 0,
-            "missing": 2
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -13371,6 +13401,11 @@
               "src": "manual",
               "h": "d2b14a93159e"
             },
+            "resultDetailsN": {
+              "t": "Einzelheiten:{n})",
+              "src": "machine",
+              "h": "4e69b1356c6f"
+            },
             "resultNotesHead": {
               "t": "Hinweise zu dieser Datei",
               "src": "manual",
@@ -13475,6 +13510,11 @@
               "t": "GeoPDF: Kartenrahmen georeferenziert{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF übersprungen: Die Kartenecken konnten nicht auf dem Globus platziert werden.",
@@ -14839,16 +14879,16 @@
           }
         },
         "el": {
-          "file": "0b27de4f4e8e",
+          "file": "da5be3f60f04",
           "counts": {
             "esri": 75,
             "esri-check": 4,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 335,
+            "machine": 336,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -15525,6 +15565,11 @@
               "t": "GeoPDF: το πλαίσιο χάρτη γεωαναφέρθηκε{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "Το GeoPDF παραλείφθηκε: οι γωνίες του χάρτη δεν μπόρεσαν να τοποθετηθούν στην υδρόγειο.",
@@ -16879,16 +16924,16 @@
           }
         },
         "es": {
-          "file": "b4713af73ae2",
+          "file": "ba3bd989d8a5",
           "counts": {
             "esri": 74,
             "esri-check": 5,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 336,
+            "machine": 337,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -17565,6 +17610,11 @@
               "t": "GeoPDF: marco del mapa georreferenciado{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF omitido: las esquinas del mapa no se pudieron ubicar en el globo.",
@@ -18919,16 +18969,16 @@
           }
         },
         "et": {
-          "file": "a29774325016",
+          "file": "51ef850979ea",
           "counts": {
             "esri": 69,
             "esri-check": 8,
             "community": 0,
             "manual": 71,
             "existing": 0,
-            "machine": 336,
+            "machine": 337,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -19610,6 +19660,11 @@
               "t": "GeoPDF: kaardiraam georefereeritud{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF jäeti vahele: kaardi nurki ei õnnestunud gloobusele paigutada.",
@@ -20969,16 +21024,16 @@
           }
         },
         "fi": {
-          "file": "f16b4b944ab3",
+          "file": "0bca8ff89dcf",
           "counts": {
             "esri": 79,
             "esri-check": 0,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 336,
+            "machine": 337,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -21655,6 +21710,11 @@
               "t": "GeoPDF: karttakehys georeferoitu{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF ohitettiin: kartan kulmia ei voitu sijoittaa maapallolle.",
@@ -23009,16 +23069,16 @@
           }
         },
         "fr": {
-          "file": "4a90a9f0a1bf",
+          "file": "8003637937ef",
           "counts": {
             "esri": 74,
             "esri-check": 2,
             "community": 0,
             "manual": 68,
             "existing": 0,
-            "machine": 340,
+            "machine": 341,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -23700,6 +23760,11 @@
               "t": "GeoPDF : cadre de carte géoréférencé{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF ignoré : les coins de la carte n'ont pas pu être placés sur le globe.",
@@ -25064,16 +25129,16 @@
           }
         },
         "he": {
-          "file": "dce1b17e7ec6",
+          "file": "a18ff0b2eb6c",
           "counts": {
             "esri": 73,
             "esri-check": 4,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -25755,6 +25820,11 @@
               "t": "GeoPDF: מסגרת המפה עברה ייחוס גיאוגרפי{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF דולג: לא ניתן היה למקם את פינות המפה על הגלובוס.",
@@ -27114,16 +27184,16 @@
           }
         },
         "hr": {
-          "file": "825512672136",
+          "file": "1bd52fc31340",
           "counts": {
             "esri": 77,
             "esri-check": 0,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 338,
+            "machine": 339,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -27795,6 +27865,11 @@
               "t": "GeoPDF: okvir karte georeferenciran{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF preskočen: kutovi karte nisu se mogli smjestiti na globus.",
@@ -29164,16 +29239,16 @@
           }
         },
         "hu": {
-          "file": "181c6814ad78",
+          "file": "41d885c00465",
           "counts": {
             "esri": 79,
             "esri-check": 0,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 336,
+            "machine": 337,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -29850,6 +29925,11 @@
               "t": "GeoPDF: a térképkeret georeferált{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF kihagyva: a térkép sarkait nem sikerült a földgömbön elhelyezni.",
@@ -31204,16 +31284,16 @@
           }
         },
         "id": {
-          "file": "52807ba692a6",
+          "file": "ecc8b357562d",
           "counts": {
             "esri": 72,
             "esri-check": 2,
             "community": 0,
             "manual": 68,
             "existing": 0,
-            "machine": 342,
+            "machine": 343,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -31890,6 +31970,11 @@
               "t": "GeoPDF: bingkai peta telah digeoreferensi{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF dilewati: sudut peta tidak dapat ditempatkan di bola dunia.",
@@ -33269,16 +33354,16 @@
           }
         },
         "it": {
-          "file": "260060cbcd7c",
+          "file": "74d2535596fb",
           "counts": {
             "esri": 72,
             "esri-check": 4,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 339,
+            "machine": 340,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -33965,6 +34050,11 @@
               "t": "GeoPDF: riquadro mappa georeferenziato{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF ignorato: gli angoli della mappa non possono essere posizionati sul globo.",
@@ -35324,16 +35414,16 @@
           }
         },
         "ja": {
-          "file": "347af93b902f",
+          "file": "e10dc589c27b",
           "counts": {
             "esri": 75,
             "esri-check": 3,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -36010,6 +36100,11 @@
               "t": "GeoPDF: マップ フレームにジオリファレンスを付けました{wkid}。",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid}) )",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF をスキップしました: マップの四隅を地球上に配置できませんでした。",
@@ -37369,16 +37464,16 @@
           }
         },
         "ko": {
-          "file": "b955146bc027",
+          "file": "a3ca537512e1",
           "counts": {
             "esri": 76,
             "esri-check": 2,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -38055,6 +38150,11 @@
               "t": "GeoPDF: 지도 프레임에 지리 참조를 적용했습니다{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid}·",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF 건너뜀: 지도 모서리를 지구본에 배치할 수 없습니다.",
@@ -39414,16 +39514,16 @@
           }
         },
         "lt": {
-          "file": "45436c0c849c",
+          "file": "76740e581531",
           "counts": {
             "esri": 78,
             "esri-check": 2,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 335,
+            "machine": 336,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -40095,6 +40195,11 @@
               "t": "GeoPDF: žemėlapio rėmelis geografiškai susietas{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF praleistas: žemėlapio kampų nepavyko išdėstyti gaublyje.",
@@ -41449,16 +41554,16 @@
           }
         },
         "lv": {
-          "file": "f337bc7da1a6",
+          "file": "7c09e9a81167",
           "counts": {
             "esri": 77,
             "esri-check": 2,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 335,
+            "machine": 336,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -42135,6 +42240,11 @@
               "t": "GeoPDF: kartes rāmis ģeoreferencēts{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF izlaists: kartes stūrus nevarēja novietot uz globusa.",
@@ -43489,16 +43599,16 @@
           }
         },
         "no": {
-          "file": "fe68c7edd7b5",
+          "file": "2164f3ad1dfd",
           "counts": {
             "esri": 77,
             "esri-check": 1,
             "community": 0,
             "manual": 68,
             "existing": 0,
-            "machine": 338,
+            "machine": 339,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -44170,6 +44280,11 @@
               "t": "GeoPDF: kartrammen er georeferert{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF hoppet over: kartets hjørner kunne ikke plasseres på kloden.",
@@ -45534,16 +45649,16 @@
           }
         },
         "nl": {
-          "file": "59849fbde695",
+          "file": "3d2aaa7524ea",
           "counts": {
             "esri": 75,
             "esri-check": 2,
             "community": 0,
             "manual": 67,
             "existing": 0,
-            "machine": 339,
+            "machine": 341,
             "stale": 0,
-            "missing": 2
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -46106,6 +46221,11 @@
               "src": "manual",
               "h": "d2b14a93159e"
             },
+            "resultDetailsN": {
+              "t": "Gegevens ({n})",
+              "src": "machine",
+              "h": "4e69b1356c6f"
+            },
             "resultNotesHead": {
               "t": "Opmerkingen bij dit bestand",
               "src": "manual",
@@ -46210,6 +46330,11 @@
               "t": "GeoPDF: kaartkader gegeorefereerd{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF overgeslagen: de kaarthoeken konden niet op de wereldbol worden geplaatst.",
@@ -47579,16 +47704,16 @@
           }
         },
         "pl": {
-          "file": "eec97498313e",
+          "file": "891c15ded2f2",
           "counts": {
             "esri": 74,
             "esri-check": 5,
             "community": 0,
             "manual": 68,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -48260,6 +48385,11 @@
               "t": "GeoPDF: ramka mapy ma georeferencję{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "Pominięto GeoPDF: nie udało się umieścić narożników mapy na globie.",
@@ -49619,16 +49749,16 @@
           }
         },
         "pt-br": {
-          "file": "499132c055b5",
+          "file": "62ae887e3dfd",
           "counts": {
             "esri": 74,
             "esri-check": 5,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 336,
+            "machine": 337,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -50305,6 +50435,11 @@
               "t": "GeoPDF: quadro do mapa georreferenciado{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF ignorado: os cantos do mapa não puderam ser posicionados no globo.",
@@ -51659,16 +51794,16 @@
           }
         },
         "pt-pt": {
-          "file": "441c87e57724",
+          "file": "f6e668f62357",
           "counts": {
             "esri": 78,
             "esri-check": 1,
             "community": 0,
             "manual": 68,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -52345,6 +52480,11 @@
               "t": "GeoPDF: moldura do mapa georreferenciada{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF ignorado: os cantos do mapa não puderam ser colocados no globo.",
@@ -53699,16 +53839,16 @@
           }
         },
         "ro": {
-          "file": "203f0f4e8f7f",
+          "file": "c21b90ebf8b4",
           "counts": {
             "esri": 73,
             "esri-check": 2,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 339,
+            "machine": 340,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -54385,6 +54525,11 @@
               "t": "GeoPDF: cadrul hărții georeferențiat{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF omis: colțurile hărții nu au putut fi plasate pe glob.",
@@ -55759,16 +55904,16 @@
           }
         },
         "ru": {
-          "file": "e82addaf7031",
+          "file": "d94e99c22b97",
           "counts": {
             "esri": 74,
             "esri-check": 5,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 335,
+            "machine": 336,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -56445,6 +56590,11 @@
               "t": "GeoPDF: фрейм карты привязан{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF пропущен: углы карты не удалось разместить на глобусе.",
@@ -57799,16 +57949,16 @@
           }
         },
         "sk": {
-          "file": "81bf9308d2a1",
+          "file": "13631022160f",
           "counts": {
             "esri": 76,
             "esri-check": 1,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 338,
+            "machine": 339,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -58480,6 +58630,11 @@
               "t": "GeoPDF: rám mapy georeferencovaný{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF preskočené: rohy mapy sa nepodarilo umiestniť na glóbus.",
@@ -59849,16 +60004,16 @@
           }
         },
         "sl": {
-          "file": "5a958b554427",
+          "file": "3b794fb0ad31",
           "counts": {
             "esri": 77,
             "esri-check": 1,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -60530,6 +60685,11 @@
               "t": "GeoPDF: okvir zemljevida georeferenciran{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF preskočen: vogalov zemljevida ni bilo mogoče postaviti na globus.",
@@ -61894,16 +62054,16 @@
           }
         },
         "sr": {
-          "file": "599012c855ee",
+          "file": "258a54b2bd56",
           "counts": {
             "esri": 76,
             "esri-check": 1,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 338,
+            "machine": 339,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -62575,6 +62735,11 @@
               "t": "GeoPDF: okvir karte georeferenciran{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF preskočen: uglovi karte nisu mogli da se smeste na globus.",
@@ -63944,16 +64109,16 @@
           }
         },
         "sv": {
-          "file": "b65f1f431fbc",
+          "file": "2e4732b37cce",
           "counts": {
             "esri": 75,
             "esri-check": 0,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 340,
+            "machine": 341,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -64635,6 +64800,11 @@
               "t": "GeoPDF: kartramen georefererad{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid}) )",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF hoppades över: kartans hörn kunde inte placeras på jordklotet.",
@@ -66004,16 +66174,16 @@
           }
         },
         "th": {
-          "file": "750f100cd483",
+          "file": "cb93d9ee3425",
           "counts": {
             "esri": 77,
             "esri-check": 3,
             "community": 0,
             "manual": 68,
             "existing": 0,
-            "machine": 336,
+            "machine": 337,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -66685,6 +66855,11 @@
               "t": "GeoPDF: อ้างอิงพิกัดกรอบแผนที่แล้ว{wkid}",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "ข้าม GeoPDF: ไม่สามารถวางมุมของแผนที่บนลูกโลกได้",
@@ -68039,16 +68214,16 @@
           }
         },
         "tr": {
-          "file": "a679d124f7e8",
+          "file": "9c9685db904c",
           "counts": {
             "esri": 74,
             "esri-check": 3,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -68730,6 +68905,11 @@
               "t": "GeoPDF: harita çerçevesi coğrafi olarak referanslandı{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF atlandı: harita köşeleri küre üzerine yerleştirilemedi.",
@@ -70089,16 +70269,16 @@
           }
         },
         "zh-cn": {
-          "file": "b5878b6c0bfe",
+          "file": "b097ce62dcee",
           "counts": {
             "esri": 73,
             "esri-check": 4,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 338,
+            "machine": 339,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -70780,6 +70960,11 @@
               "t": "GeoPDF：地图框已完成地理配准{wkid}。",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID语: {wkid}(中文(简体) ).",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "已跳过 GeoPDF：无法将地图角点定位到地球上。",
@@ -72139,16 +72324,16 @@
           }
         },
         "uk": {
-          "file": "20e64750e33b",
+          "file": "4b86bf913628",
           "counts": {
             "esri": 79,
             "esri-check": 0,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 335,
+            "machine": 336,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -72825,6 +73010,11 @@
               "t": "GeoPDF: фрейм карти прив'язано{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid}й",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "GeoPDF пропущено: кути карти не вдалося розмістити на глобусі.",
@@ -74179,16 +74369,16 @@
           }
         },
         "vi": {
-          "file": "950a94a0c16e",
+          "file": "cc8af579c6d3",
           "counts": {
             "esri": 77,
             "esri-check": 2,
             "community": 0,
             "manual": 70,
             "existing": 0,
-            "machine": 335,
+            "machine": 336,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -74865,6 +75055,11 @@
               "t": "GeoPDF: khung bản đồ đã được tham chiếu địa lý{wkid}.",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "Đã bỏ qua GeoPDF: không thể đặt các góc bản đồ lên quả địa cầu.",
@@ -76219,16 +76414,16 @@
           }
         },
         "zh-hk": {
-          "file": "5282c417d3f4",
+          "file": "62fcc50f6954",
           "counts": {
             "esri": 78,
             "esri-check": 0,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -76905,6 +77100,11 @@
               "t": "GeoPDF：地圖框已完成地理對位{wkid}。",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "已略過 GeoPDF：無法將地圖角點定位到地球上。",
@@ -78264,16 +78464,16 @@
           }
         },
         "zh-tw": {
-          "file": "5282c417d3f4",
+          "file": "62fcc50f6954",
           "counts": {
             "esri": 78,
             "esri-check": 0,
             "community": 0,
             "manual": 69,
             "existing": 0,
-            "machine": 337,
+            "machine": 338,
             "stale": 0,
-            "missing": 1
+            "missing": 0
           },
           "entries": {
             "_widgetLabel": {
@@ -78950,6 +79150,11 @@
               "t": "GeoPDF：地圖框已完成地理對位{wkid}。",
               "src": "manual",
               "h": "5018e39a0218"
+            },
+            "progGeoPdfWkid": {
+              "t": "(WKID) {wkid})",
+              "src": "machine",
+              "h": "fe17d3dd9486"
             },
             "progGeoPdfSkipped": {
               "t": "已略過 GeoPDF：無法將地圖角點定位到地球上。",
