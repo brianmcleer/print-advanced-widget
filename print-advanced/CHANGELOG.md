@@ -2,6 +2,11 @@
 
 Newest first. Every release bumps `manifest.json` and `package.json` together.
 
+## 1.17.0 (2026-11-23)
+
+- Changed: the legend model used to build the printed legend now comes from a headless Maps SDK `arcgis-legend` component instead of the `Legend` widget class. Reason: Esri deprecated the widgets in the ArcGIS Maps SDK for JavaScript at version 5.0 and plans to remove them as early as Q1 2027, so anything built on them stops working on an Experience Builder release that ships without them. See [Deprecation: Widgets in ArcGIS Maps SDK for JavaScript](https://support.esri.com/en-us/knowledge-base/deprecation-widgets-in-arcgis-maps-sdk-for-javascript-000040437).
+- No change to the printed legend. The fallbacks (a Legend widget on the page, then the renderer walk) are unchanged.
+
 ## 1.16.0 (2026-10-15)
 
 ### Changed

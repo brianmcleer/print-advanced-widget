@@ -20,6 +20,8 @@ import Extent from 'esri/geometry/Extent'
 import { metersPerMapUnit, extentFitScale, resolvePrintedScale, printExtent, PrintScaleMode } from './scaleMath'
 import * as reactiveUtils from 'esri/core/reactiveUtils'
 import { loadArcGISJSAPIModules } from 'jimu-arcgis'
+// Registers <arcgis-legend> through Experience Builder's shared bundle (nothing is bundled here).
+import 'arcgis-map-components'
 import * as symbolUtils from 'esri/symbols/support/symbolUtils'
 import { jsPDF } from 'jspdf'
 import {
@@ -3155,11 +3157,13 @@ export function findLegendDom(widgetId?: string): Element | null {
     } catch (e) { return null }
 }
 
-/** Build legend rows from the JSAPI Legend widget's own model
- *  (activeLayerInfos), so the printed legend mirrors exactly what the
- *  Legend widget shows: layer visibility, legendEnabled, scale ranges,
- *  group layers, map-service sublayers, and every renderer type the API
- *  supports. Falls back to a renderer walk when the module is missing. */
+/** Build legend rows from the SDK legend's own model (activeLayerInfos),
+ *  so the printed legend mirrors exactly what the Legend shows: layer
+ *  visibility, legendEnabled, scale ranges, group layers, map-service
+ *  sublayers, and every renderer type the API supports. The model comes
+ *  from a headless <arcgis-legend> component (the Legend widget class was
+ *  deprecated in SDK 5.0). Falls back to a renderer walk when the
+ *  component is not available. */
 /* ------------------------------------------------------------------ */
 /* legend: scale-dependent filtering                                    */
 /* ------------------------------------------------------------------ */
@@ -3696,13 +3700,37 @@ function sublayerRestTarget(ali: any): { url: string, id: number } | null {
     return { url, id }
 }
 
+/** Wait for the <arcgis-legend> custom element to be registered. Rejects
+ *  after `ms` so a missing component falls through to the renderer walk. */
+function legendComponentDefined(ms: number = 15000): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => { reject(new Error('arcgis-legend is not registered')) }, ms)
+        customElements.whenDefined('arcgis-legend').then(
+            () => { clearTimeout(timer); resolve() },
+            (e) => { clearTimeout(timer); reject(e) }
+        )
+    })
+}
+
 async function buildRowsFromLegendModel(view: MapView): Promise<LegendRow[]> {
-    const [LegendCls] = await loadArcGISJSAPIModules(['esri/widgets/Legend'])
+    await legendComponentDefined()
     const holder = document.createElement('div')
     holder.style.cssText = 'position:absolute;left:-10000px;top:0;width:300px;height:10px;overflow:hidden;'
     document.body.appendChild(holder)
-    const legend: any = new LegendCls({ view, container: holder })
+    // Headless <arcgis-legend>: it exposes the same activeLayerInfos model
+    // the Legend widget class did. The view is set before the element is
+    // attached so the component never looks for a parent <arcgis-map>.
+    const legend: any = document.createElement('arcgis-legend')
+    legend.view = view
+    holder.appendChild(legend)
     try {
+        // the component loads lazily; its model is not readable until ready
+        if (typeof legend.componentOnReady === 'function') {
+            await Promise.race([
+                Promise.resolve(legend.componentOnReady()).catch((): void => undefined),
+                new Promise(r => setTimeout(r, 8000))
+            ])
+        }
         // Wait for the legend model to settle: activeLayerInfos populated and
         // each info past its loading state (children included).
         const deadline = Date.now() + 8000
@@ -3801,7 +3829,8 @@ async function buildRowsFromLegendModel(view: MapView): Promise<LegendRow[]> {
         for (const ali of top) await walk(ali, 0)
         return rows
     } finally {
-        try { legend.destroy() } catch (e) { /* noop */ }
+        // destroy() returns a promise on the component
+        try { Promise.resolve(legend.destroy && legend.destroy()).catch((): void => undefined) } catch (e) { /* noop */ }
         try { holder.remove() } catch (e) { /* noop */ }
     }
 }
@@ -3829,7 +3858,7 @@ async function infoToRow(info: any, depth: number): Promise<LegendRow> {
     return { kind: 'item', label: (info && info.label) ? String(info.label) : '', dataUrl, indent: depth }
 }
 
-/** Fallback: manual renderer walk (no JSAPI Legend module available). */
+/** Fallback: manual renderer walk (no SDK legend component available). */
 async function buildRowsFromRenderers(view: MapView, maxItems: number): Promise<LegendRow[]> {
     const rows: LegendRow[] = []
     let count = 0
